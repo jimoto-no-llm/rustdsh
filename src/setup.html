@@ -201,6 +201,14 @@ details[open] > summary::before { transform: rotate(90deg); }
         <div class="field"><input type="password" id="other-key" autocomplete="off" spellcheck="false" placeholder="API key"><button id="save-other-key" onclick="setupAction(saveOther)">保存</button></div>
         <p class="hint" id="other-keys-hint" hidden></p>
       </details>
+      <details id="detected-box" hidden>
+        <summary id="detected-summary">この PC で見つかったもの</summary>
+        <h3 class="small" id="detected-known-head">dsh がそのまま使えます</h3>
+        <div class="list" id="detected-known"></div>
+        <h3 class="small" id="detected-route-head">rdsh で登録できます</h3>
+        <div class="list" id="detected-routes"></div>
+        <p class="hint" id="detected-hint"></p>
+      </details>
       <details id="detail-box">
         <summary id="detail-summary">くわしい情報（上級者向け）</summary>
         <h3 class="small" id="h0">dsh が使うモデル</h3>
@@ -386,6 +394,71 @@ function statusLabel(value) {
 var PROVIDER_NAMES = {"openai-codex": "ChatGPT (OpenAI)", anthropic: "Claude (Anthropic)", "github-copilot": "GitHub Copilot", google: "Gemini (Google)"};
 function providerName(id) { return PROVIDER_NAMES[id] || id; }
 
+// 検出結果はどれも読み取りだけの情報。ここでは並べるだけで、書き込みは
+// ターミナルの rdsh provider import に任せる（この画面からの経路追加は
+// cordis.patch.yml を触るため、範囲を広げない）。
+var KEY_STATE_LABELS = {"env": "環境変数", "elsewhere": "他ツール", "not-needed": "キー不要", "missing": "キー未検出"};
+function renderDetected() {
+  var box = $("detected-box");
+  if (!box || !STATUS) return;
+  var detected = STATUS.detected || {};
+  var known = detected.dshKnown || [];
+  var routes = detected.routes || [];
+  if (!known.length && !routes.length) { box.hidden = true; return; }
+  box.hidden = false;
+  var total = known.length + routes.length;
+  $("detected-summary").textContent = t("この PC で見つかったもの（" + total + " 件）", "Found on this PC (" + total + ")", "本机检测到（" + total + " 项）");
+  var knownList = $("detected-known");
+  knownList.replaceChildren();
+  known.forEach(function (item) {
+    var row = document.createElement("div");
+    row.className = "row";
+    var name = document.createElement("span");
+    name.textContent = providerName(item.provider);
+    var badge = document.createElement("span");
+    badge.className = "badge ok";
+    badge.textContent = t("登録不要", "no route needed", "无需注册");
+    var where = document.createElement("small");
+    where.textContent = item.evidence;
+    row.appendChild(name);
+    row.appendChild(badge);
+    row.appendChild(where);
+    knownList.appendChild(row);
+  });
+  $("detected-known-head").hidden = !known.length;
+  var routeList = $("detected-routes");
+  routeList.replaceChildren();
+  routes.forEach(function (item) {
+    var row = document.createElement("div");
+    row.className = "row";
+    var name = document.createElement("span");
+    name.textContent = item.route;
+    var badge = document.createElement("span");
+    badge.className = item.registered || item.writable ? "badge ok" : "badge";
+    badge.textContent = item.registered
+      ? t("登録済み", "registered", "已注册")
+      : KEY_STATE_LABELS[item.key] || item.key;
+    var detail = document.createElement("small");
+    var parts = [];
+    if (item.baseURL) parts.push(item.baseURL);
+    if (item.models && item.models.length) parts.push(item.models.length + " models");
+    if (item.note) parts.push(item.note);
+    detail.textContent = parts.join(" ・ ");
+    row.appendChild(name);
+    row.appendChild(badge);
+    row.appendChild(detail);
+    routeList.appendChild(row);
+  });
+  $("detected-route-head").hidden = !routes.length;
+  var writable = routes.filter(function (item) { return item.writable && !item.registered; }).length;
+  $("detected-hint").textContent = writable
+    ? t("書き込める経路は " + writable + " 件です。ターミナルで rdsh provider import を実行すると登録できます。",
+        writable + " route(s) can be written; run rdsh provider import in a terminal.",
+        "可写入的路由有 " + writable + " 条。请在终端运行 rdsh provider import。")
+    : t("いま書き込める経路はありません。キーを保存すると登録できます。",
+        "No route can be written yet. Store a key first.",
+        "当前没有可写入的路由。请先保存密钥。");
+}
 async function load() {
   var response = await fetch("/api/status", {headers: {"X-RDSH-Token": setupToken}});
   if (!response.ok) { go("token"); return; }
@@ -393,6 +466,7 @@ async function load() {
   renderOptions();
   renderDetails();
   renderKeyNames();
+  renderDetected();
   var connected = !STATUS.needed;
   $("okbar").hidden = !connected;
   $("okbar").textContent = "✓ " + t("AIとつながりました。「次へ」で最初の会話へ進めます。", "Connected. Press Next to start your first conversation.", "已连接。点击“下一步”开始第一次对话。");

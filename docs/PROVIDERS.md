@@ -14,6 +14,8 @@ rdsh provider add hai [options]
 rdsh provider add commandcode [options]
 rdsh provider add sarashina [options]
 rdsh provider add ollama [options]
+rdsh provider detect [--json]
+rdsh provider import [options]
 rdsh provider add local-openai --base-url <url> [options]
 ```
 
@@ -265,6 +267,50 @@ retention (`x-cmd-zdr: 1` on `/chat/completions`, answered with `422`
 written by this preset; `headers` injection is tracked separately in #484.
 On `/messages` the header is accepted but does not change routing.
 
+## Detection and import (`detect`, `import`)
+
+```sh
+rdsh provider detect [--json]
+rdsh provider import [--profile web] [--only <route>] [--no-discover] [--json] [--dry-run]
+```
+
+`detect` reads the machine and reports two buckets. It writes nothing.
+
+- **dsh can use these as-is** — the provider is in dsh's own catalog, so a
+  route would only duplicate what dsh already resolves. The evidence is an
+  environment variable (`env:OPENAI_API_KEY`), a key dsh stored under that
+  name (`dsh:credentials(DEEPSEEK_API_KEY)`), or another tool's config file
+  that mentions a key (`file:~/.codex/auth.json`).
+- **rdsh can register these routes** — presets whose key is on this machine, a
+  local server that is listening (11434 Ollama, 8080 llama.cpp, 8000 vLLM, 1234
+  LM Studio), and custom providers declared in OpenCode's `provider.<id>`
+  block.
+
+`import` then writes the second bucket, reading model ids from `GET /models`
+unless the OpenCode entry already named them. A candidate whose key is missing
+is reported as unregistered and left alone; it never stores a guess.
+
+`rdsh setup` runs the same scan and registers what it finds: every route that is
+writable is written for the default profile without asking, so a fresh install already has
+the local server it can see. Existing routes are left untouched, nothing is registered for a
+route whose key is missing, and `rdsh setup --no-auto-import` (or `--dry-run`) turns the
+automatic part off. `rdsh setup --web` does the same before it opens the page, and the page
+shows each route as registered.
+
+Key values are never printed, and keys belonging to other tools are never
+copied: the report only says where one was found. Store a key explicitly with
+`rdsh provider add <preset> --key-stdin` when you want rdsh to keep it.
+
+```sh
+rdsh provider detect                 # what this machine can reach
+rdsh provider import --dry-run       # what would be written
+rdsh provider import --only ollama   # just one route
+```
+
+`import` follows the same rules as `add`: an existing route is left
+untouched (use `add --replace`), and an entry that cannot be placed safely is
+refused instead of guessed.
+
 ## Ollama
 
 ```sh
@@ -277,6 +323,11 @@ authenticates nobody, so the route is registered with the `ollama` id, the
 fixed base URL and the `no-key` placeholder under `OLLAMA_API_KEY`. No key
 input is needed; `--no-key` stays accepted for symmetry with `local-openai`.
 Pass `--base-url` to reach an Ollama on another host.
+
+Ollama Cloud (`rdsh provider add ollama-cloud`) serves the hosted catalog on
+`https://ollama.com/v1` and wants a real key. It keeps its key under
+`OLLAMA_CLOUD_API_KEY`, apart from the local route, so the local placeholder
+never stands in for a cloud key.
 
 The preset declares `gpt-oss:20b` (131,072 context, 32,768 output) and the
 three thinking levels that model publishes. Ids that come from `--model` or

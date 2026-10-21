@@ -2316,12 +2316,24 @@ fn print_guide(locale: crate::locale::Locale) {
 /// First-run wizard: sync selected credentials, offer individual key saves, optionally run
 /// the provider login flow or reveal settings dirs, otherwise print the
 /// exact next step. Safe non-interactive: prompts only fire on a TTY.
+/// 既定プロファイル名（settings の general.default_profile）。読めなければ web。
+fn default_profile_name() -> String {
+    let configured = crate::rdsh_config::load().general.default_profile;
+    match configured.trim().is_empty() {
+        true => "web".to_string(),
+        false => configured.trim().to_string(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)] // setup の入力は CLI フラグをそのまま並べる
 pub fn cmd_setup(
     open: bool,
     login: bool,
     json: bool,
     yes: bool,
     dry: bool,
+    profile: &str,
+    auto_import: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     if !dry {
@@ -2382,6 +2394,24 @@ pub fn cmd_setup(
     if open && !dry {
         open_settings_dirs(json, locale);
     }
+    // 検出した経路は、鍵が揃っているものだけを黙って登録する（既にある経路は触らない）。
+    let mut registered: Vec<String> = crate::provider_detect::registered_routes(profile, locale);
+    if !dry && auto_import {
+        let auto_added = crate::provider_detect::auto_import(profile, profile, locale);
+        registered = crate::provider_detect::registered_routes(profile, locale);
+        if !auto_added.is_empty() {
+            let joined = auto_added.join(", ");
+            println!(
+                "{}",
+                localized_format!(
+                    locale,
+                    "[rdsh setup] added detected routes: {joined}",
+                    "[rdsh setup] 已添加检测到的路由：{joined}",
+                    "[rdsh setup] 検出した経路を追加しました: {joined}",
+                )
+            );
+        }
+    }
     let needed = setup_needed();
     if json {
         let mut status: serde_json::Value = serde_json::from_str(&setup_status_json())?;
@@ -2393,9 +2423,11 @@ pub fn cmd_setup(
     }
     if !needed {
         println!("{}", localized_format!(locale, "[rdsh setup] credentials present; authentication not verified (see rdsh auth / rdsh doctor)", "[rdsh setup] 凭据已存在；身份验证尚未确认（参见 rdsh auth / rdsh doctor）", "[rdsh setup] 認証情報は存在します。認証の成功は未確認です（rdsh auth / rdsh doctorを参照）"));
+        crate::provider_detect::print_setup_block(locale, &registered);
         return Ok(());
     }
     print_guide(locale);
+    crate::provider_detect::print_setup_block(locale, &registered);
     Ok(())
 }
 
@@ -2451,6 +2483,7 @@ pub fn setup_status_json() -> String {
         "opencode_config": opencode_config_path(),
         "defaults": defaults,
         "declared_key_envs": declared_api_key_envs(),
+        "detected": crate::provider_detect::detected_json(&default_profile_name()),
     })
     .to_string()
 }

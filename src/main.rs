@@ -81,6 +81,7 @@ mod models;
 mod opencode_header;
 mod passthrough;
 mod plugins;
+mod provider_detect;
 mod providers;
 mod question_contracts;
 mod rdsh_config;
@@ -113,7 +114,9 @@ mod worker_scopes;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh plugins status             what a profile still misses (essential tier, read-only)\n  rdsh plugins install --profile web   attach the essential plugins after an upgrade\n  rdsh --passthrough tui          no slim env; only rdsh_inspect stays isolated\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
+  rdsh provider detect            credentials and local servers on this machine
+  rdsh provider import --dry-run  what detection would write into the profile\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh plugins status             what a profile still misses (essential tier, read-only)\n  rdsh plugins install --profile web   attach the essential plugins after an upgrade\n  rdsh --passthrough tui          no slim env; only rdsh_inspect stays isolated\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -145,6 +148,24 @@ struct Cli {
 enum ProviderAction {
     /// Built-in presets and, per profile, whether each route and its key exist
     List {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Detect provider credentials and local servers on this machine
+    Detect {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Register the routes detection found, reading models from GET /models
+    Import {
+        #[arg(long = "profile")]
+        profile: Option<String>,
+        /// Only these route ids or presets (repeatable)
+        #[arg(long = "only")]
+        only: Vec<String>,
+        /// Do not read model ids from the endpoint
+        #[arg(long = "no-discover")]
+        no_discover: bool,
         #[arg(long = "json")]
         json: bool,
     },
@@ -364,6 +385,9 @@ enum Commands {
         /// Local port for --web (0 = random, default: settings setup.web_port).
         #[arg(long = "port")]
         port: Option<u16>,
+        /// Do not register the routes detection finds (dry-run does it too)
+        #[arg(long = "no-auto-import")]
+        no_auto_import: bool,
     },
     Bench {
         /// Iterations (default: settings bench.n).
@@ -1724,6 +1748,23 @@ fn main() {
         Some(Commands::Auth(args)) => auth::cmd_auth(args, dry, locale),
         Some(Commands::Provider { action }) => match action {
             ProviderAction::List { json } => providers::cmd_list(json, locale),
+            ProviderAction::Detect { json } => provider_detect::cmd_detect(json, locale),
+            ProviderAction::Import {
+                profile,
+                only,
+                no_discover,
+                json,
+            } => provider_detect::cmd_import(
+                provider_detect::ImportArgs {
+                    profile: profile.or(cli.profile),
+                    only,
+                    discover: !no_discover,
+                    dry_run: cli.dry_run,
+                    json,
+                },
+                &cfg.general.default_profile,
+                locale,
+            ),
             ProviderAction::Add {
                 preset,
                 profile,
@@ -1752,6 +1793,7 @@ fn main() {
                     no_key,
                     effort,
                     replace,
+                    quiet: false,
                     // The global flag only: general.dry_run in settings is
                     // about delegated launches, not about file edits.
                     dry_run: cli.dry_run,
@@ -1768,10 +1810,18 @@ fn main() {
             yes,
             web,
             port,
+            no_auto_import,
         }) => {
+            let setup_profile = profile_or_default(None, &cfg.general.default_profile, locale)
+                .unwrap_or_else(|_| "web".to_string());
             if web && !dry {
                 if rdsh_config::feature_enabled(&cfg, "setup_web") {
-                    setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port), locale)
+                    setup_web::cmd_setup_web(
+                        port.unwrap_or(cfg.setup.web_port),
+                        &setup_profile,
+                        !no_auto_import,
+                        locale,
+                    )
                 } else {
                     Err(anyhow::anyhow!(match locale {
                         locale::Locale::English => {
@@ -1786,7 +1836,16 @@ fn main() {
                     }))
                 }
             } else {
-                auth::cmd_setup(open, login, json, yes, dry, locale)
+                auth::cmd_setup(
+                    open,
+                    login,
+                    json,
+                    yes,
+                    dry,
+                    &setup_profile,
+                    !no_auto_import,
+                    locale,
+                )
             }
         }
         Some(Commands::DumpConfig { profile, native }) => profile_or_default(
@@ -2364,6 +2423,14 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "将提供方路由添加到配置文件",
             "プロファイルへプロバイダー経路を追加",
         ),
+        "detect" => (
+            "检测本机的提供方凭据与本地服务器",
+            "手元のプロバイダー資格情報とローカルサーバーを検出",
+        ),
+        "import" => (
+            "把检测到的路由写入配置文件并取得模型",
+            "検出した経路を設定へ書き込み、モデルを取得",
+        ),
         "serial-proxy" => (
             "启动限制并发和速率的本地反向代理",
             "同時実行数と速度を制限するローカル逆プロキシを起動",
@@ -2622,6 +2689,18 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "no_key" => (
             "无需密钥的 local-openai 服务",
             "キー不要のlocal-openaiサーバー",
+        ),
+        "only" => (
+            "仅处理这些路由 id 或预设（可重复）",
+            "これらの経路idまたはプリセットだけを対象にする（繰り返し可）",
+        ),
+        "no_discover" => (
+            "不从端点读取模型清单",
+            "エンドポイントからモデル一覧を取得しない",
+        ),
+        "no_auto_import" => (
+            "不自动注册检测到的路由",
+            "検出した経路を自動で登録しない",
         ),
         "effort" => (
             "路由内所有模型的推理强度（如 low,medium,high，或 none）",

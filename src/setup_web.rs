@@ -9,7 +9,12 @@ use std::sync::Arc;
 const HTML: &str = include_str!("setup.html");
 const ICON: &str = include_str!("../assets/icon.svg");
 
-pub fn cmd_setup_web(port: u16, locale: crate::locale::Locale) -> anyhow::Result<()> {
+pub fn cmd_setup_web(
+    port: u16,
+    profile: &str,
+    auto_import: bool,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}")).map_err(|e| {
         anyhow::anyhow!(
             "{} 127.0.0.1:{port}: {e}",
@@ -23,6 +28,21 @@ pub fn cmd_setup_web(port: u16, locale: crate::locale::Locale) -> anyhow::Result
     listener.set_nonblocking(true)?;
     crate::shutdown::install(locale)?;
     let port = listener.local_addr()?.port();
+    // 画面を開く前に、鍵の揃った検出経路を一度だけ登録する（既にある経路は触らない）。
+    if auto_import {
+        let added = crate::provider_detect::auto_import(profile, profile, locale);
+        if !added.is_empty() {
+            eprintln!(
+                "[rdsh setup] {}: {}",
+                match locale {
+                    crate::locale::Locale::English => "added detected routes",
+                    crate::locale::Locale::Chinese => "已添加检测到的路由",
+                    crate::locale::Locale::Japanese => "検出した経路を追加しました",
+                },
+                added.join(", ")
+            );
+        }
+    }
     let token = Arc::new(crate::local_http::random_token()?);
     let handoff = crate::token_handoff::TokenHandoff::create(&token, locale)?;
     let base = format!("http://127.0.0.1:{port}/");

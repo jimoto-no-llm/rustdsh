@@ -38,6 +38,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `rdsh setup` と `rdsh setup --web` が、検出した経路のうち鍵が揃っているものを
+  自動で設定へ登録するようにしました。既にある経路は変更せず、鍵が無い経路は登録しません。
+  `--no-auto-import`（または `--dry-run`）で自動登録を止められます。
+  `setup --web` の画面では登録済みの経路に「登録済み」を表示します。
+- `rdsh provider detect` を追加しました。環境変数、dsh の保存済みキー、OpenCode の
+  独自プロバイダー、待ち受け中のローカルサーバーから、使えるプロバイダーを検出します。
+  dsh 本体がカタログで解決できるものと、rdsh で経路が必要なものを分けて表示し、
+  キーの値は表示しません。
+- `rdsh provider import` を追加しました。検出した経路のうち、鍵が揃っていて
+  書き込めるものだけを `cordis.patch.yml` へ登録し、モデルは `GET /models` から取得します。
+  鍵が見つからない経路は未登録として表示し、推測した値は保存しません。
+- `ollama-cloud` プリセットを追加しました（`https://ollama.com/v1`、キーは
+  `OLLAMA_CLOUD_API_KEY`）。ローカルOllamaのダミーキーと混ざりません。
 - `rdsh provider add ollama` を追加しました。ローカルのOllamaへはキー入力なしで接続でき、
   接続先は `http://127.0.0.1:11434/v1` 固定です（別ホストは `--base-url`）。
 - `rdsh provider add --effort` で、経路内の全モデルの推論強度（reasoningEfforts）を
