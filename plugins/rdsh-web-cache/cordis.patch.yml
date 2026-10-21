@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-web-cache
+      name: "rdsh-web-cache"
+      config: {}
