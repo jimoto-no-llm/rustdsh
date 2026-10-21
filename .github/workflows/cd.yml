@@ -22,7 +22,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Require an annotated version tag, main ancestry, and successful CI
@@ -87,9 +87,10 @@ jobs:
             pkg: rdsh-windows-x64.zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
       - if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
@@ -107,7 +108,7 @@ jobs:
         shell: pwsh
         run: (Get-FileHash -Algorithm SHA256 ${{ matrix.pkg }}).Hash.ToLower() | Out-File -NoNewline -Encoding ascii ${{ matrix.pkg }}.sha256
       # Stage builds without creating or modifying a GitHub release.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-${{ matrix.target }}
           path: |
@@ -124,8 +125,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Pinned together with nfpm: nfpm v2.48.0 declares go 1.26.4.
           go-version: '1.26.9'
@@ -139,7 +140,9 @@ jobs:
           set -euo pipefail
           nfpm --version
           go version -m "$(command -v nfpm)" | grep 'github.com/goreleaser/nfpm'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
       - run: cargo build --locked --release --target x86_64-unknown-linux-gnu
       - name: Build the .deb and .rpm
         env:
@@ -160,7 +163,7 @@ jobs:
           cd dist
           for file in *.deb *.rpm; do sha256sum "$file" > "$file.sha256"; done
           ls -l .
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-packages
           path: dist/*
@@ -173,8 +176,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: release-*
           merge-multiple: true
@@ -221,7 +224,10 @@ jobs:
           if [[ "$RELEASE_TAG" == *-* ]]; then
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --prerelease --latest=false
           else
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --prerelease=false --latest
+            # Not --latest yet: the installer and updater resolve a version from the
+            # digest ledgers on main, so until the pin PR merges, marking this release latest would make releases/latest disagree with what the documented
+            # command installs. mark-release-latest flips it once the ledgers land.
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --prerelease=false --latest=false
           fi
 
   # Publish the crate only after the GitHub release is up, so a tag that never
@@ -231,8 +237,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
       - name: Publish rdsh to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
