@@ -653,7 +653,7 @@ fn apply_privacy_default(cmd: &mut std::process::Command) {
     }
 }
 
-fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
+fn apply_slim(cmd: &mut std::process::Command, slim: bool, locale: crate::locale::Locale) {
     if !slim {
         return;
     }
@@ -676,6 +676,10 @@ fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
         crate::slim::resolve_node_compile_cache(hint.as_deref(), existing.as_deref(), &default_dir)
     {
         let _ = std::fs::create_dir_all(&dir);
+        // 育ちすぎたキャッシュは起動を逆に遅くする。消さずに一度だけ知らせる。
+        if let Some(advice) = crate::slim::compile_cache_advice(&dir, locale) {
+            eprintln!("[rdsh slim] {advice}");
+        }
         cmd.env("NODE_COMPILE_CACHE", dir);
     }
 }
@@ -753,7 +757,7 @@ pub fn exec_boot(
         cmd.arg("--patch").arg(p);
     }
     cmd.args(app_args);
-    apply_slim(&mut cmd, slim);
+    apply_slim(&mut cmd, slim, locale);
     apply_web_assets(&mut cmd, &orig, profile);
     if slim {
         eprintln!(
@@ -809,7 +813,7 @@ pub fn exec_dump_config(
         crate::dsh_args::DumpKind::DefaultConfig => cmd.arg("--dump-default-config"),
         crate::dsh_args::DumpKind::Schema => cmd.arg("--dump-config-schema"),
     };
-    apply_slim(&mut cmd, slim);
+    apply_slim(&mut cmd, slim, locale);
     exec_or_spawn(cmd, dry, locale)
 }
 
@@ -828,7 +832,7 @@ pub fn exec_raw(args: &[String], dry: bool, slim: bool) -> anyhow::Result<()> {
         crate::auth::pre_boot(true, crate::locale::Locale::English);
     }
     cmd.args(args);
-    apply_slim(&mut cmd, slim);
+    apply_slim(&mut cmd, slim, crate::locale::Locale::English);
     // The shadowed-dsh path (`dsh --profile web`) is how the web profile is
     // actually started, so the web optimizations must apply here too, not only
     // on the `rdsh boot` subcommand.
@@ -854,7 +858,7 @@ pub fn exec_plugin(
     }
     cmd.arg("plugin").arg("--profile").arg(profile);
     cmd.args(pnpm_args);
-    apply_slim(&mut cmd, slim);
+    apply_slim(&mut cmd, slim, locale);
     exec_or_spawn(cmd, dry, locale)
 }
 
