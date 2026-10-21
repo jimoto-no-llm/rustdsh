@@ -177,6 +177,9 @@ enum ProviderAction {
         /// Server needs no key: store a placeholder (local-openai only)
         #[arg(long = "no-key")]
         no_key: bool,
+        /// Reasoning levels for every model of the route, e.g. low,medium,high (or none)
+        #[arg(long = "effort")]
+        effort: Option<String>,
         /// Rewrite the route block when it already exists
         #[arg(long = "replace")]
         replace: bool,
@@ -1732,6 +1735,7 @@ fn main() {
                 name,
                 key_stdin,
                 no_key,
+                effort,
                 replace,
                 json,
             } => providers::cmd_add(
@@ -1746,6 +1750,7 @@ fn main() {
                     name,
                     key_stdin,
                     no_key,
+                    effort,
                     replace,
                     // The global flag only: general.dry_run in settings is
                     // about delegated launches, not about file edits.
@@ -2593,8 +2598,8 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "key_ref" => ("凭据引用名称", "認証情報参照名"),
         "open" => ("打开设置目录", "設定ディレクトリを開く"),
         "preset" => (
-            "提供方预设：hai、sarashina、local-openai",
-            "プロバイダープリセット: hai、sarashina、local-openai",
+            "提供方预设：hai、sarashina、local-openai、ollama",
+            "プロバイダープリセット: hai、sarashina、local-openai、ollama",
         ),
         "model" => (
             "要声明的模型标识（可重复）",
@@ -2617,6 +2622,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "no_key" => (
             "无需密钥的 local-openai 服务",
             "キー不要のlocal-openaiサーバー",
+        ),
+        "effort" => (
+            "路由内所有模型的推理强度（如 low,medium,high，或 none）",
+            "経路内の全モデルの推論強度（例: low,medium,high、または none）",
         ),
         "replace" => ("重写现有路由区块", "既存の経路ブロックを置き換え"),
         "select" => (

@@ -53,6 +53,8 @@ struct PresetModel {
     name: &'static str,
     context_window: u64,
     max_tokens: u64,
+    /// `reasoningEfforts` levels this model publishes, as (label, value).
+    reasoning_efforts: &'static [(&'static str, &'static str)],
 }
 
 struct Preset {
@@ -69,6 +71,10 @@ struct Preset {
     max_tokens_cap: Option<u64>,
     /// `false` when the endpoint has no `GET /models`.
     supports_discovery: bool,
+    /// Levels applied to every model of the route that names none.
+    reasoning_efforts: &'static [(&'static str, &'static str)],
+    /// `false` for a server that authenticates nobody (a local runtime).
+    needs_key: bool,
 }
 
 const PRESETS: &[Preset] = &[
@@ -80,6 +86,8 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
+        reasoning_efforts: &[],
+        needs_key: true,
     },
     Preset {
         id: "local-openai",
@@ -89,6 +97,8 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
+        reasoning_efforts: &[],
+        needs_key: true,
     },
     // Chat Completions rejects fields it does not document (`store`,
     // `stream_options`) and a `max_completion_tokens` above 8000; the compat
@@ -103,17 +113,21 @@ const PRESETS: &[Preset] = &[
                 name: "Sarashina3 mini",
                 context_window: 128000,
                 max_tokens: 8000,
+                reasoning_efforts: &[],
             },
             PresetModel {
                 id: "sarashina3-nano",
                 name: "Sarashina3 nano",
                 context_window: 128000,
                 max_tokens: 8000,
+                reasoning_efforts: &[],
             },
         ],
         compat: &["supportsStore: false", "supportsUsageInStreaming: false"],
         max_tokens_cap: Some(8000),
         supports_discovery: false,
+        reasoning_efforts: &[],
+        needs_key: true,
     },
     // Command Code's Provider API is OpenAI-compatible at a fixed base URL, and
     // dsh ships no catalog for it: every model is named here or fetched with
@@ -129,6 +143,29 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
+        reasoning_efforts: &[],
+        needs_key: true,
+    },
+    // Ollama serves an OpenAI-compatible API on a local port and authenticates
+    // nobody, so the route stores the placeholder key. gpt-oss publishes three
+    // named thinking levels; other models fall back to the route default and
+    // can be overridden with --effort.
+    Preset {
+        id: "ollama",
+        display_name: "Ollama",
+        base_url: Some("http://127.0.0.1:11434/v1"),
+        default_models: &[PresetModel {
+            id: "gpt-oss:20b",
+            name: "gpt-oss 20B",
+            context_window: 131072,
+            max_tokens: 32768,
+            reasoning_efforts: &[("low", "low"), ("medium", "medium"), ("high", "high")],
+        }],
+        compat: &[],
+        max_tokens_cap: None,
+        supports_discovery: true,
+        reasoning_efforts: &[("low", "low"), ("medium", "medium"), ("high", "high")],
+        needs_key: false,
     },
 ];
 
@@ -154,6 +191,61 @@ struct Model {
     context_window: Option<u64>,
     max_tokens: Option<u64>,
     input: Vec<String>,
+    /// `reasoningEfforts:` entries; empty writes no block, which leaves the
+    /// model as dsh resolves it (reasoning only when its catalog says so).
+    reasoning_efforts: Vec<ReasoningEffort>,
+}
+
+/// One selectable reasoning level: the label dsh shows and the value it sends.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct ReasoningEffort {
+    label: String,
+    value: String,
+}
+
+impl ReasoningEffort {
+    fn levels(pairs: &[(&str, &str)]) -> Vec<Self> {
+        pairs
+            .iter()
+            .map(|(label, value)| Self {
+                label: (*label).to_string(),
+                value: (*value).to_string(),
+            })
+            .collect()
+    }
+
+    /// `low, medium` for the plain case, `low=minimal` to split label from value.
+    fn parse_list(raw: &str) -> Option<Vec<Self>> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let mut out: Vec<Self> = Vec::new();
+        for part in trimmed.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                return None;
+            }
+            let (label, value) = match part.split_once('=') {
+                Some((label, value)) => (label.trim(), value.trim()),
+                None => (part, part),
+            };
+            if label.is_empty()
+                || value.is_empty()
+                || label.len() > 40
+                || value.len() > 60
+                || label.chars().chain(value.chars()).any(|c| c.is_control())
+                || out.iter().any(|e| e.label == label)
+            {
+                return None;
+            }
+            out.push(Self {
+                label: label.to_string(),
+                value: value.to_string(),
+            });
+        }
+        Some(out)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -176,7 +268,10 @@ fn apply_preset_models(
     locale: crate::locale::Locale,
 ) -> Vec<String> {
     let mut notes = Vec::new();
-    if preset.default_models.is_empty() && preset.max_tokens_cap.is_none() {
+    if preset.default_models.is_empty()
+        && preset.max_tokens_cap.is_none()
+        && preset.reasoning_efforts.is_empty()
+    {
         return notes;
     }
     for model in models.iter_mut() {
@@ -204,6 +299,14 @@ fn apply_preset_models(
         if let Some(cap) = preset.max_tokens_cap {
             model.max_tokens = Some(model.max_tokens.map_or(cap, |m| m.min(cap)));
         }
+        if model.reasoning_efforts.is_empty() {
+            let published = preset
+                .default_models
+                .iter()
+                .find(|d| d.id == model.id)
+                .map_or(preset.reasoning_efforts, |d| d.reasoning_efforts);
+            model.reasoning_efforts = ReasoningEffort::levels(published);
+        }
     }
     notes
 }
@@ -230,6 +333,9 @@ fn merge_models(groups: Vec<Vec<Model>>) -> Vec<Model> {
                 }
                 if have.input.is_empty() {
                     have.input = model.input;
+                }
+                if have.reasoning_efforts.is_empty() {
+                    have.reasoning_efforts = model.reasoning_efforts;
                 }
             }
             None => out.push(model),
@@ -302,10 +408,63 @@ fn render_route(route: &Route, indent: usize, step: usize) -> Vec<String> {
         if !model.input.is_empty() {
             out.push(format!("{item_key}input: [{}]", model.input.join(", ")));
         }
+        if !model.reasoning_efforts.is_empty() {
+            out.push(format!("{item_key}reasoningEfforts:"));
+            for effort in &model.reasoning_efforts {
+                out.push(format!(
+                    "{item_key}  {}: {}",
+                    yaml_scalar(&effort.label),
+                    yaml_scalar(&effort.value)
+                ));
+            }
+        }
     }
     out
 }
 
+/// Model id to the level labels it publishes, for `--json` callers.
+fn efforts_by_model(route: &Route) -> serde_json::Map<String, serde_json::Value> {
+    route
+        .models
+        .iter()
+        .map(|model| {
+            let labels: Vec<&str> = model
+                .reasoning_efforts
+                .iter()
+                .map(|e| e.label.as_str())
+                .collect();
+            (model.id.clone(), serde_json::json!(labels))
+        })
+        .collect()
+}
+
+/// One ``low, medium, high`` line, or per-model lines when they differ.
+fn effort_summary(route: &Route) -> Option<String> {
+    let levels = |model: &Model| {
+        model
+            .reasoning_efforts
+            .iter()
+            .map(|e| e.label.clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let mut unique: Vec<String> = route.models.iter().map(levels).collect();
+    unique.sort();
+    unique.dedup();
+    match unique.as_slice() {
+        [] => None,
+        [only] if only.is_empty() => None,
+        [only] => Some(only.clone()),
+        _ => Some(
+            route
+                .models
+                .iter()
+                .map(|m| format!("{}: {}", m.id, levels(m)))
+                .collect::<Vec<_>>()
+                .join("; "),
+        ),
+    }
+}
 /// The whole entry, for the message shown when the file cannot be edited.
 fn manual_snippet(route: &Route) -> String {
     let mut lines = vec![
@@ -1491,6 +1650,9 @@ fn verify_written(
     let mend = block_end(&lines, models_at);
     let mut item_col = None;
     let mut items = 0;
+    // `reasoningEfforts:` is the one model key whose value is a mapping, so
+    // its children sit one level deeper than the model keys themselves.
+    let mut nested_under = false;
     for line in lines.iter().take(mend).skip(models_at + 1) {
         if skippable(line) {
             continue;
@@ -1505,13 +1667,28 @@ fn verify_written(
                 .to_string());
             }
             items += 1;
-        } else if item_col.is_none_or(|c| col != c + 2) {
+            nested_under = false;
+            continue;
+        }
+        let Some(item) = item_col else {
             return Err(crate::locale::diagnostic(
                 locale,
                 "a model key is not aligned with its `- id`",
             )
             .to_string());
+        };
+        if col == item + 2 {
+            nested_under = key_rest(line, "reasoningEfforts", locale).is_some();
+            continue;
         }
+        if nested_under && col == item + 4 {
+            continue;
+        }
+        return Err(crate::locale::diagnostic(
+            locale,
+            "a model key is not aligned with its `- id`",
+        )
+        .to_string());
     }
     if items != route.models.len() {
         return Err(crate::locale::diagnostic(
@@ -2146,6 +2323,7 @@ fn parse_opencode_provider(
                     .and_then(Value::as_u64)
                     .filter(|n| *n > 0),
                 input,
+                ..Model::default()
             });
         }
     }
@@ -2551,6 +2729,8 @@ pub(crate) struct AddArgs {
     pub name: Option<String>,
     pub key_stdin: bool,
     pub no_key: bool,
+    /// `low,medium,high` / `none` for every model of this route.
+    pub effort: Option<String>,
     pub replace: bool,
     pub dry_run: bool,
     pub json: bool,
@@ -2676,10 +2856,29 @@ pub(crate) fn cmd_add(
     })?;
     // Presets with a fixed endpoint are a fixed route: only local-openai is
     // free-form.
-    if preset.base_url.is_some() && (args.id.is_some() || args.name.is_some() || args.no_key) {
-        bail!("{}", localized_format!(locale, "--id, --name and --no-key are for local-openai; {} has a fixed route and needs a key", "--id、--name 和 --no-key 仅适用于 local-openai；{} 使用固定路由且需要密钥", "--id・--name・--no-key は local-openai 専用です。{} は固定経路でキーが必要です",
-            preset.id
-        ));
+    if preset.base_url.is_some() && (args.id.is_some() || args.name.is_some()) {
+        bail!(
+            "{}",
+            localized_format!(
+                locale,
+                "--id and --name are for local-openai; {} has a fixed route",
+                "--id 和 --name 仅适用于 local-openai；{} 使用固定路由",
+                "--id・--name は local-openai 専用です。{} は固定経路です",
+                preset.id
+            )
+        );
+    }
+    if args.no_key && preset.needs_key && preset.base_url.is_some() {
+        bail!(
+            "{}",
+            localized_format!(
+                locale,
+                "--no-key is for a server that authenticates nobody; {} needs an API key",
+                "--no-key 用于无需认证的服务器；{} 需要 API 密钥",
+                "--no-key は認証のないサーバー向けです。{} はAPIキーが必要です",
+                preset.id
+            )
+        );
     }
     if args.discover && !preset.supports_discovery {
         bail!(
@@ -2732,6 +2931,19 @@ pub(crate) fn cmd_add(
             );
         }
     }
+    let effort_override = match args.effort.as_deref() {
+        // "none" clears the levels, so dsh resolves the model as non-reasoning.
+        Some(raw) if raw.trim().eq_ignore_ascii_case("none") => Some(Vec::new()),
+        Some(raw) => match ReasoningEffort::parse_list(raw) {
+            Some(levels) => Some(levels),
+            None => bail!("{}", localized_format!(locale,
+                "--effort takes a comma list such as low,medium,high (label=value also works), or none",
+                "--effort 需要 low,medium,high 这样的逗号分隔级别（也可 label=value），或 none",
+                "--effort は low,medium,high のようなカンマ区切り（label=value も可）、または none です"
+            )),
+        },
+        None => None,
+    };
     let explicit_base = args
         .base_url
         .as_deref()
@@ -2889,6 +3101,11 @@ pub(crate) fn cmd_add(
         crate::locale::Locale::English,
     ));
     human_notes.extend(apply_preset_models(preset, &mut models, locale));
+    if let Some(levels) = &effort_override {
+        for model in models.iter_mut() {
+            model.reasoning_efforts = levels.clone();
+        }
+    }
     if models.is_empty() && !skip_existing {
         bail!("{}", localized_format!(locale, "no models: pass --model <id>, or use --from-opencode / --discover", "没有模型：请传入 --model <id>，或使用 --from-opencode / --discover", "モデルがありません。--model <id> または --from-opencode / --discover を指定してください"));
     }
@@ -2929,7 +3146,7 @@ pub(crate) fn cmd_add(
         }
     } else if has_ref || env_key.is_some() {
         "present"
-    } else if args.no_key {
+    } else if args.no_key || !preset.needs_key {
         if args.dry_run {
             "would-store-placeholder"
         } else {
@@ -2957,6 +3174,7 @@ pub(crate) fn cmd_add(
                 "apiKeyEnv": route.api_key_env,
                 "key": key_state,
                 "models": model_ids,
+                "reasoningEfforts": efforts_by_model(&route),
                 "notes": notes,
             })
         );
@@ -3010,6 +3228,17 @@ pub(crate) fn cmd_add(
             model_ids.join(", ")
         )
     );
+    if let Some(line) = effort_summary(&route) {
+        println!(
+            "{}",
+            localized_format!(
+                locale,
+                "[rdsh provider] reasoning effort: {line}",
+                "[rdsh provider] 推理强度：{line}",
+                "[rdsh provider] 推論の強さ: {line}"
+            )
+        );
+    }
     if args.dry_run && change.writes() {
         println!("{}", manual_snippet(&route));
     }
@@ -3223,6 +3452,88 @@ pub(crate) fn cmd_list(json: bool, locale: crate::locale::Locale) -> Result<()> 
 mod tests {
     use super::*;
 
+    #[test]
+    fn ollama_is_keyless_and_publishes_thinking_levels() {
+        let p = preset("ollama").expect("ollama preset");
+        assert_eq!(p.base_url, Some("http://127.0.0.1:11434/v1"));
+        assert!(!p.needs_key);
+        let levels: Vec<&str> = p.reasoning_efforts.iter().map(|(l, _)| *l).collect();
+        assert_eq!(levels, vec!["low", "medium", "high"]);
+    }
+
+    #[test]
+    fn every_remote_preset_still_needs_a_key() {
+        for preset in PRESETS.iter().filter(|p| p.id != "ollama") {
+            assert!(preset.needs_key, "{} must keep needing a key", preset.id);
+        }
+    }
+
+    #[test]
+    fn reasoning_efforts_are_written_under_the_model() {
+        let mut r = route("ollama", &["gpt-oss:20b"]);
+        r.models[0].reasoning_efforts =
+            ReasoningEffort::levels(preset("ollama").unwrap().reasoning_efforts);
+        let rendered = render_route(&r, 6, 2).join("\n");
+        assert!(rendered.contains("reasoningEfforts:"), "{rendered}");
+        assert!(rendered.contains("      low: low"), "{rendered}");
+        assert!(rendered.contains("      high: high"), "{rendered}");
+    }
+
+    #[test]
+    fn a_model_without_levels_writes_no_block() {
+        let rendered = render_route(&route("ollama", &["m"]), 0, 2).join("\n");
+        assert!(!rendered.contains("reasoningEfforts"), "{rendered}");
+    }
+
+    #[test]
+    fn effort_lists_parse_labels_and_explicit_values() {
+        let plain = ReasoningEffort::parse_list("low,medium,high").unwrap();
+        assert_eq!(plain[1].label, "medium");
+        assert_eq!(plain[1].value, "medium");
+        let aliased = ReasoningEffort::parse_list("quick=low, deep=high").unwrap();
+        assert_eq!(aliased[0].label, "quick");
+        assert_eq!(aliased[0].value, "low");
+        assert_eq!(aliased[1].value, "high");
+    }
+
+    #[test]
+    fn effort_lists_reject_duplicates_and_empty_parts() {
+        assert!(ReasoningEffort::parse_list("low,low").is_none());
+        assert!(ReasoningEffort::parse_list("low,,high").is_none());
+        assert!(ReasoningEffort::parse_list("=high").is_none());
+        assert!(ReasoningEffort::parse_list("   ").is_none());
+        assert!(ReasoningEffort::parse_list("a\u{7}b").is_none());
+    }
+
+    #[test]
+    fn preset_levels_fill_models_that_name_none() {
+        let preset = preset("ollama").unwrap();
+        let mut models = vec![
+            Model {
+                id: "gpt-oss:20b".to_string(),
+                ..Model::default()
+            },
+            Model {
+                id: "other".to_string(),
+                ..Model::default()
+            },
+        ];
+        apply_preset_models(preset, &mut models, crate::locale::Locale::English);
+        assert_eq!(models[0].reasoning_efforts.len(), 3);
+        assert_eq!(models[1].reasoning_efforts.len(), 3);
+    }
+
+    #[test]
+    fn effort_summary_collapses_identical_levels() {
+        let mut r = route("ollama", &["a", "b"]);
+        let levels = ReasoningEffort::levels(&[("low", "low"), ("high", "high")]);
+        for m in r.models.iter_mut() {
+            m.reasoning_efforts = levels.clone();
+        }
+        assert_eq!(effort_summary(&r).as_deref(), Some("low, high"));
+        r.models[1].reasoning_efforts.clear();
+        assert_eq!(effort_summary(&r).as_deref(), Some("a: low, high; b: "));
+    }
     fn route(id: &str, models: &[&str]) -> Route {
         Route {
             id: id.to_string(),
@@ -4230,6 +4541,7 @@ mod tests {
                 name: None,
                 key_stdin: false,
                 no_key: false,
+                effort: None,
                 replace: false,
                 dry_run: true,
                 json: false,
