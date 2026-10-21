@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-21
+
 ### Fixed
 
 - 外部コマンド起動の信頼境界を強化しました。git 起動は PATH からの信頼付き
