@@ -89,11 +89,18 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `rdsh-no-feedback` バンドルを導入して無効化します。本体の画面へ戻す
   ときは `rdsh features on feedback` を保存してからプラグインを導入し、
   DSH を再起動してください。
+- 設定画面の狭いカードで、フォームの入力欄が潰れる問題を直しました（#855）。
+- `rdsh update auto on` が、所有者・権限を検証せずに同期スクリプトを毎日のタイマーへ
+  登録しないようにしました。検証を通らないスクリプトは登録されず、意図して使う場合だけ
+  `--force` が必要になります（#856、#823）。
+- 依存を更新し、RUSTSEC-2026-0381 / RUSTSEC-2026-0382 の対象（rustls-webpki、
+  webpki-roots）を修正版へ上げました（#871）。
 
-- Web UI のシェル資産を Rust 側で事前圧縮して配信し、`Cache-Control: immutable` と
-  `ETag`（`If-None-Match` 一致時は 304）を付けるようにしました。機能は変えずに
-  転送量が 26.6%、4 資産の取得時間が 42.4% 減っています。切り戻しは
-  `rdsh features off web_assets` です（#863、#870）。
+- Web UI のシェル資産を Rust 側で起動時に一度だけ事前圧縮するようにしました。
+  配信は `plugins/rdsh-web-cache` サーバープラグインが担い、導入時に
+  `Cache-Control: immutable` と `ETag`（`If-None-Match` 一致時は 304）が付きます。
+  プラグイン導入時の計測で転送量が 26.6%、4 資産の取得時間が 42.4% 減りました。
+  切り戻しは `rdsh features off web_assets` です（#863、#870）。
 
 ## [0.9.2] - 2026-10-19
 
