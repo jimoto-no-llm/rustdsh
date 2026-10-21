@@ -38,6 +38,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `NODE_COMPILE_CACHE` が育ちすぎているとき（512 MiB または 5 万ファイル超）に、
+  片付け方を一度だけ表示するようにしました。削除はせず、同じ確認は 24 時間に一度だけです。
+  キャッシュが大きいと起動が逆に遅くなるためで、計測は時間と件数に上限を設けています（#864）。
+
 - Ollama 系のプリセットで `--discover`／`--model` を使うと、`POST /api/show` から
   モデルごとの thinking 制御を読み、`reasoningEfforts` を自動で書くようにしました。
   名前付きの段階（low・medium・high など）はそのまま書き、ON/OFF だけのモデルや
