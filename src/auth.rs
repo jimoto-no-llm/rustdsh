@@ -351,9 +351,15 @@ fn flush_entry(
 fn load_doc(path: &str) -> CredsDoc {
     let mut doc = CredsDoc::default();
     // dsh refuses to read a credentials file that others can read, so a
-    // 0644 file turns into a silent "no key"; say why at the point we see it.
-    if crate::file_security::others_can_read(std::path::Path::new(path)) {
-        eprintln!("[rdsh] credentials file is readable by others; run chmod 600 {path}");
+    // 0644 file turns into a silent "no key"; tell the person at the terminal.
+    // A pipe (tests, delegation) keeps stderr clean for the child's output.
+    {
+        use std::io::IsTerminal as _;
+        if std::io::stderr().is_terminal()
+            && crate::file_security::others_can_read(std::path::Path::new(path))
+        {
+            eprintln!("[rdsh] credentials file is readable by others; run chmod 600 {path}");
+        }
     }
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
