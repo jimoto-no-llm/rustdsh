@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-21
+
 ### Fixed
 
 - 外部コマンド起動の信頼境界を強化しました。git 起動は PATH からの信頼付き
@@ -87,6 +89,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `rdsh-no-feedback` バンドルを導入して無効化します。本体の画面へ戻す
   ときは `rdsh features on feedback` を保存してからプラグインを導入し、
   DSH を再起動してください。
+
+- Web UI のシェル資産を Rust 側で事前圧縮して配信し、`Cache-Control: immutable` と
+  `ETag`（`If-None-Match` 一致時は 304）を付けるようにしました。機能は変えずに
+  転送量が 26.6%、4 資産の取得時間が 42.4% 減っています。切り戻しは
+  `rdsh features off web_assets` です（#863、#870）。
 
 ## [0.9.2] - 2026-10-19
 
