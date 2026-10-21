@@ -272,6 +272,12 @@ ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui rdsh-answer-guard"
 if [ "$PROFILE" = "web" ]; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-update-banner"
 fi
+# The Web shell is served by this profile, so the server plugin that returns
+# the Rust-precompressed assets belongs to the same tier: without it the
+# cache directory is built and never read (see docs/webui-asset-cache.md).
+if [ "$PROFILE" = "web" ]; then
+  ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-web-cache"
+fi
 # The OFF default adds this bundle unless features.feedback is explicitly
 # true; the check runs before the profile branches so desktop and headless
 # get the same behavior.

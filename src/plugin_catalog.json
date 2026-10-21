@@ -58,6 +58,14 @@
       "why": "Web release banner"
     },
     {
+      "package": "rdsh-web-cache",
+      "bundled": true,
+      "profiles": [
+        "web"
+      ],
+      "why": "serve the Rust-precompressed web shell with immutable caching"
+    },
+    {
       "package": "rdsh-no-feedback",
       "bundled": true,
       "feature": "feedback",
