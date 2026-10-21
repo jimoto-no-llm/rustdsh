@@ -42,8 +42,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   接続先は `http://127.0.0.1:11434/v1` 固定です（別ホストは `--base-url`）。
 - `rdsh provider add --effort` で、経路内の全モデルの推論強度（reasoningEfforts）を
   指定できるようにしました。`low,medium,high`、`label=value` 形式、`--effort none` で
-  段階を持たないモデルとして宣言できます。Ollamaのプリセットは low・medium・high を持ち、
-  それ以外のモデルも同じ段階を引き継ぎます（サーバーごとの能力差は `--effort` で上書き）。
+  段階を持たないモデルとして宣言できます。Ollamaのプリセットは gpt-oss:20b の low・medium・high を
+  記録し、記録のないモデルには段階を書かず注記します（dshでは推論非対応として扱われるため）。
 - `rdsh rustxng install` が追加されました。RustXNG の最新リリースを
   `~/.local/bin` へ導入します。サイドカーが見つからない状態で
   `rdsh search-web` や `rdsh rustxng start` を使うと、この導入を自動で

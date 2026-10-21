@@ -71,8 +71,6 @@ struct Preset {
     max_tokens_cap: Option<u64>,
     /// `false` when the endpoint has no `GET /models`.
     supports_discovery: bool,
-    /// Levels applied to every model of the route that names none.
-    reasoning_efforts: &'static [(&'static str, &'static str)],
     /// `false` for a server that authenticates nobody (a local runtime).
     needs_key: bool,
 }
@@ -86,7 +84,6 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
-        reasoning_efforts: &[],
         needs_key: true,
     },
     Preset {
@@ -97,7 +94,6 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
-        reasoning_efforts: &[],
         needs_key: true,
     },
     // Chat Completions rejects fields it does not document (`store`,
@@ -126,7 +122,6 @@ const PRESETS: &[Preset] = &[
         compat: &["supportsStore: false", "supportsUsageInStreaming: false"],
         max_tokens_cap: Some(8000),
         supports_discovery: false,
-        reasoning_efforts: &[],
         needs_key: true,
     },
     // Command Code's Provider API is OpenAI-compatible at a fixed base URL, and
@@ -143,7 +138,6 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
-        reasoning_efforts: &[],
         needs_key: true,
     },
     // Ollama serves an OpenAI-compatible API on a local port and authenticates
@@ -164,7 +158,6 @@ const PRESETS: &[Preset] = &[
         compat: &[],
         max_tokens_cap: None,
         supports_discovery: true,
-        reasoning_efforts: &[("low", "low"), ("medium", "medium"), ("high", "high")],
         needs_key: false,
     },
 ];
@@ -268,10 +261,7 @@ fn apply_preset_models(
     locale: crate::locale::Locale,
 ) -> Vec<String> {
     let mut notes = Vec::new();
-    if preset.default_models.is_empty()
-        && preset.max_tokens_cap.is_none()
-        && preset.reasoning_efforts.is_empty()
-    {
+    if preset.default_models.is_empty() && preset.max_tokens_cap.is_none() {
         return notes;
     }
     for model in models.iter_mut() {
@@ -300,12 +290,9 @@ fn apply_preset_models(
             model.max_tokens = Some(model.max_tokens.map_or(cap, |m| m.min(cap)));
         }
         if model.reasoning_efforts.is_empty() {
-            let published = preset
-                .default_models
-                .iter()
-                .find(|d| d.id == model.id)
-                .map_or(preset.reasoning_efforts, |d| d.reasoning_efforts);
-            model.reasoning_efforts = ReasoningEffort::levels(published);
+            if let Some(known) = preset.default_models.iter().find(|d| d.id == model.id) {
+                model.reasoning_efforts = ReasoningEffort::levels(known.reasoning_efforts);
+            }
         }
     }
     notes
@@ -3101,9 +3088,29 @@ pub(crate) fn cmd_add(
         crate::locale::Locale::English,
     ));
     human_notes.extend(apply_preset_models(preset, &mut models, locale));
-    if let Some(levels) = &effort_override {
-        for model in models.iter_mut() {
-            model.reasoning_efforts = levels.clone();
+    match &effort_override {
+        Some(levels) => {
+            for model in models.iter_mut() {
+                model.reasoning_efforts = levels.clone();
+            }
+        }
+        // dsh resolves a model with no levels as non-reasoning, so say which
+        // ones got none instead of guessing a list that fits every server.
+        None => {
+            let unlevelled: Vec<&str> = models
+                .iter()
+                .filter(|model| model.reasoning_efforts.is_empty())
+                .map(|model| model.id.as_str())
+                .collect();
+            if !unlevelled.is_empty() {
+                human_notes.push(localized_format!(
+                    locale,
+                    "no reasoning levels for {}: pass --effort to declare them (dsh treats such a model as non-reasoning)",
+                    "{} 没有推理强度：用 --effort 声明（否则 dsh 视为不支持推理）",
+                    "{} には推論強度がありません。--effort で宣言できます（未指定のモデルはdshで推論非対応として扱われます）",
+                    unlevelled.join(", ")
+                ));
+            }
         }
     }
     if models.is_empty() && !skip_existing {
@@ -3457,7 +3464,11 @@ mod tests {
         let p = preset("ollama").expect("ollama preset");
         assert_eq!(p.base_url, Some("http://127.0.0.1:11434/v1"));
         assert!(!p.needs_key);
-        let levels: Vec<&str> = p.reasoning_efforts.iter().map(|(l, _)| *l).collect();
+        let levels: Vec<&str> = p.default_models[0]
+            .reasoning_efforts
+            .iter()
+            .map(|(l, _)| *l)
+            .collect();
         assert_eq!(levels, vec!["low", "medium", "high"]);
     }
 
@@ -3472,7 +3483,7 @@ mod tests {
     fn reasoning_efforts_are_written_under_the_model() {
         let mut r = route("ollama", &["gpt-oss:20b"]);
         r.models[0].reasoning_efforts =
-            ReasoningEffort::levels(preset("ollama").unwrap().reasoning_efforts);
+            ReasoningEffort::levels(preset("ollama").unwrap().default_models[0].reasoning_efforts);
         let rendered = render_route(&r, 6, 2).join("\n");
         assert!(rendered.contains("reasoningEfforts:"), "{rendered}");
         assert!(rendered.contains("      low: low"), "{rendered}");
@@ -3506,7 +3517,7 @@ mod tests {
     }
 
     #[test]
-    fn preset_levels_fill_models_that_name_none() {
+    fn preset_levels_reach_only_the_models_the_preset_documents() {
         let preset = preset("ollama").unwrap();
         let mut models = vec![
             Model {
@@ -3520,7 +3531,7 @@ mod tests {
         ];
         apply_preset_models(preset, &mut models, crate::locale::Locale::English);
         assert_eq!(models[0].reasoning_efforts.len(), 3);
-        assert_eq!(models[1].reasoning_efforts.len(), 3);
+        assert!(models[1].reasoning_efforts.is_empty());
     }
 
     #[test]

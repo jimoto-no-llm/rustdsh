@@ -279,10 +279,11 @@ input is needed; `--no-key` stays accepted for symmetry with `local-openai`.
 Pass `--base-url` to reach an Ollama on another host.
 
 The preset declares `gpt-oss:20b` (131,072 context, 32,768 output) and the
-three thinking levels that model publishes. Other ids come from `--model` or
-`--discover` and inherit the same three levels, because Ollama exposes its
-per-model capability through `POST /api/show` rather than `/v1/models`: rdsh
-does not guess them per model. Override the levels with `--effort`.
+three thinking levels that model publishes. Ids that come from `--model` or
+`--discover` get no levels: Ollama reports thinking support through
+`POST /api/show`, not through `/v1/models`, so rdsh does not assume one list
+fits every model. Add the levels with `--effort`, and see [Reasoning levels]
+(#reasoning-levels---effort) below.
 
 ## Reasoning levels (`--effort`)
 
