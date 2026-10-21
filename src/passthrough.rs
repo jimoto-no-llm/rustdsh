@@ -487,12 +487,14 @@ fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
     // V8 code cache for the delegated Node process. Set unconditionally:
     // Node < 22.1 ignores the variable, and a version probe would cost a
     // `node --version` spawn (~14ms) per launch — more than the cache saves.
-    // Never overrides an explicit user value; RDSH_NODE_COMPILE_CACHE=0 opts out.
+    // Never overrides an explicit user value; RDSH_NODE_COMPILE_CACHE=0 opts
+    // out, RDSH_NODE_COMPILE_CACHE=<dir> places the cache at that dir.
     let hint = std::env::var("RDSH_NODE_COMPILE_CACHE").ok();
     let existing = std::env::var("NODE_COMPILE_CACHE").ok();
-    if let Some(dir) = crate::slim::default_compile_cache_dir().and_then(|d| {
-        crate::slim::resolve_node_compile_cache(hint.as_deref(), existing.as_deref(), &d)
-    }) {
+    let default_dir = crate::slim::default_compile_cache_dir().unwrap_or_default();
+    if let Some(dir) =
+        crate::slim::resolve_node_compile_cache(hint.as_deref(), existing.as_deref(), &default_dir)
+    {
         let _ = std::fs::create_dir_all(&dir);
         cmd.env("NODE_COMPILE_CACHE", dir);
     }

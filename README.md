@@ -510,7 +510,9 @@ distributions, and hosts without Node.js installed.
   to `~/.cache/rdsh-node-compile-cache`, letting Node reuse compiled code across
   launches (Node 22.1 or newer; older versions ignore it). An existing
   `NODE_COMPILE_CACHE` value is preserved. Set `RDSH_NODE_COMPILE_CACHE=0`, or
-  use `--passthrough` / `RDSH_PASSTHROUGH=1`, to opt out.
+  use `--passthrough` / `RDSH_PASSTHROUGH=1`, to opt out. Set
+  `RDSH_NODE_COMPILE_CACHE=<dir>` to keep the cache at a fixed location instead
+  of the default, for example on hosts where `$HOME` is volatile.
 - **Broad CPU support.** Prebuilt x86-64 binaries do not require AVX or BMI;
   the static musl build also runs on systems with older glibc.
 - **Session token estimates.** `sessions --tokens` reads a decompressed size
