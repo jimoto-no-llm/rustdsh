@@ -5,6 +5,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+- `rdsh provider add` が、モデルの画像入力対応を自動で判定して `input: [text, image]` を
+  書くようにしました。Ollama 系は `POST /api/show` の `capabilities` を、それ以外は
+  `GET /models` の `architecture.input_modalities`／`input_modalities`／`capabilities` を読みます。
+  手動指定は `--input text,image`（`text` は必須、未知の値は拒否）。宣言が無いモデルには
+  `input:` を書かず、dsh の既定（テキストのみ）に任せます。
+
 ## [0.10.0] - 2026-10-21
 
 ### Fixed

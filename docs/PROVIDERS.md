@@ -370,6 +370,21 @@ list for the whole server:
 not implement `/api/show`. A model the preset already documents keeps the
 preset's levels; the probe only fills models it does not know.
 
+## Image input (`--input`)
+
+`rdsh provider add` writes each model's `input:` line, which tells dsh whether a model
+accepts images. Three sources fill it, in this order:
+
+1. `--input text,image` — applies to every model of the route. `text` is required,
+   values are comma separated, and anything outside `text`/`image` is refused.
+2. The endpoint's own declaration. `GET /models` entries that carry
+   `architecture.input_modalities` (OpenRouter), `input_modalities`, or a `capabilities` name list
+   containing `vision` are read per model. Ollama's `POST /api/show` `capabilities` array is
+   read the same way for the `ollama` and `ollama-cloud` presets.
+3. Nothing — the model gets no `input:` line and dsh treats it as text only.
+
+An image-only declaration gains `text`, because dsh always sends text.
+
 ## Reasoning levels (`--effort`)
 
 dsh only offers a reasoning level when the model publishes one. Models in its
