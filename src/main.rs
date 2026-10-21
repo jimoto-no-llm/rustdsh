@@ -1812,8 +1812,10 @@ fn main() {
             port,
             no_auto_import,
         }) => {
-            let setup_profile = profile_or_default(None, &cfg.general.default_profile, locale)
-                .unwrap_or_else(|_| "web".to_string());
+            // 明示された --profile を尊重し、無ければ既定（無ければ web）へ倒す。
+            let setup_profile =
+                profile_or_default(cli.profile.clone(), &cfg.general.default_profile, locale)
+                    .unwrap_or_else(|_| "web".to_string());
             if web && !dry {
                 if rdsh_config::feature_enabled(&cfg, "setup_web") {
                     setup_web::cmd_setup_web(
