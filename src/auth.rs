@@ -2396,7 +2396,8 @@ pub fn cmd_setup(
     }
     // 検出した経路は、鍵が揃っているものだけを黙って登録する（既にある経路は触らない）。
     let mut registered: Vec<String> = crate::provider_detect::registered_routes(profile, locale);
-    if !dry && auto_import {
+    // --json は状態の読み取りなので何も書かない（自動登録もしない）。
+    if !dry && !json && auto_import {
         let auto_added = crate::provider_detect::auto_import(profile, profile, locale);
         registered = crate::provider_detect::registered_routes(profile, locale);
         if !auto_added.is_empty() {
