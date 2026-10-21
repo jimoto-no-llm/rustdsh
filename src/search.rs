@@ -52,7 +52,14 @@ pub fn cmd_search(
                 break;
             }
             if let Some(hit) = line.strip_prefix(&prefix) {
-                let _ = writeln!(out, "{}:{hit}", display_path.display());
+                // The matched line comes from the searched tree; keep it from
+                // rewriting the terminal around the result.
+                let _ = writeln!(
+                    out,
+                    "{}:{}",
+                    crate::terminal_safe::strip_control(&display_path.display().to_string()),
+                    crate::terminal_safe::strip_control(hit)
+                );
             }
             shown += 1;
         }

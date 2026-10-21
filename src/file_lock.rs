@@ -56,7 +56,7 @@ impl CredentialFileLock {
     ) -> anyhow::Result<Self> {
         if let Some(parent) = target.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent).map_err(|error| {
+                crate::file_security::ensure_private_dir(parent).map_err(|error| {
                     anyhow::anyhow!(
                         "{} {}: {error}",
                         lock_text(
@@ -414,7 +414,7 @@ impl FileLock {
     ) -> anyhow::Result<Self> {
         if let Some(parent) = target.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent).map_err(|error| {
+                crate::file_security::ensure_private_dir(parent).map_err(|error| {
                     anyhow::anyhow!(
                         "{} {}: {error}",
                         lock_text(

@@ -97,6 +97,7 @@ mod slim;
 mod subagent_plan;
 mod swarm;
 mod task_outcomes;
+mod terminal_safe;
 #[cfg(test)]
 mod test_support;
 mod token_handoff;
