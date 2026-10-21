@@ -96,10 +96,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - 依存を更新し、RUSTSEC-2026-0381 / RUSTSEC-2026-0382 の対象（rustls-webpki、
   webpki-roots）を修正版へ上げました（#871）。
 
-- Web UI のシェル資産を Rust 側で起動時に一度だけ事前圧縮するようにしました。
-  配信は `plugins/rdsh-web-cache` サーバープラグインが担い、導入時に
+- Web UI のシェル資産を Rust 側で起動時に一度だけ事前圧縮し、同梱の
+  `rdsh-web-cache` サーバープラグインから配信するようにしました。このプラグインは
+  Web プロファイルの必須セットに含まれるため既定で有効になり、
   `Cache-Control: immutable` と `ETag`（`If-None-Match` 一致時は 304）が付きます。
-  プラグイン導入時の計測で転送量が 26.6%、4 資産の取得時間が 42.4% 減りました。
+  計測で転送量が 26.6%、4 資産の取得時間が 42.4% 減りました。
   切り戻しは `rdsh features off web_assets` です（#863、#870）。
 
 ## [0.9.2] - 2026-10-19
