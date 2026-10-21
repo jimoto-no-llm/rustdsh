@@ -2094,3 +2094,134 @@ fn setup_no_auto_import_leaves_the_patch_untouched() {
     ok(&out);
     assert_eq!(f.patch(), before);
 }
+
+/// Ollama の互換APIとネイティブAPIを1つのサーバーで返す。
+fn mock_ollama() -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!(
+        "http://127.0.0.1:{}/v1",
+        listener.local_addr().unwrap().port()
+    );
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { break };
+            let mut head = Vec::new();
+            let mut byte = [0u8; 1];
+            while !head.ends_with(b"\r\n\r\n") {
+                if stream.read(&mut byte).unwrap_or(0) == 0 {
+                    break;
+                }
+                head.push(byte[0]);
+            }
+            let text = String::from_utf8_lossy(&head).into_owned();
+            let length: usize = text
+                .lines()
+                .find_map(|line| {
+                    let lower = line.to_ascii_lowercase();
+                    lower
+                        .starts_with("content-length:")
+                        .then(|| line.split(':').nth(1).unwrap_or("0").trim().parse().ok())
+                        .flatten()
+                })
+                .unwrap_or(0);
+            let mut body = vec![0u8; length];
+            if length > 0 {
+                let _ = stream.read_exact(&mut body);
+            }
+            let body = String::from_utf8_lossy(&body).into_owned();
+            let payload = if text.starts_with("GET /v1/models") {
+                r#"{"data":[{"id":"gpt-oss:20b"},{"id":"qwen3:8b"},{"id":"deepseek-r1:8b"}]}"#
+                    .to_string()
+            } else if body.contains("qwen3") {
+                r#"{"thinking":{"values":[true,false]}}"#.to_string()
+            } else {
+                r#"{"thinking":{"values":["low","medium","high"],"default":"medium"}}"#.to_string()
+            };
+            let reply = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                payload.len(),
+                payload
+            );
+            let _ = stream.write_all(reply.as_bytes());
+        }
+    });
+    base
+}
+
+#[test]
+fn ollama_discovery_reads_thinking_per_model() {
+    let f = Fixture::new();
+    let base = mock_ollama();
+    let out = f.run(&[
+        "provider",
+        "add",
+        "ollama",
+        "--base-url",
+        &base,
+        "--discover",
+        "--profile",
+        "tui",
+    ]);
+    ok(&out);
+    let patch = f.patch();
+    assert!(patch.contains("gpt-oss:20b"), "{patch}");
+    assert!(patch.contains("qwen3:8b"), "{patch}");
+    assert!(patch.contains("deepseek-r1:8b"), "{patch}");
+    // 各モデルの定義の直後だけを見る（次の "- id:" まで）。
+    let block = |id: &str| {
+        let tail = patch.split(id).nth(1).unwrap_or_default();
+        tail.split("- id:").next().unwrap_or_default().to_string()
+    };
+    assert!(
+        block("deepseek-r1:8b").contains("reasoningEfforts"),
+        "{patch}"
+    );
+    // qwen3 は ON/OFF 型なので段階を書かず、その旨を注記する。
+    assert!(!block("qwen3:8b").contains("reasoningEfforts"), "{patch}");
+    let body = text(&out).to_lowercase();
+    assert!(body.contains("on/off"), "{body}");
+}
+
+#[test]
+fn no_probe_leaves_every_model_without_levels() {
+    let f = Fixture::new();
+    let base = mock_ollama();
+    let out = f.run(&[
+        "provider",
+        "add",
+        "ollama",
+        "--base-url",
+        &base,
+        "--discover",
+        "--no-probe",
+        "--profile",
+        "tui",
+    ]);
+    ok(&out);
+    let patch = f.patch();
+    assert!(patch.contains("deepseek-r1:8b"), "{patch}");
+    // プリセットが記録した gpt-oss は残るが、探索で足したモデルには段階が付かない。
+    let after = patch.split("deepseek-r1:8b").nth(1).unwrap_or_default();
+    assert!(!after.contains("reasoningEfforts"), "{patch}");
+}
+
+#[test]
+fn a_tiered_model_from_the_probe_gets_its_levels() {
+    let f = Fixture::new();
+    let base = mock_ollama();
+    let out = f.run(&[
+        "provider",
+        "add",
+        "ollama",
+        "--base-url",
+        &base,
+        "--model",
+        "qwen3:8b",
+        "--profile",
+        "tui",
+    ]);
+    ok(&out);
+    // qwen3 は ON/OFF 型なので段階は書かない。gpt-oss を明示したときだけ段階が付く。
+    let patch = f.patch();
+    assert!(!patch.contains("reasoningEfforts"), "{patch}");
+}

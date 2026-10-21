@@ -336,6 +336,40 @@ three thinking levels that model publishes. Ids that come from `--model` or
 fits every model. Add the levels with `--effort`, and see [Reasoning levels]
 (#reasoning-levels---effort) below.
 
+## Ollama Cloud
+
+`rdsh provider add ollama-cloud` registers the hosted catalog on
+`https://ollama.com/v1`. It keeps its key under `OLLAMA_CLOUD_API_KEY`
+rather than the local route's name, so a cloud key is never sent to a
+localhost server. Ollama's own documentation calls the same credential
+`OLLAMA_API_KEY`; `rdsh provider detect` accepts either name.
+
+## Model capabilities (`--no-probe`)
+
+Ollama answers `POST /api/show` with the thinking controls a model actually
+publishes:
+
+```json
+{ "thinking": { "values": ["low", "medium", "high"], "default": "medium" } }
+```
+
+For the `ollama` and `ollama-cloud` presets, `--discover` and `--model` ask
+that endpoint once per model and write the levels it returns into
+`reasoningEfforts`. Three answers are distinguished instead of assuming one
+list for the whole server:
+
+- **named levels** — those names are written for that model.
+- **`true`/`false`** — the model only switches thinking on or off, which the
+  OpenAI-compatible `reasoning_effort` field cannot express, so no levels are
+  written and the run says so.
+- **`values: [false]`** — the model reports no thinking support.
+- **no `thinking` object** — the server has no metadata; the existing
+  `--effort` note applies.
+
+`--no-probe` skips the request entirely, for a server that is slow or does
+not implement `/api/show`. A model the preset already documents keeps the
+preset's levels; the probe only fills models it does not know.
+
 ## Reasoning levels (`--effort`)
 
 dsh only offers a reasoning level when the model publishes one. Models in its

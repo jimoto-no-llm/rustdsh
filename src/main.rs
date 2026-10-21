@@ -201,6 +201,9 @@ enum ProviderAction {
         /// Reasoning levels for every model of the route, e.g. low,medium,high (or none)
         #[arg(long = "effort")]
         effort: Option<String>,
+        /// Do not read model capabilities from an Ollama /api/show
+        #[arg(long = "no-probe")]
+        no_probe: bool,
         /// Rewrite the route block when it already exists
         #[arg(long = "replace")]
         replace: bool,
@@ -1777,6 +1780,7 @@ fn main() {
                 key_stdin,
                 no_key,
                 effort,
+                no_probe,
                 replace,
                 json,
             } => providers::cmd_add(
@@ -1792,6 +1796,7 @@ fn main() {
                     key_stdin,
                     no_key,
                     effort,
+                    no_probe,
                     replace,
                     quiet: false,
                     // The global flag only: general.dry_run in settings is
@@ -2699,6 +2704,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "no_discover" => (
             "不从端点读取模型清单",
             "エンドポイントからモデル一覧を取得しない",
+        ),
+        "no_probe" => (
+            "不读取 Ollama /api/show 的模型能力",
+            "Ollama の /api/show からモデル能力を読まない",
         ),
         "no_auto_import" => (
             "不自动注册检测到的路由",

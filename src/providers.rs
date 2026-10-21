@@ -456,18 +456,23 @@ fn effort_summary(route: &Route) -> Option<String> {
             .collect::<Vec<_>>()
             .join(", ")
     };
-    let mut unique: Vec<String> = route.models.iter().map(levels).collect();
+    // 段階を持たないモデルはここでは挙げない（別の注記が担当する）。
+    let listed: Vec<(&str, String)> = route
+        .models
+        .iter()
+        .map(|model| (model.id.as_str(), levels(model)))
+        .filter(|(_, levels)| !levels.is_empty())
+        .collect();
+    let mut unique: Vec<String> = listed.iter().map(|(_, levels)| levels.clone()).collect();
     unique.sort();
     unique.dedup();
     match unique.as_slice() {
         [] => None,
-        [only] if only.is_empty() => None,
         [only] => Some(only.clone()),
         _ => Some(
-            route
-                .models
+            listed
                 .iter()
-                .map(|m| format!("{}: {}", m.id, levels(m)))
+                .map(|(id, levels)| format!("{id}: {levels}"))
                 .collect::<Vec<_>>()
                 .join("; "),
         ),
@@ -2412,6 +2417,28 @@ fn http_get(
     key: Option<&str>,
     locale: crate::locale::Locale,
 ) -> Result<String> {
+    http_request(base, "GET", path, key, None, locale)
+}
+
+/// Ollama の /api/show のように、小さな JSON を送って能力を尋ねる。
+fn http_post(
+    base: &Base,
+    path: &str,
+    key: Option<&str>,
+    body: &str,
+    locale: crate::locale::Locale,
+) -> Result<String> {
+    http_request(base, "POST", path, key, Some(body), locale)
+}
+
+fn http_request(
+    base: &Base,
+    method: &str,
+    path: &str,
+    key: Option<&str>,
+    body: Option<&str>,
+    locale: crate::locale::Locale,
+) -> Result<String> {
     let deadline = Instant::now() + Duration::from_secs(HTTP_TIMEOUT_SECONDS);
     let bare_host = base.host.trim_matches(['[', ']']);
     let mut stream = None;
@@ -2443,13 +2470,20 @@ fn http_get(
         format!("{}:{}", base.host, base.port)
     };
     let mut request = format!(
-        "GET {path} HTTP/1.1\r\nHost: {host_header}\r\nUser-Agent: rdsh/{}\r\nAccept: application/json\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: {host_header}\r\nUser-Agent: rdsh/{}\r\nAccept: application/json\r\n",
         env!("CARGO_PKG_VERSION")
     );
     if let Some(key) = key {
         request.push_str(&format!("Authorization: Bearer {key}\r\n"));
     }
+    if let Some(body) = body {
+        request.push_str("Content-Type: application/json\r\n");
+        request.push_str(&format!("Content-Length: {}\r\n", body.len()));
+    }
     request.push_str("Connection: close\r\n\r\n");
+    if let Some(body) = body {
+        request.push_str(body);
+    }
     stream.set_write_timeout(Some(Duration::from_secs(HTTP_TIMEOUT_SECONDS)))?;
     stream.write_all(request.as_bytes())?;
     let mut raw = Vec::new();
@@ -2587,7 +2621,15 @@ fn curl_quote(value: &str) -> String {
 /// The curl config handed over stdin, so the URL and Authorization header
 /// stay out of the process list and a redirect cannot leave https.
 fn curl_config(url: &str, key: Option<&str>) -> String {
+    curl_request_config("GET", url, key, None)
+}
+
+/// curl に渡す設定。鍵は argv ではなく標準入力の設定本文にだけ載せる。
+fn curl_request_config(method: &str, url: &str, key: Option<&str>, body: Option<&str>) -> String {
     let mut config = format!("url = {}\n", curl_quote(url));
+    if method != "GET" {
+        config.push_str(&format!("request = {}\n", curl_quote(method)));
+    }
     if let Some(key) = key {
         config.push_str(&format!(
             "header = {}\n",
@@ -2595,6 +2637,10 @@ fn curl_config(url: &str, key: Option<&str>) -> String {
         ));
     }
     config.push_str("header = \"Accept: application/json\"\n");
+    if let Some(body) = body {
+        config.push_str("header = \"Content-Type: application/json\"\n");
+        config.push_str(&format!("data = {}\n", curl_quote(body)));
+    }
     config.push_str("silent\nshow-error\nfail\n");
     config.push_str("proto = \"=https\"\nproto-redir = \"=https\"\n");
     config.push_str(&format!(
@@ -2604,7 +2650,29 @@ fn curl_config(url: &str, key: Option<&str>) -> String {
 }
 
 fn curl_get(url: &str, key: Option<&str>, locale: crate::locale::Locale) -> Result<String> {
-    let config = curl_config(url, key);
+    curl_send(curl_config(url, key), url, key, locale)
+}
+
+fn curl_post(
+    url: &str,
+    key: Option<&str>,
+    body: &str,
+    locale: crate::locale::Locale,
+) -> Result<String> {
+    curl_send(
+        curl_request_config("POST", url, key, Some(body)),
+        url,
+        key,
+        locale,
+    )
+}
+
+fn curl_send(
+    config: String,
+    url: &str,
+    key: Option<&str>,
+    locale: crate::locale::Locale,
+) -> Result<String> {
     let mut child = Command::new("curl")
         .args(["-q", "--config", "-"])
         .stdin(Stdio::piped())
@@ -2679,6 +2747,98 @@ fn curl_get(url: &str, key: Option<&str>, locale: crate::locale::Locale) -> Resu
     })
 }
 
+/// Ollama の /api/show が返す、推論の制御方法。
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Thinking {
+    /// モデル定義の段階名（例: low, medium, high）。
+    Levels(Vec<String>),
+    /// ON/OFF だけを持つ。OpenAI 互換の段階指定では表せない。
+    Toggle,
+    /// values: [false]。推論に対応しない。
+    Unsupported,
+    /// thinking が無い、または問い合わせに失敗した。
+    Unknown,
+}
+
+/// /api/show の応答から thinking を読む。読めなければ Unknown。
+fn parse_thinking(body: &str) -> Thinking {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
+        return Thinking::Unknown;
+    };
+    let Some(values) = value
+        .get("thinking")
+        .and_then(|thinking| thinking.get("values"))
+        .and_then(|values| values.as_array())
+    else {
+        return Thinking::Unknown;
+    };
+    let names: Vec<String> = values
+        .iter()
+        .filter_map(|value| value.as_str())
+        .map(str::to_string)
+        .filter(|name| level_name_ok(name))
+        .collect();
+    if !names.is_empty() {
+        return Thinking::Levels(names);
+    }
+    if values.iter().any(|value| value.as_bool() == Some(true)) {
+        Thinking::Toggle
+    } else if values.is_empty() {
+        Thinking::Unknown
+    } else {
+        Thinking::Unsupported
+    }
+}
+
+/// サーバー由来の段階名を、そのまま設定へ書いてよいか。
+fn level_name_ok(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 60
+        && !name.chars().any(|c| c.is_control() || c.is_whitespace())
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphanumeric())
+}
+
+/// OpenAI 互換の base（.../v1）から、Ollama のネイティブ API の根を組み立てる。
+fn ollama_native_root(base: &Base) -> Option<Base> {
+    let url = base.url.trim_end_matches('/');
+    let root = url.strip_suffix("/v1").unwrap_or(url);
+    parse_base_url(root, crate::locale::Locale::English).ok()
+}
+
+/// POST /api/show で、モデルが公開する推論の制御方法を尋ねる。
+fn probe_thinking(
+    base: &Base,
+    key: Option<&str>,
+    model: &str,
+    locale: crate::locale::Locale,
+) -> Thinking {
+    let Some(root) = ollama_native_root(base) else {
+        return Thinking::Unknown;
+    };
+    let path = format!("{}/api/show", root.path);
+    let body = serde_json::json!({ "model": model }).to_string();
+    let answer = if root.https {
+        curl_post(&format!("{}{path}", root.url), key, &body, locale)
+    } else {
+        http_post(&root, &path, key, &body, locale)
+    };
+    answer.map_or(Thinking::Unknown, |text| parse_thinking(&text))
+}
+
+/// 取得した段階名を reasoningEfforts の形にする。
+fn levels_from_names(names: &[String]) -> Vec<ReasoningEffort> {
+    names
+        .iter()
+        .map(|name| ReasoningEffort {
+            label: name.clone(),
+            value: name.clone(),
+        })
+        .collect()
+}
+
 fn discover(base: &Base, key: Option<&str>, locale: crate::locale::Locale) -> Result<Vec<Model>> {
     if let Some(key) = key {
         if !auth_value_ok(key) {
@@ -2739,6 +2899,8 @@ pub(crate) struct AddArgs {
     pub no_key: bool,
     /// `low,medium,high` / `none` for every model of this route.
     pub effort: Option<String>,
+    /// Ollama 系で /api/show を読まない。
+    pub no_probe: bool,
     pub replace: bool,
     /// Suppress this command's own report; the caller aggregates results.
     pub quiet: bool,
@@ -3082,6 +3244,8 @@ pub(crate) fn cmd_add(
         });
 
     let skip_existing = already && !args.replace;
+    // 推論の制御方法を /api/show から読めるのは Ollama 系のプリセットだけ。
+    let probe_capabilities = !args.no_probe && matches!(preset.id, "ollama" | "ollama-cloud");
     let mut notes: Vec<String> = Vec::new();
     let mut human_notes: Vec<String> = Vec::new();
     let mut groups = vec![explicit_models];
@@ -3124,6 +3288,55 @@ pub(crate) fn cmd_add(
         crate::locale::Locale::English,
     ));
     human_notes.extend(apply_preset_models(preset, &mut models, locale));
+    // Ollama 系は /api/show がモデルごとの推論制御を返すので、手入力の代わりに読む。
+    // 説明済みのモデルは、下の「段階が無い」注記から外して二重に言わない。
+    let mut explained: Vec<String> = Vec::new();
+    if probe_capabilities && !skip_existing && effort_override.is_none() {
+        let key = stdin_key
+            .clone()
+            .or_else(|| env_key.clone())
+            .or_else(|| refs.get(&key_env).cloned())
+            .filter(|k| k != PLACEHOLDER_KEY);
+        for model in models.iter_mut() {
+            if !model.reasoning_efforts.is_empty() {
+                continue;
+            }
+            match probe_thinking(&base, key.as_deref(), &model.id, locale) {
+                Thinking::Levels(names) => {
+                    model.reasoning_efforts = levels_from_names(&names);
+                    human_notes.push(localized_format!(
+                        locale,
+                        "{}: the model publishes {}",
+                        "{}：模型公开了 {}",
+                        "{}: モデルが {} を公開しています",
+                        model.id,
+                        names.join(", ")
+                    ));
+                }
+                Thinking::Toggle => {
+                    explained.push(model.id.clone());
+                    human_notes.push(localized_format!(
+                        locale,
+                        "{}: thinking is on/off only, so no reasoning levels are written",
+                        "{}：推理只有开/关，因此不写入推理强度",
+                        "{}: 推論がON/OFFのみのため、推論強度は書きません",
+                        model.id
+                    ));
+                }
+                Thinking::Unsupported => {
+                    explained.push(model.id.clone());
+                    human_notes.push(localized_format!(
+                        locale,
+                        "{}: the model reports no thinking support",
+                        "{}：模型报告不支持推理",
+                        "{}: モデルは推論非対応と回答しています",
+                        model.id
+                    ));
+                }
+                Thinking::Unknown => {}
+            }
+        }
+    }
     match &effort_override {
         Some(levels) => {
             for model in models.iter_mut() {
@@ -3136,6 +3349,7 @@ pub(crate) fn cmd_add(
             let unlevelled: Vec<&str> = models
                 .iter()
                 .filter(|model| model.reasoning_efforts.is_empty())
+                .filter(|model| !explained.iter().any(|id| id == &model.id))
                 .map(|model| model.id.as_str())
                 .collect();
             if !unlevelled.is_empty() {
@@ -3574,6 +3788,146 @@ mod tests {
     }
 
     #[test]
+    fn thiking_levels_come_from_the_show_response() {
+        assert_eq!(
+            parse_thinking(r#"{"thinking":{"values":["low","medium","high"],"default":"medium"}}"#),
+            Thinking::Levels(vec![
+                "low".to_string(),
+                "medium".to_string(),
+                "high".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn an_on_off_model_reports_toggle_instead_of_levels() {
+        assert_eq!(
+            parse_thinking(r#"{"thinking":{"values":[true,false]}}"#),
+            Thinking::Toggle
+        );
+        assert_eq!(
+            parse_thinking(r#"{"thinking":{"values":[false]}}"#),
+            Thinking::Unsupported
+        );
+    }
+
+    #[test]
+    fn a_response_without_thinking_metadata_is_unknown() {
+        assert_eq!(parse_thinking("{}"), Thinking::Unknown);
+        assert_eq!(parse_thinking(r#"{"thinking":{}}"#), Thinking::Unknown);
+        assert_eq!(parse_thinking("not json"), Thinking::Unknown);
+        assert_eq!(
+            parse_thinking(r#"{"thinking":{"values":[]}}"#),
+            Thinking::Unknown
+        );
+    }
+
+    #[test]
+    fn unsafe_level_names_are_dropped_instead_of_written() {
+        assert!(!level_name_ok("has space"));
+        assert!(!level_name_ok("line\nbreak"));
+        assert!(!level_name_ok(""));
+        assert!(!level_name_ok("-leading-dash"));
+        assert!(level_name_ok("medium"));
+        assert_eq!(
+            parse_thinking(r#"{"thinking":{"values":["low","two words","high"]}}"#),
+            Thinking::Levels(vec!["low".to_string(), "high".to_string()])
+        );
+    }
+
+    #[test]
+    fn the_native_api_root_drops_the_compatibility_prefix() {
+        let base =
+            parse_base_url("http://127.0.0.1:11434/v1", crate::locale::Locale::English).unwrap();
+        let root = ollama_native_root(&base).expect("root");
+        assert_eq!(root.url, "http://127.0.0.1:11434");
+        assert_eq!(root.path, "");
+        let cloud =
+            parse_base_url("https://ollama.com/v1", crate::locale::Locale::English).unwrap();
+        let root = ollama_native_root(&cloud).expect("root");
+        assert_eq!(root.url, "https://ollama.com");
+    }
+
+    #[test]
+    fn the_probe_reads_thinking_from_a_live_server() {
+        let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = server.local_addr().unwrap().port();
+        let handle = std::thread::spawn(move || {
+            for _ in 0..1 {
+                let (mut stream, _) = server.accept().unwrap();
+                let mut head = Vec::new();
+                let mut byte = [0u8; 1];
+                while !head.ends_with(b"\r\n\r\n") {
+                    if std::io::Read::read(&mut stream, &mut byte).unwrap_or(0) == 0 {
+                        break;
+                    }
+                    head.push(byte[0]);
+                }
+                let text = String::from_utf8_lossy(&head).into_owned();
+                assert!(text.starts_with("POST /api/show "), "{text}");
+                assert!(text.contains("Content-Type: application/json"), "{text}");
+                // 本文を読まずに閉じると RST になるので、宣言された長さだけ読み切る。
+                let length: usize = text
+                    .lines()
+                    .find_map(|line| {
+                        let lower = line.to_ascii_lowercase();
+                        lower
+                            .starts_with("content-length:")
+                            .then(|| line.split(':').nth(1).unwrap_or("0").trim().parse().ok())
+                            .flatten()
+                    })
+                    .unwrap_or(0);
+                let mut rest = vec![0u8; length];
+                if length > 0 {
+                    std::io::Read::read_exact(&mut stream, &mut rest).unwrap();
+                }
+                let body = r#"{"thinking":{"values":["low","high"],"default":"low"}}"#;
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                std::io::Write::write_all(&mut stream, reply.as_bytes()).unwrap();
+            }
+        });
+        let base = parse_base_url(
+            &format!("http://127.0.0.1:{port}/v1"),
+            crate::locale::Locale::English,
+        )
+        .unwrap();
+        let answer = probe_thinking(&base, None, "gpt-oss:20b", crate::locale::Locale::English);
+        handle.join().unwrap();
+        assert_eq!(
+            answer,
+            Thinking::Levels(vec!["low".to_string(), "high".to_string()])
+        );
+    }
+
+    #[test]
+    fn an_unreachable_server_leaves_the_model_unknown() {
+        let base = parse_base_url("http://127.0.0.1:1/v1", crate::locale::Locale::English).unwrap();
+        assert_eq!(
+            probe_thinking(&base, None, "x", crate::locale::Locale::English),
+            Thinking::Unknown
+        );
+    }
+
+    #[test]
+    fn curl_post_keeps_the_key_out_of_argv_and_sends_json() {
+        let cfg = curl_request_config(
+            "POST",
+            "https://ollama.com/api/show",
+            Some("sk-abc"),
+            Some(r#"{"model":"x"}"#),
+        );
+        assert!(cfg.contains("request = \"POST\""), "{cfg}");
+        assert!(cfg.contains("data = "), "{cfg}");
+        assert!(cfg.contains("model"), "{cfg}");
+        assert!(cfg.contains("Authorization: Bearer sk-abc"), "{cfg}");
+        assert!(cfg.contains("proto = \"=https\""), "{cfg}");
+    }
+
+    #[test]
     fn effort_summary_collapses_identical_levels() {
         let mut r = route("ollama", &["a", "b"]);
         let levels = ReasoningEffort::levels(&[("low", "low"), ("high", "high")]);
@@ -3582,7 +3936,9 @@ mod tests {
         }
         assert_eq!(effort_summary(&r).as_deref(), Some("low, high"));
         r.models[1].reasoning_efforts.clear();
-        assert_eq!(effort_summary(&r).as_deref(), Some("a: low, high; b: "));
+        assert_eq!(effort_summary(&r).as_deref(), Some("low, high"));
+        r.models[0].reasoning_efforts.clear();
+        assert_eq!(effort_summary(&r), None);
     }
     fn route(id: &str, models: &[&str]) -> Route {
         Route {
@@ -4592,6 +4948,7 @@ mod tests {
                 key_stdin: false,
                 no_key: false,
                 effort: None,
+                no_probe: true,
                 replace: false,
                 quiet: false,
                 dry_run: true,

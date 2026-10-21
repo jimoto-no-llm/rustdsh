@@ -42,11 +42,12 @@ const DSH_KNOWN: &[(&str, &[&str])] = &[
 ];
 
 /// 環境変数が入っていれば rdsh の経路を登録できるプリセット。
-const ENV_PRESETS: &[(&str, &str)] = &[
-    ("commandcode", "COMMANDCODE_API_KEY"),
-    ("hai", "HAI_API_KEY"),
-    ("sarashina", "SARASHINA_API_KEY"),
-    ("ollama-cloud", "OLLAMA_CLOUD_API_KEY"),
+const ENV_PRESETS: &[(&str, &[&str])] = &[
+    ("commandcode", &["COMMANDCODE_API_KEY"]),
+    ("hai", &["HAI_API_KEY"]),
+    ("sarashina", &["SARASHINA_API_KEY"]),
+    // Ollama Cloud の公式名は OLLAMA_API_KEY。rdsh 側の名前もそのまま受け付ける。
+    ("ollama-cloud", &["OLLAMA_CLOUD_API_KEY", "OLLAMA_API_KEY"]),
 ];
 
 /// 待ち受けていれば経路を作れるローカルサーバー。
@@ -199,11 +200,12 @@ pub(crate) fn detect(scan: &Scan<'_>) -> Detected {
     }
 
     // 2. rdsh で登録する候補: 環境変数。
-    for (preset, env) in ENV_PRESETS {
-        let stored_here = stored.iter().any(|name| name == env);
-        if (scan.getenv)(env).is_none() && !stored_here {
-            let similar = similar_ref(&stored, env);
-            if let Some(name) = similar {
+    for (preset, names) in ENV_PRESETS {
+        let present = names
+            .iter()
+            .find(|name| (scan.getenv)(name).is_some() || stored.iter().any(|s| s == *name));
+        let Some(found) = present else {
+            if let Some(name) = names.iter().find_map(|name| similar_ref(&stored, name)) {
                 out.candidates.push(Candidate {
                     preset: (*preset).to_string(),
                     route_id: None,
@@ -213,12 +215,14 @@ pub(crate) fn detect(scan: &Scan<'_>) -> Detected {
                     models: Vec::new(),
                     source: format!("dsh:credentials({name})"),
                     note: Some(format!(
-                        "dsh に {name} が保存済みですが、この経路のキー名は {env} です",
+                        "dsh に {name} が保存済みですが、この経路のキー名は {} です",
+                        names.join(" または ")
                     )),
                 });
             }
             continue;
-        }
+        };
+        let env = *found;
         let source = if (scan.getenv)(env).is_some() {
             format!("env:{env}")
         } else {
@@ -568,6 +572,7 @@ pub(crate) fn cmd_import(
             key_stdin: false,
             no_key: matches!(candidate.key_state, KeyState::NotNeeded),
             effort: None,
+            no_probe: false,
             replace: false,
             quiet: true,
             dry_run: args.dry_run,
@@ -659,6 +664,7 @@ pub(crate) fn auto_import(
             key_stdin: false,
             no_key: matches!(candidate.key_state, KeyState::NotNeeded),
             effort: None,
+            no_probe: false,
             replace: false,
             quiet: true,
             dry_run: false,
@@ -966,6 +972,35 @@ mod tests {
             "{:?}",
             found.candidates
         );
+    }
+
+    #[test]
+    fn the_documented_ollama_key_name_still_finds_the_cloud_route() {
+        let home = temp_home("ollama-key");
+        let env = env_with(&[("OLLAMA_API_KEY", SECRET)]);
+        let found = with_scan(&home, &env, &[], detect);
+        let cloud = found
+            .candidates
+            .iter()
+            .find(|c| c.preset == "ollama-cloud")
+            .expect("ollama-cloud candidate");
+        assert_eq!(cloud.key_state, KeyState::Env);
+        assert_eq!(cloud.source, "env:OLLAMA_API_KEY");
+        assert!(cloud.writable());
+        assert!(!format!("{found:?}").contains(SECRET));
+    }
+
+    #[test]
+    fn the_rdsh_ollama_cloud_name_also_counts() {
+        let home = temp_home("ollama-cloud-key");
+        let env = env_with(&[("OLLAMA_CLOUD_API_KEY", SECRET)]);
+        let found = with_scan(&home, &env, &[], detect);
+        let cloud = found
+            .candidates
+            .iter()
+            .find(|c| c.preset == "ollama-cloud")
+            .expect("ollama-cloud candidate");
+        assert_eq!(cloud.source, "env:OLLAMA_CLOUD_API_KEY");
     }
 
     #[test]
