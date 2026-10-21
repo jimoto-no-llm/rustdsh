@@ -5,7 +5,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
-## [0.10.0] - 2026-10-21
+## [1.0.0] - 2026-10-21
+
+1.0 として、既存の CLI サブコマンド・設定キー・`cordis.patch.yml` の書き込み形式・`rdsh.json` の形式は 1.x の間は互換を保ちます。破壊的な変更は 2.0.0 として扱います。
 
 ### Fixed
 

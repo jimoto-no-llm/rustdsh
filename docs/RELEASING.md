@@ -35,7 +35,7 @@ chosen from what users can do after the release.
 | --- | --- | --- |
 | **patch** `vX.Y.(Z+1)` | The default. Nothing new for users to learn. | Bug fixes, documentation, dependency updates, internal improvements, small UX adjustments. |
 | **minor** `vX.(Y+1).0` | An important addition users notice. | A new command or feature, a new distribution channel, a change to a default users can see, security hardening users recognise. |
-| **major** `v(X+1).0.0` | A breaking change. | While the project is `0.x` there is no `1.0.0` yet, so a breaking change takes a minor bump exactly as the existing `0.x` releases do; the CHANGELOG entry and the release notes must still say so. |
+| **major** `v(X+1).0.0` | A breaking change, or the version that starts a new compatibility promise. | `v1.0.0` fixed the 0.x surface as stable: the existing subcommands, setting keys, `cordis.patch.yml` writes and `rdsh.json` stay compatible through 1.x, and a breaking change after it takes `v2.0.0`. The CHANGELOG entry and the release notes must still say why. |
 
 When in doubt, ask whether a user would recognise the change as a new feature:
 if yes, it is a minor. Leave one line in the release notes saying why that
