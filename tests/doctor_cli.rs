@@ -340,7 +340,7 @@ fn doctor_reports_the_essential_plugins_a_profile_is_missing() {
         "doctor must print the fix: {output}"
     );
     assert!(
-        output.contains("plugins: web is missing 11 essential plugin(s)"),
+        output.contains("plugins: web is missing 12 essential plugin(s)"),
         "the attached package must not be counted as missing: {output}"
     );
     fs::remove_dir_all(root).unwrap();

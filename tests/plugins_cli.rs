@@ -141,7 +141,7 @@ fn status_reports_installed_enabled_and_missing_essential_packages() {
     assert_eq!(report["profile"], "web");
     assert_eq!(report["initialized"], true);
     assert_eq!(report["ok"], false);
-    assert_eq!(report["essential"].as_array().unwrap().len(), 12);
+    assert_eq!(report["essential"].as_array().unwrap().len(), 13);
     assert_eq!(
         row(&report, "essential", "rdsh-settings")["installed"],
         true
@@ -155,8 +155,8 @@ fn status_reports_installed_enabled_and_missing_essential_packages() {
         row(&report, "essential", "rdsh-answer-guard")["state"],
         "missing"
     );
-    // 12 essentials on web, 2 already attached.
-    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 10);
+    // 13 essentials on web, 2 already attached.
+    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 11);
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn an_uninitialized_profile_reports_every_essential_as_missing() {
     let fixture = Fixture::new("web", None);
     let report = status_json(&fixture, "web");
     assert_eq!(report["initialized"], false);
-    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 12);
+    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 13);
 }
 
 #[test]
@@ -208,7 +208,7 @@ fn install_dry_run_lists_the_essential_specs_without_calling_dsh() {
         .join(if cfg!(windows) { "dsh.exe" } else { "dsh" });
     assert_eq!(report["command"], dsh.display().to_string());
     let actions = report["actions"].as_array().unwrap();
-    assert_eq!(actions.len(), 12);
+    assert_eq!(actions.len(), 13);
     let bundled = actions
         .iter()
         .find(|action| action["package"].as_str() == Some("rdsh-settings"))
@@ -243,7 +243,7 @@ fn install_attaches_only_the_missing_packages_through_dsh() {
         String::from_utf8_lossy(&output.stderr)
     );
     let calls = fixture.calls();
-    assert_eq!(calls.len(), 10, "{calls:?}");
+    assert_eq!(calls.len(), 11, "{calls:?}");
     assert!(
         !calls.iter().any(|line| line.contains("rdsh-settings")),
         "an attached package must not be added twice: {calls:?}"
@@ -352,6 +352,6 @@ fn a_missing_checkout_fails_loudly_unless_bundled_plugins_are_declined() {
         .iter()
         .all(|spec| spec.starts_with("@deepseek-ai/")));
     assert!(json(&output)["failed"].as_array().unwrap().is_empty());
-    // web carries five bundled essentials (the release banner is Web-only).
-    assert_eq!(json(&output)["skipped"].as_array().unwrap().len(), 5);
+    // web carries six bundled essentials (the banner and the asset server are Web-only).
+    assert_eq!(json(&output)["skipped"].as_array().unwrap().len(), 6);
 }
