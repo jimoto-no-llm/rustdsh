@@ -1976,3 +1976,121 @@ fn structural_mapping_refusal_is_localized_without_profile_or_credential_writes(
         assert_eq!(fixture.creds().as_bytes(), credentials.as_bytes());
     }
 }
+
+#[test]
+fn detect_reports_a_stored_dsh_key_without_printing_its_value() {
+    let f = Fixture::new();
+    fs::write(
+        f.0.join("dsh/.credentials.yaml"),
+        "version: 1\nrecords: {}\nrefs:\n  DEEPSEEK_API_KEY: sk-sentinel-value\n",
+    )
+    .unwrap();
+    let out = f.run(&["provider", "detect"]);
+    ok(&out);
+    let body = text(&out);
+    assert!(body.contains("deepseek"), "{body}");
+    assert!(body.contains("DEEPSEEK_API_KEY"), "{body}");
+    assert!(!body.contains("sk-sentinel-value"), "{body}");
+}
+
+#[test]
+fn detect_json_marks_an_environment_key_as_writable() {
+    let f = Fixture::new();
+    let out = f.run_with(
+        &["provider", "detect", "--json"],
+        &[("HAI_API_KEY", "sk-test")],
+        b"",
+    );
+    ok(&out);
+    let value: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let hai = value["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|route| route["route"] == "hai")
+        .expect("hai route");
+    assert_eq!(hai["key"], "env");
+    assert_eq!(hai["writable"], true);
+    assert_eq!(hai["baseURL"], "https://hai-api.hcloud.ltd/v1");
+    assert!(!text(&out).contains("sk-test"));
+}
+
+#[test]
+fn import_writes_only_the_route_whose_key_is_present() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let out = f.run_with(
+        &["provider", "import", "--profile", "tui", "--json"],
+        &[("HAI_API_KEY", "sk-test")],
+        b"",
+    );
+    ok(&out);
+    let value: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let routes = value["routes"].as_array().unwrap();
+    let hai = routes.iter().find(|r| r["route"] == "hai").expect("hai");
+    assert_eq!(hai["ok"], true);
+    assert!(f.patch().contains("hai:"), "{}", f.patch());
+    // commandcode は鍵が無いので登録しない（推測で保存しない）。
+    let commandcode = routes.iter().find(|r| r["route"] == "commandcode");
+    if let Some(entry) = commandcode {
+        assert_eq!(entry["ok"], false);
+    }
+    assert!(!f.patch().contains("commandcode:"), "{}", f.patch());
+}
+
+#[test]
+fn import_is_a_no_op_when_the_route_already_exists() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let first = f.run_with(
+        &["provider", "import", "--profile", "tui"],
+        &[("HAI_API_KEY", "sk-test")],
+        b"",
+    );
+    ok(&first);
+    let patch = f.patch();
+    let second = f.run_with(
+        &["provider", "import", "--profile", "tui"],
+        &[("HAI_API_KEY", "sk-test")],
+        b"",
+    );
+    ok(&second);
+    assert_eq!(f.patch(), patch);
+}
+
+#[test]
+fn setup_json_never_writes_detected_routes() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let before = f.patch();
+    let out = f.run_with(&["setup", "--json"], &[("HAI_API_KEY", "sk-test")], b"");
+    ok(&out);
+    assert_eq!(f.patch(), before);
+}
+
+#[test]
+fn setup_registers_a_detected_route_without_being_asked() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    // --open も --login も既定では無効なので、素の setup は案内だけを出す。
+    let out = f.run_with(&["setup"], &[("HAI_API_KEY", "sk-test")], b"");
+    ok(&out);
+    let body = text(&out);
+    assert!(body.contains("hai"), "{body}");
+    assert!(f.patch().contains("hai:"), "{}", f.patch());
+    assert!(f.patch().contains("https://hai-api.hcloud.ltd/v1"));
+}
+
+#[test]
+fn setup_no_auto_import_leaves_the_patch_untouched() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let before = f.patch();
+    let out = f.run_with(
+        &["setup", "--no-auto-import"],
+        &[("HAI_API_KEY", "sk-test")],
+        b"",
+    );
+    ok(&out);
+    assert_eq!(f.patch(), before);
+}

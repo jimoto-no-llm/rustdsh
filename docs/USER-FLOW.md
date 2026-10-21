@@ -32,6 +32,10 @@ rdsh setup --web
 - 準備: Node.js 22以上、本家DSH、rdshの有無を確認し、足りないものの導入コマンドを示します。
 - AIとつなぐ: 見つかったCodex／OpenCodeのログインを1クリックで共有します（`rdsh auth --select … --import` と同じ永続設定）。
   未ログインなら `codex login`／`opencode auth login` を新しい端末ウィンドウで起動します。DeepSeek・OpenAI・Anthropicのキーも保存できます。
+- この PC で見つかったもの: 環境変数、`dsh` に保存済みのキー、OpenCode の独自プロバイダー、
+  待ち受け中のローカルサーバーを読み取り、「`dsh` がそのまま使えるもの」と「rdsh で登録できるもの」に
+  分けて表示します。鍵が揃っている経路はこの時点で自動的に設定へ登録します（`--no-auto-import` で無効化）。
+  `rdsh setup`（コマンド版）も最後に同じ要約を出します。
 - 完了: DeepSeek Harnessアプリ、`rdsh tui`、Webプロファイルのいずれかで最初の会話を始めます。
 
 インストーラーは対話端末での導入後にこの画面を開きます（`install.ps1 -NoSetup`／`install.sh --no-setup`、

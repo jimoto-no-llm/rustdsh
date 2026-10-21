@@ -160,13 +160,34 @@ const PRESETS: &[Preset] = &[
         supports_discovery: true,
         needs_key: false,
     },
+    // Ollama Cloud serves the hosted catalog on ollama.com; unlike the local
+    // runtime it needs a real key, kept apart from the local route so the two
+    // do not share one placeholder.
+    Preset {
+        id: "ollama-cloud",
+        display_name: "Ollama Cloud",
+        base_url: Some("https://ollama.com/v1"),
+        default_models: &[],
+        compat: &[],
+        max_tokens_cap: None,
+        supports_discovery: true,
+        needs_key: true,
+    },
 ];
 
+/// The endpoint a preset writes, for callers that only need the URL.
+/// Whether the endpoint offers GET /models, for callers that pick a model source.
+pub(crate) fn preset_supports_discovery(id: &str) -> Option<bool> {
+    preset(id).map(|p| p.supports_discovery)
+}
+pub(crate) fn preset_base_url(id: &str) -> Option<&'static str> {
+    preset(id).and_then(|p| p.base_url)
+}
 fn preset(id: &str) -> Option<&'static Preset> {
     PRESETS.iter().find(|p| p.id == id)
 }
 
-fn t(locale: crate::locale::Locale, ja: &str, en: &str, zh: &str) -> String {
+pub(crate) fn t(locale: crate::locale::Locale, ja: &str, en: &str, zh: &str) -> String {
     match locale {
         crate::locale::Locale::Japanese => ja,
         crate::locale::Locale::English => en,
@@ -2095,7 +2116,7 @@ fn parse_base_url(raw: &str, locale: crate::locale::Locale) -> Result<Base> {
 
 /// Remove `//` and `/* */` comments outside strings, then trailing commas
 /// before `}` or `]`, so the result is plain JSON.
-fn strip_jsonc(input: &str) -> String {
+pub(crate) fn strip_jsonc(input: &str) -> String {
     let input = input.strip_prefix('\u{feff}').unwrap_or(input);
     let b = input.as_bytes();
     let mut stage = Vec::with_capacity(b.len());
@@ -2719,6 +2740,8 @@ pub(crate) struct AddArgs {
     /// `low,medium,high` / `none` for every model of this route.
     pub effort: Option<String>,
     pub replace: bool,
+    /// Suppress this command's own report; the caller aggregates results.
+    pub quiet: bool,
     pub dry_run: bool,
     pub json: bool,
 }
@@ -2804,6 +2827,19 @@ fn write_atomic(path: &Path, text: &str, locale: crate::locale::Locale) -> Resul
         let _ = std::fs::remove_file(&tmp);
     }
     result
+}
+
+/// プロファイル設定に既にある経路ID（読み取りのみ。鍵の値は含まない）。
+pub(crate) fn configured_route_ids(profile: &str, locale: crate::locale::Locale) -> Vec<String> {
+    let path = PathBuf::from(dsh_home())
+        .join("profiles")
+        .join(profile)
+        .join("cordis.patch.yml");
+    let text = read_patch(&path, locale).unwrap_or_default();
+    routes_in(&text, locale)
+        .into_iter()
+        .map(|route| route.id)
+        .collect()
 }
 
 fn read_patch(path: &Path, locale: crate::locale::Locale) -> Result<String> {
@@ -3164,6 +3200,9 @@ pub(crate) fn cmd_add(
         "missing"
     };
 
+    if args.quiet {
+        return Ok(());
+    }
     let model_ids: Vec<&str> = route.models.iter().map(|m| m.id.as_str()).collect();
     if args.json {
         println!(
@@ -4554,6 +4593,7 @@ mod tests {
                 no_key: false,
                 effort: None,
                 replace: false,
+                quiet: false,
                 dry_run: true,
                 json: false,
             },
