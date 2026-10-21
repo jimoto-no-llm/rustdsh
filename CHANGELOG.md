@@ -38,6 +38,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- Ollama 系のプリセットで `--discover`／`--model` を使うと、`POST /api/show` から
+  モデルごとの thinking 制御を読み、`reasoningEfforts` を自動で書くようにしました。
+  名前付きの段階（low・medium・high など）はそのまま書き、ON/OFF だけのモデルや
+  推論非対応のモデルには段階を書かず、その旨を表示します。従来どおり全モデルに
+  同じ一覧を仮定しません。`--no-probe` で問い合わせを止められます。
+- `rdsh provider detect` が Ollama Cloud 公式の `OLLAMA_API_KEY` も
+  `ollama-cloud` 経路の資格情報として扱うようにしました。
 - `rdsh setup` と `rdsh setup --web` が、検出した経路のうち鍵が揃っているものを
   自動で設定へ登録するようにしました。既にある経路は変更せず、鍵が無い経路は登録しません。
   `--no-auto-import`（または `--dry-run`）で自動登録を止められます。
