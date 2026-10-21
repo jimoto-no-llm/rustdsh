@@ -1,4 +1,4 @@
-# Provider routes: HAI, Command Code, Sarashina and home LLM servers
+# Provider routes: HAI, Command Code, Sarashina, Ollama and home LLM servers
 
 `rdsh provider` registers an OpenAI-compatible endpoint as a DeepSeek Harness
 (dsh) route, so the model appears in dsh's model picker without editing YAML by
@@ -13,6 +13,7 @@ rdsh provider list [--json]
 rdsh provider add hai [options]
 rdsh provider add commandcode [options]
 rdsh provider add sarashina [options]
+rdsh provider add ollama [options]
 rdsh provider add local-openai --base-url <url> [options]
 ```
 
@@ -264,6 +265,56 @@ retention (`x-cmd-zdr: 1` on `/chat/completions`, answered with `422`
 written by this preset; `headers` injection is tracked separately in #484.
 On `/messages` the header is accepted but does not change routing.
 
+## Ollama
+
+```sh
+rdsh provider add ollama
+rdsh provider add ollama --discover --model qwen3:8b --effort low,medium,high
+```
+
+Ollama speaks the OpenAI-compatible API on `http://127.0.0.1:11434/v1` and
+authenticates nobody, so the route is registered with the `ollama` id, the
+fixed base URL and the `no-key` placeholder under `OLLAMA_API_KEY`. No key
+input is needed; `--no-key` stays accepted for symmetry with `local-openai`.
+Pass `--base-url` to reach an Ollama on another host.
+
+The preset declares `gpt-oss:20b` (131,072 context, 32,768 output) and the
+three thinking levels that model publishes. Other ids come from `--model` or
+`--discover` and inherit the same three levels, because Ollama exposes its
+per-model capability through `POST /api/show` rather than `/v1/models`: rdsh
+does not guess them per model. Override the levels with `--effort`.
+
+## Reasoning levels (`--effort`)
+
+dsh only offers a reasoning level when the model publishes one. Models in its
+catalog carry their own; for anything else dsh treats the model as
+non-reasoning unless the route states `reasoningEfforts:` by hand. `--effort`
+writes that block for every model of the route:
+
+```sh
+rdsh provider add ollama --effort low,medium,high          # label and value are the same
+rdsh provider add ollama --effort "minimal=low,deep=high"  # label=value
+rdsh provider add ollama --effort none                     # no block: non-reasoning
+```
+
+```yaml
+          - id: gpt-oss:20b
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+```
+
+The label is what the model picker shows and the value is what dsh sends as
+`reasoning_effort`, so a server that expects different words can be given
+`quick=low`. `--effort none` removes the block on `--replace`, which is how a
+model is declared non-reasoning. `rdsh provider add` prints the levels it
+wrote, and `--json` reports them under `reasoningEfforts`.
+
+A model whose server exposes no effort capability simply receives none: rdsh
+does not assume one list fits every model, and leaves hand-written
+`reasoningEfforts:` alone unless the whole block is replaced.
+
 ## Home servers (`local-openai`)
 
 ```sh
@@ -288,7 +339,7 @@ Typical base URLs:
 | llama.cpp `llama-server` | `http://host:8080/v1` |
 | vLLM | `http://host:8000/v1` |
 | LM Studio | `http://host:1234/v1` |
-| Ollama | `http://host:11434/v1` |
+| Ollama | `http://host:11434/v1` (or the `ollama` preset) |
 
 `--discover` over `http://` uses a plain built-in HTTP client; over `https://`
 it runs `curl`, pinned to https with a 30 second timeout and an 8 MiB cap.
