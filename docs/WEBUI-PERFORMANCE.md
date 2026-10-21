@@ -7,6 +7,24 @@
 NRestarts=0 を計測前後で確認）。全計測は別ポート (39080-39520) と
 `DSH_HOME=/tmp/dsh-*` で実施した。
 
+## 起動を rdsh 経由にする（NODE_COMPILE_CACHE を効かせる）
+
+rdsh は委譲時に `NODE_COMPILE_CACHE` を設定しますが、systemd などが `dsh-orig` を直接 exec していると、その設定は一度も使われません。起動が遅いと感じたら、次で経路を確認できます。
+
+```sh
+systemctl --user cat dsh-web.service | grep ^ExecStart
+grep -n 'exec ' ~/.local/bin/dsh-web-local 2>/dev/null
+```
+
+出力に `rdsh` が現れず、`dsh-orig` や `dsh` を直接 exec していれば迂回されています。 ランチャー側を rdsh 経由に変えると有効になります（例）。
+
+```sh
+#!/usr/bin/env bash
+exec /path/to/rdsh --profile web -- --host 127.0.0.1 --port 3080 "$@"
+```
+
+迂回しているかどうかは `rdsh doctor` でも分かります（Web プロファイルの起動経路を表示します）。キャッシュ先は `RDSH_NODE_COMPILE_CACHE=<dir>` で変更でき、`0` で無効化できます。育ちすぎたキャッシュ（512 MiB または 5 万ファイル超）は、次回起動時に片付け方だけを表示します。
+
 ## 1. 結論
 
 軽量化の余地は「起動」と「転送」にあり、**効果の大きい順**に次でした。
