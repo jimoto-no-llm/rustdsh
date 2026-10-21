@@ -5,6 +5,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- `rdsh search` と `rdsh search-web` の人間向け出力から制御文字を除きました。検索対象の
+  ファイル名・一致行・検索結果の URL に ESC や OSC 52 が入っていても、端末の行消去や
+  クリップボード書き換えが起きません（#889、#896）。機械可読出力は従来どおりです。
+- rdsh が `$DSH_HOME` を最初に作るとき、ディレクトリを 0700 で作成するようにしました
+  （umask に依存しません）。既存ディレクトリのモードは変更しません（#891）。
+- `.credentials.yaml` が他ユーザーから読めるモードのとき、読み込み時に警告するようにしました
+  （dsh は 0600 以外を読まないため、黙って空になるのを避けます）（#893）。
+
 - `rdsh provider add` が、モデルの画像入力対応を自動で判定して `input: [text, image]` を
   書くようにしました。Ollama 系は `POST /api/show` の `capabilities` を、それ以外は
   `GET /models` の `architecture.input_modalities`／`input_modalities`／`capabilities` を読みます。

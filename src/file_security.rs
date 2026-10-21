@@ -681,6 +681,100 @@ pub(crate) fn validate_share_files(files: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// Create the directory (recursively) with 0700 so no other user can traverse
+/// the state tree below it. Directories that already exist keep their mode:
+/// only the ones this call creates are tightened, so a DSH-made 0700 is never
+/// relaxed and a user's own choice is not silently changed.
+pub(crate) fn ensure_private_dir(path: &Path) -> std::io::Result<()> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path)
+}
+
+/// True when the file exists and other users can read or traverse it. The
+/// documented rule is "keep it at 0600, otherwise dsh refuses to read it";
+/// refusing loudly here keeps a world-readable key from being used silently.
+pub(crate) fn others_can_read(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let Ok(metadata) = std::fs::symlink_metadata(path) else {
+            return false;
+        };
+        metadata.is_file() && metadata.mode() & 0o077 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        false
+    }
+}
+
+#[cfg(test)]
+mod private_state_tests {
+    use super::{ensure_private_dir, others_can_read};
+
+    #[test]
+    fn a_created_state_directory_is_owner_only() {
+        let root = std::env::temp_dir().join(format!("rdsh-privdir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let target = root.join("a").join("b");
+        ensure_private_dir(&target).unwrap();
+        assert!(target.is_dir());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt as _;
+            let mode = std::fs::metadata(&target).unwrap().mode() & 0o777;
+            assert_eq!(mode, 0o700, "created state dir must be 0700, got {mode:o}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_existing_directory_keeps_its_mode() {
+        let root = std::env::temp_dir().join(format!("rdsh-privkeep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o750)).unwrap();
+        }
+        ensure_private_dir(&root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt as _;
+            let mode = std::fs::metadata(&root).unwrap().mode() & 0o777;
+            assert_eq!(mode, 0o750, "an existing directory must not be changed");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_world_readable_file_is_flagged() {
+        let path = std::env::temp_dir().join(format!("rdsh-creds-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, b"x").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            assert!(others_can_read(&path));
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            assert!(!others_can_read(&path));
+        }
+        assert!(!others_can_read(&path.with_extension("missing")));
+        let _ = std::fs::remove_file(&path);
+    }
+}
 #[cfg(test)]
 mod share_validation_tests {
     use super::validate_share_files;

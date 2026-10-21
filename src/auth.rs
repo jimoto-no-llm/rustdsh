@@ -350,6 +350,17 @@ fn flush_entry(
 
 fn load_doc(path: &str) -> CredsDoc {
     let mut doc = CredsDoc::default();
+    // dsh refuses to read a credentials file that others can read, so a
+    // 0644 file turns into a silent "no key"; tell the person at the terminal.
+    // A pipe (tests, delegation) keeps stderr clean for the child's output.
+    {
+        use std::io::IsTerminal as _;
+        if std::io::stderr().is_terminal()
+            && crate::file_security::others_can_read(std::path::Path::new(path))
+        {
+            eprintln!("[rdsh] credentials file is readable by others; run chmod 600 {path}");
+        }
+    }
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(_) => return doc,
@@ -639,7 +650,7 @@ fn splice_entry(text: &str, section: &str, key: &str, block: &[String]) -> Optio
 pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
     use std::io::Write;
     if let Some(parent) = std::path::Path::new(path).parent() {
-        std::fs::create_dir_all(parent)?;
+        crate::file_security::ensure_private_dir(parent)?;
     }
     let tmp = format!("{path}.tmp.{}", crate::local_http::random_token()?);
     let mut options = std::fs::OpenOptions::new();
