@@ -7,6 +7,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Security
 
+- リリースビルドの `uses:` を 40桁コミット SHA に固定しました。可変 ref の上流書き換えで
+  公開バイナリへ任意コードが混入する経路を塞ぎます（#890）。
+- CD は安定版を `--latest=false` で公開し、digest 台帳が main に入った時点で
+  `mark-release-latest` が Latest を切り替えるようにしました。台帳 pin 前に
+  documented な導入コマンドが旧版を入れる食い違いが起きません（#892）。
+
 - `rdsh search` と `rdsh search-web` の人間向け出力から制御文字を除きました。検索対象の
   ファイル名・一致行・検索結果の URL に ESC や OSC 52 が入っていても、端末の行消去や
   クリップボード書き換えが起きません（#889、#896）。機械可読出力は従来どおりです。

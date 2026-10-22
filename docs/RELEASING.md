@@ -350,3 +350,19 @@ ruleset blocks updates and deletion of `v*` tags; it allows creating new tags.
 The source configuration is [.github/tag-ruleset.json](../.github/tag-ruleset.json).
 Do not repush an existing tag to rerun CD: retry failed jobs in Actions, or publish
 a corrected patch version if the release is already public.
+
+## Latest の切り替え（#892）
+
+CD は安定版を **`--latest=false`** で公開します。`install.sh --from-release` と自動更新は
+`main` の digest 台帳からバージョンを解決するため、台帳が pin される前に `releases/latest`
+を切り替えると「documented なコマンドが旧版を入れる」食い違いが起きます。
+
+流れは次のとおりです。
+
+1. CD が `--latest=false` でリリースを公開する（アセットは最新タグの下に揃う）。
+2. `pin-release-digests` が台帳更新ブランチを作り、PR を開く（自分の PR は `--admin` マージ）。
+3. 台帳が `main` に入ると `mark-release-latest` が走り、台帳の `latest` 行が指すタグを
+   `gh release edit --latest` で Latest にします。
+
+つまり `releases/latest`・台帳・実際に配られる版は常に一致します。pin がマージされるまで
+Latest は旧版のままなので、`latest` 経由で新しい版が降ってくることはありません。
