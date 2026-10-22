@@ -1,0 +1,55 @@
+name: mark-release-latest
+
+# cd publishes a stable release with --latest=false on purpose. The installer
+# and updater resolve a version from the digest ledgers on main, so marking the
+# release latest during upload would make releases/latest disagree with what
+# the documented command installs (#892). This workflow flips the flag once the
+# pin PR has landed on main.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - release-digests.tsv
+      - release-digests-windows.tsv
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mark-release-latest
+  cancel-in-progress: false
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: release-digests.tsv
+
+      - name: Mark the pinned release latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="$(awk '$1 == "latest" { print $2 }' release-digests.tsv)"
+          if ! printf '%s' "${tag}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "the ledger has no stable latest tag (${tag}); nothing to mark"
+            exit 0
+          fi
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            echo "release ${tag} does not exist yet; nothing to mark"
+            exit 0
+          fi
+          if [ "$(gh release view "${tag}" --json isPrerelease --jq .isPrerelease)" = "true" ]; then
+            echo "release ${tag} is a prerelease; not marking it latest"
+            exit 0
+          fi
+          if [ "$(gh release view "${tag}" --json isLatest --jq .isLatest)" = "true" ]; then
+            echo "release ${tag} is already latest"
+            exit 0
+          fi
+          gh release edit "${tag}" --latest
+          echo "release ${tag} is now latest"

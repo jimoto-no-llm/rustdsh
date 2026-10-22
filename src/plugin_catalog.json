@@ -70,6 +70,12 @@
       "bundled": true,
       "feature": "feedback",
       "why": "disable the DSH Like/Dislike and /feedback surface"
+    },
+    {
+      "package": "rdsh-no-feedback-client",
+      "bundled": true,
+      "feature": "feedback",
+      "why": "hide the sidebar Feedback row the patch layer cannot remove"
     }
   ],
   "recommended": [

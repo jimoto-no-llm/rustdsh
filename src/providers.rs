@@ -2369,25 +2369,24 @@ fn parse_listing(body: &str, locale: crate::locale::Locale) -> Result<Vec<Model>
         locale,
         "the model listing is not JSON",
     ))?;
-    let mut ids: Vec<String> = Vec::new();
+    let mut listed: Vec<(String, Vec<String>)> = Vec::new();
     if let Some(data) = doc.get("data").and_then(Value::as_array) {
-        ids.extend(
+        listed.extend(
             data.iter()
                 .filter(|m| serves_chat_completions(m))
-                .filter_map(|m| m.get("id").and_then(Value::as_str))
-                .map(str::to_string),
+                .filter_map(|m| {
+                    let id = m.get("id").and_then(Value::as_str)?;
+                    Some((id.to_string(), input_from_listing(m)))
+                }),
         );
     } else if let Some(models) = doc.get("models").and_then(Value::as_array) {
-        ids.extend(
-            models
-                .iter()
-                .filter_map(|m| {
-                    m.get("name")
-                        .or_else(|| m.get("model"))
-                        .and_then(Value::as_str)
-                })
-                .map(str::to_string),
-        );
+        listed.extend(models.iter().filter_map(|m| {
+            let id = m
+                .get("name")
+                .or_else(|| m.get("model"))
+                .and_then(Value::as_str)?;
+            Some((id.to_string(), input_from_listing(m)))
+        }));
     } else {
         bail!(
             "{}",
@@ -2399,14 +2398,61 @@ fn parse_listing(body: &str, locale: crate::locale::Locale) -> Result<Vec<Model>
             )
         );
     }
-    Ok(ids
+    Ok(listed
         .into_iter()
-        .filter(|id| valid_model_id(id))
-        .map(|id| Model {
+        .filter(|(id, _)| valid_model_id(id))
+        .map(|(id, input)| Model {
             id,
+            input,
             ..Model::default()
         })
         .collect())
+}
+
+/// A listing entry's own input modalities, when it declares them in a shape
+/// worth trusting: OpenRouter's architecture.input_modalities, a plain
+/// input_modalities, or a capabilities name list that says "vision".
+fn input_from_listing(entry: &Value) -> Vec<String> {
+    let Some(values) = entry
+        .get("architecture")
+        .and_then(|architecture| architecture.get("input_modalities"))
+        .or_else(|| entry.get("input_modalities"))
+        .or_else(|| entry.get("capabilities"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    let mut out: Vec<String> = Vec::new();
+    for value in values.iter().filter_map(Value::as_str) {
+        let name = match value {
+            "vision" => "image",
+            other => other,
+        };
+        if MODALITIES.contains(&name) && !out.iter().any(|seen| seen == name) {
+            out.push(name.to_string());
+        }
+    }
+    // dsh always needs text, so an image-only declaration gains it.
+    if out.iter().any(|name| name == "image") && !out.iter().any(|name| name == "text") {
+        out.insert(0, "text".to_string());
+    }
+    out
+}
+
+/// text,image as the CLI spells it.
+fn parse_inputs(raw: &str) -> Option<Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    for part in raw.split(',') {
+        let name = part.trim().to_ascii_lowercase();
+        if name.is_empty() || !MODALITIES.contains(&name.as_str()) || out.contains(&name) {
+            return None;
+        }
+        out.push(name);
+    }
+    if !out.iter().any(|name| name == "text") {
+        return None;
+    }
+    Some(out)
 }
 
 fn auth_value_ok(key: &str) -> bool {
@@ -2810,15 +2856,48 @@ fn ollama_native_root(base: &Base) -> Option<Base> {
     parse_base_url(root, crate::locale::Locale::English).ok()
 }
 
-/// POST /api/show で、モデルが公開する推論の制御方法を尋ねる。
-fn probe_thinking(
+/// POST /api/show が返す能力。
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Capabilities {
+    thinking: Thinking,
+    /// capabilities に "vision" がある（画像入力を申告している）。
+    vision: bool,
+}
+
+/// /api/show の応答から capabilities と thinking を読む。
+fn parse_capabilities(body: &str) -> Capabilities {
+    let vision = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("capabilities")
+                .and_then(serde_json::Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .any(|name| name == "vision")
+                })
+        })
+        .unwrap_or(false);
+    Capabilities {
+        thinking: parse_thinking(body),
+        vision,
+    }
+}
+
+/// POST /api/show で、モデルが公開する能力を尋ねる。
+fn probe_capabilities(
     base: &Base,
     key: Option<&str>,
     model: &str,
     locale: crate::locale::Locale,
-) -> Thinking {
+) -> Capabilities {
     let Some(root) = ollama_native_root(base) else {
-        return Thinking::Unknown;
+        return Capabilities {
+            thinking: Thinking::Unknown,
+            vision: false,
+        };
     };
     let path = format!("{}/api/show", root.path);
     let body = serde_json::json!({ "model": model }).to_string();
@@ -2827,7 +2906,13 @@ fn probe_thinking(
     } else {
         http_post(&root, &path, key, &body, locale)
     };
-    answer.map_or(Thinking::Unknown, |text| parse_thinking(&text))
+    answer.map_or(
+        Capabilities {
+            thinking: Thinking::Unknown,
+            vision: false,
+        },
+        |text| parse_capabilities(&text),
+    )
 }
 
 /// 取得した段階名を reasoningEfforts の形にする。
@@ -2903,6 +2988,8 @@ pub(crate) struct AddArgs {
     pub effort: Option<String>,
     /// Ollama 系で /api/show を読まない。
     pub no_probe: bool,
+    /// text,image を全モデルに明示する。
+    pub input: Option<String>,
     pub replace: bool,
     /// Suppress this command's own report; the caller aggregates results.
     pub quiet: bool,
@@ -3118,6 +3205,7 @@ pub(crate) fn cmd_add(
             );
         }
     }
+    let input_override = args.input.clone();
     let effort_override = match args.effort.as_deref() {
         // "none" clears the levels, so dsh resolves the model as non-reasoning.
         Some(raw) if raw.trim().eq_ignore_ascii_case("none") => Some(Vec::new()),
@@ -3247,7 +3335,7 @@ pub(crate) fn cmd_add(
 
     let skip_existing = already && !args.replace;
     // 推論の制御方法を /api/show から読めるのは Ollama 系のプリセットだけ。
-    let probe_capabilities = !args.no_probe && matches!(preset.id, "ollama" | "ollama-cloud");
+    let read_capabilities = !args.no_probe && matches!(preset.id, "ollama" | "ollama-cloud");
     let mut notes: Vec<String> = Vec::new();
     let mut human_notes: Vec<String> = Vec::new();
     let mut groups = vec![explicit_models];
@@ -3293,7 +3381,7 @@ pub(crate) fn cmd_add(
     // Ollama 系は /api/show がモデルごとの推論制御を返すので、手入力の代わりに読む。
     // 説明済みのモデルは、下の「段階が無い」注記から外して二重に言わない。
     let mut explained: Vec<String> = Vec::new();
-    if probe_capabilities && !skip_existing && effort_override.is_none() {
+    if read_capabilities && !skip_existing && effort_override.is_none() {
         let key = stdin_key
             .clone()
             .or_else(|| env_key.clone())
@@ -3303,7 +3391,18 @@ pub(crate) fn cmd_add(
             if !model.reasoning_efforts.is_empty() {
                 continue;
             }
-            match probe_thinking(&base, key.as_deref(), &model.id, locale) {
+            let capabilities = probe_capabilities(&base, key.as_deref(), &model.id, locale);
+            if capabilities.vision && !model.input.iter().any(|name| name == "image") {
+                model.input = vec!["text".to_string(), "image".to_string()];
+                human_notes.push(localized_format!(
+                    locale,
+                    "{}: the model reports image input",
+                    "{}：模型声明支持图像输入",
+                    "{}: 画像入力に対応すると申告しています",
+                    model.id
+                ));
+            }
+            match capabilities.thinking {
                 Thinking::Levels(names) => {
                     model.reasoning_efforts = levels_from_names(&names);
                     human_notes.push(localized_format!(
@@ -3337,6 +3436,22 @@ pub(crate) fn cmd_add(
                 }
                 Thinking::Unknown => {}
             }
+        }
+    }
+    if let Some(raw) = input_override.as_deref() {
+        let Some(inputs) = parse_inputs(raw) else {
+            bail!(
+                "{}",
+                localized_format!(
+                    locale,
+                    "--input takes text and/or image, comma separated (text is required)",
+                    "--input 接受 text 和/或 image，用逗号分隔（必须包含 text）",
+                    "--input は text と image をカンマ区切りで指定します（text は必須）"
+                )
+            );
+        };
+        for model in models.iter_mut() {
+            model.input = inputs.clone();
         }
     }
     match &effort_override {
@@ -3790,6 +3905,52 @@ mod tests {
     }
 
     #[test]
+    fn vision_capabilities_become_image_input() {
+        let caps = parse_capabilities(
+            r#"{"capabilities":["completion","tools","thinking","vision"],"thinking":{"values":["low","high"]}}"#,
+        );
+        assert!(caps.vision);
+        assert_eq!(
+            caps.thinking,
+            Thinking::Levels(vec!["low".to_string(), "high".to_string()])
+        );
+        let plain = parse_capabilities(r#"{"capabilities":["completion"],"thinking":{}}"#);
+        assert!(!plain.vision);
+        assert!(!parse_capabilities("not json").vision);
+    }
+
+    #[test]
+    fn a_listing_can_declare_image_input() {
+        let body = r#"{"data":[
+            {"id":"a","architecture":{"input_modalities":["text","image"]}},
+            {"id":"b","capabilities":["vision"]},
+            {"id":"c"},
+            {"id":"d","input_modalities":["image"]}
+        ]}"#;
+        let models = parse_listing(body, crate::locale::Locale::English).unwrap();
+        assert_eq!(models[0].input, vec!["text", "image"]);
+        assert_eq!(models[1].input, vec!["text", "image"]);
+        assert!(models[2].input.is_empty());
+        assert_eq!(models[3].input, vec!["text", "image"]);
+    }
+
+    #[test]
+    fn the_input_flag_takes_only_known_modalities() {
+        assert_eq!(
+            parse_inputs("text,image"),
+            Some(vec!["text".to_string(), "image".to_string()])
+        );
+        assert_eq!(
+            parse_inputs("IMAGE,TEXT"),
+            Some(vec!["image".to_string(), "text".to_string()])
+        );
+        assert_eq!(parse_inputs("image"), None);
+        assert_eq!(parse_inputs("text,audio"), None);
+        assert_eq!(parse_inputs("text,text"), None);
+        assert_eq!(parse_inputs(""), None);
+    }
+
+    #[test]
     fn thiking_levels_come_from_the_show_response() {
         assert_eq!(
             parse_thinking(r#"{"thinking":{"values":["low","medium","high"],"default":"medium"}}"#),
@@ -3897,7 +4058,8 @@ mod tests {
             crate::locale::Locale::English,
         )
         .unwrap();
-        let answer = probe_thinking(&base, None, "gpt-oss:20b", crate::locale::Locale::English);
+        let answer =
+            probe_capabilities(&base, None, "gpt-oss:20b", crate::locale::Locale::English).thinking;
         handle.join().unwrap();
         assert_eq!(
             answer,
@@ -3909,7 +4071,7 @@ mod tests {
     fn an_unreachable_server_leaves_the_model_unknown() {
         let base = parse_base_url("http://127.0.0.1:1/v1", crate::locale::Locale::English).unwrap();
         assert_eq!(
-            probe_thinking(&base, None, "x", crate::locale::Locale::English),
+            probe_capabilities(&base, None, "x", crate::locale::Locale::English).thinking,
             Thinking::Unknown
         );
     }
@@ -4951,6 +5113,7 @@ mod tests {
                 no_key: false,
                 effort: None,
                 no_probe: true,
+                input: None,
                 replace: false,
                 quiet: false,
                 dry_run: true,

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -75,9 +76,16 @@ test('the package composes as a loader bundle', () => {
   assert.equal(manifest.name, 'rdsh-no-feedback');
   assert.equal(manifest.license, 'MIT');
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
-  // No client half: the bundle only edits the loader tree, so a browser
-  // platform declaration here would be a lie.
+  // The browser half lives in its own package so the module graph keys it
+  // separately from the loader-tree patch layer.
   assert.equal(manifest.dsh.client, undefined);
+  const clientManifest = JSON.parse(
+    readFileSync(join(plugin, '..', 'rdsh-no-feedback-client', 'package.json'), 'utf8'),
+  );
+  assert.equal(clientManifest.name, 'rdsh-no-feedback-client');
+  assert.equal(clientManifest.dsh.client.platform, 'web');
+  assert.deepEqual(clientManifest.dsh.client.inject, []);
+  assert.equal(clientManifest.exports['./client'], './client.js');
 });
 
 test('the patch targets ids the shipped DSH web profile actually carries', async (t) => {

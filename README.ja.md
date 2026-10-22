@@ -677,8 +677,9 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 本家 DeepSeek Harness の開発者およびコントリビューターの皆様に感謝します。本家のランタイムが rustdsh の基盤です。
 
 - アイコン制作: [PENTACoXIAN](https://x.com/PENTACoXIAN)
-- セキュリティレビュー・脆弱性報告: [GrEarl](https://github.com/GrEarl)、[PENTACoXIAN](https://x.com/PENTACoXIAN)
+- セキュリティ監査（専門家）・レビュー・脆弱性報告: [GrEarl](https://github.com/GrEarl)（[@Iamwonderingif](https://x.com/Iamwonderingif)）、[PENTACoXIAN](https://x.com/PENTACoXIAN)
 - 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)、[cyrne1-7208](https://github.com/cyrne1-7208)
+- AI 提供: [StudioYebisu](https://github.com/yebisu0529-ship-it)、Eureka（[@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM)）
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
 - 標準搭載の Web UI プラグイン（許諾済み、MIT）：[cwd514](https://github.com/cwd514) さんの [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（(c) 2026、効果音・デスクトップ通知）、[yugapor](https://github.com/yugapor) さんの [dsh-gitview](https://github.com/yugapor/dsh-gitview)（(c) 2026、差分・履歴・CI付き Git パネル）。どちらもインストール時に上流 GitHub から取得します（詳細は `plugins/recommended.md`）。
 

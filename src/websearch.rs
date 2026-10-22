@@ -463,7 +463,9 @@ fn find_href(blk: &str) -> Option<String> {
         let close = tag.find('>')?;
         let head = &tag[..close];
         if let Some(u) = attr(head, "href").filter(|u| !u.is_empty() && !u.starts_with('#')) {
-            return Some(decode_entities(&u));
+            // The link is printed as-is, so a control character in it must not
+            // reach the terminal (the title and snippet are cleaned already).
+            return Some(strip_control(&decode_entities(&u)));
         }
         rest = &tag[close + 1..];
     }

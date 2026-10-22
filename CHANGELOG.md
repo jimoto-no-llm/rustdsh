@@ -5,6 +5,36 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- サイドバーの **Feedback** 行を隠す `plugins/rdsh-no-feedback-client` を追加しました。DSH の
+  アカウントメニューは Settings / Feedback / Sign in を固定で組み立てており、既存の3パッケージ
+  無効化では行だけが残って機能しないフォームを開いていました。サインアウト時のメニューに限って
+  非表示にします（サインイン中のメニューは変更しません）。`features.feedback` が off のとき
+  `rdsh-no-feedback` と一緒に導入されます。
+
+### Security
+
+- リリースビルドの `uses:` を 40桁コミット SHA に固定しました。可変 ref の上流書き換えで
+  公開バイナリへ任意コードが混入する経路を塞ぎます（#890）。
+- CD は安定版を `--latest=false` で公開し、digest 台帳が main に入った時点で
+  `mark-release-latest` が Latest を切り替えるようにしました。台帳 pin 前に
+  documented な導入コマンドが旧版を入れる食い違いが起きません（#892）。
+
+- `rdsh search` と `rdsh search-web` の人間向け出力から制御文字を除きました。検索対象の
+  ファイル名・一致行・検索結果の URL に ESC や OSC 52 が入っていても、端末の行消去や
+  クリップボード書き換えが起きません（#889、#896）。機械可読出力は従来どおりです。
+- rdsh が `$DSH_HOME` を最初に作るとき、ディレクトリを 0700 で作成するようにしました
+  （umask に依存しません）。既存ディレクトリのモードは変更しません（#891）。
+- `.credentials.yaml` が他ユーザーから読めるモードのとき、読み込み時に警告するようにしました
+  （dsh は 0600 以外を読まないため、黙って空になるのを避けます）（#893）。
+
+- `rdsh provider add` が、モデルの画像入力対応を自動で判定して `input: [text, image]` を
+  書くようにしました。Ollama 系は `POST /api/show` の `capabilities` を、それ以外は
+  `GET /models` の `architecture.input_modalities`／`input_modalities`／`capabilities` を読みます。
+  手動指定は `--input text,image`（`text` は必須、未知の値は拒否）。宣言が無いモデルには
+  `input:` を書かず、dsh の既定（テキストのみ）に任せます。
+
 ## [0.10.0] - 2026-10-21
 
 ### Fixed

@@ -802,7 +802,7 @@ impl RdshSettings {
     fn save_locked(&self, path: &str) -> anyhow::Result<()> {
         if let Some(parent) = std::path::Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)?;
+                crate::file_security::ensure_private_dir(parent)?;
             }
         }
         let mut clean = self.clone();

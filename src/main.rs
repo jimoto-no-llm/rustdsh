@@ -98,6 +98,7 @@ mod slim;
 mod subagent_plan;
 mod swarm;
 mod task_outcomes;
+mod terminal_safe;
 #[cfg(test)]
 mod test_support;
 mod token_handoff;
@@ -205,6 +206,9 @@ enum ProviderAction {
         /// Do not read model capabilities from an Ollama /api/show
         #[arg(long = "no-probe")]
         no_probe: bool,
+        /// Input modalities for every model: text,image (text is required)
+        #[arg(long = "input")]
+        input: Option<String>,
         /// Rewrite the route block when it already exists
         #[arg(long = "replace")]
         replace: bool,
@@ -1815,6 +1819,7 @@ fn main() {
                 no_key,
                 effort,
                 no_probe,
+                input,
                 replace,
                 json,
             } => providers::cmd_add(
@@ -1831,6 +1836,7 @@ fn main() {
                     no_key,
                     effort,
                     no_probe,
+                    input,
                     replace,
                     quiet: false,
                     // The global flag only: general.dry_run in settings is
@@ -2747,6 +2753,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "no_discover" => (
             "不从端点读取模型清单",
             "エンドポイントからモデル一覧を取得しない",
+        ),
+        "input" => (
+            "路由内所有模型的输入模态（如 text,image；text 必须包含）",
+            "経路内の全モデルの入力モダリティ（例: text,image。text は必須）",
         ),
         "no_probe" => (
             "不读取 Ollama /api/show 的模型能力",
