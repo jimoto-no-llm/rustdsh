@@ -1032,10 +1032,11 @@ mod tests {
     fn catalog_carries_the_essential_tier_the_installer_ships() {
         let catalog = Catalog::load().unwrap();
         let web = packages(&catalog.essential_for("web"));
-        // The tier is the ten unconditional entries plus the two Web-only
-        // bundles plus the feature-gated feedback bundle; the gate itself is
+        // The tier is the eleven unconditional entries plus the two Web-only
+        // bundles plus the two feature-gated feedback packages; the gate itself
+        // is asserted in feedback_bundle_is_provisioned_only_when_the_switch_is_off.
         // asserted in feedback_bundle_is_provisioned_only_when_the_switch_is_off.
-        assert_eq!(web.len(), 13);
+        assert_eq!(web.len(), 14);
         assert_eq!(web[0], "@deepseek-ai/dsh-tool-present");
         assert_eq!(web[6], "@deepseek-ai/dsh-mcp-client");
         assert_eq!(web[7], "rdsh-settings");
@@ -1044,7 +1045,7 @@ mod tests {
         assert_eq!(web[12], "rdsh-no-feedback");
         // The Web banner and the asset server are essential for web only.
         let headless = packages(&catalog.essential_for("headless"));
-        assert_eq!(headless.len(), 11);
+        assert_eq!(headless.len(), 12);
         assert!(!headless.iter().any(|name| name == "rdsh-update-banner"));
         assert!(!headless.iter().any(|name| name == "rdsh-web-cache"));
     }
@@ -1070,7 +1071,7 @@ mod tests {
         let headless = catalog
             .selection("headless", None, &RdshSettings::default())
             .unwrap();
-        assert_eq!(headless.len(), 11);
+        assert_eq!(headless.len(), 12);
         assert!(headless.iter().all(|entry| entry.essential));
     }
 
@@ -1269,7 +1270,12 @@ mod tests {
             .collect();
         assert_eq!(
             skipped_packages,
-            ["rdsh-mobile-ui", "rdsh-answer-guard", "rdsh-no-feedback"]
+            [
+                "rdsh-mobile-ui",
+                "rdsh-answer-guard",
+                "rdsh-no-feedback",
+                "rdsh-no-feedback-client",
+            ]
         );
         assert!(skipped.iter().all(|(_, why)| why.contains("not in")));
         let _ = std::fs::remove_dir_all(&temp);
