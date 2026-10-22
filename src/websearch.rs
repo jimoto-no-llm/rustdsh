@@ -125,10 +125,24 @@ pub(crate) fn resolve_base(engine: Engine) -> anyhow::Result<String> {
 fn resolve_base_with(engine: Engine, health: impl Fn(&str) -> bool) -> anyhow::Result<String> {
     match engine {
         Engine::Searxng => Ok(default_base()),
-        Engine::Rustxng => match crate::rustxng::base_url() {
-            Some(url) => Ok(url),
-            None => crate::rustxng::ensure().map_err(anyhow::Error::new),
-        },
+        Engine::Rustxng => {
+            // base_url names an explicit RUSTXNG_URL or a configured port the
+            // user owns; both must answer before this search trusts them, and a
+            // silent one is an error rather than a reason to spawn a second engine.
+            if env_url("RUSTXNG_URL").is_some() || crate::rustxng::configured_port().is_some() {
+                let url = crate::rustxng::base_url()
+                    .ok_or_else(|| anyhow::anyhow!("RUSTXNG_URL_UNRESOLVED"))?;
+                anyhow::ensure!(health(&url), "RUSTXNG_UNRESPONSIVE");
+                Ok(url)
+            } else {
+                // ensure() may reuse an instance this profile already started;
+                // it never falls back to SearXNG, and a silent one is an error.
+                let base =
+                    crate::rustxng::ensure().map_err(|_| anyhow::anyhow!("RUSTXNG_UNAVAILABLE"))?;
+                anyhow::ensure!(health(&base), "RUSTXNG_UNRESPONSIVE");
+                Ok(base)
+            }
+        }
         Engine::Auto => {
             if let Some(url) = env_url("SEARXNG_URL") {
                 return Ok(url);
@@ -1101,13 +1115,18 @@ mod tests {
             ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
             ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
         ]);
+        // An explicit RUSTXNG_URL is still probed: a URL the user owns must
+        // answer before the search trusts it, and a silent one must not be
+        // replaced by a second engine.
         assert_eq!(
-            resolve_base_with(Engine::Rustxng, |_| panic!(
-                "a configured URL needs no probe"
-            ))
+            resolve_base_with(Engine::Rustxng, |url| {
+                assert_eq!(url, "http://127.0.0.1:7777");
+                true
+            })
             .unwrap(),
             "http://127.0.0.1:7777"
         );
+        assert!(resolve_base_with(Engine::Rustxng, |_| false).is_err());
         // With nothing configured the local engine decides; a missing binary is
         // an explicit error rather than a silent fallback.
         std::env::remove_var("RUSTXNG_URL");
@@ -1134,7 +1153,12 @@ mod tests {
         ];
         std::env::set_var("HOME", &dir);
         std::env::set_var("USERPROFILE", &dir);
+        // Ports live under DSH_HOME; without this the test would read (or spawn)
+        // the sidecar recorded by a search on this machine.
+        std::env::set_var("DSH_HOME", &dir);
         std::env::remove_var("RUSTXNG_PORT");
+        // Nothing is configured, so the probe is only ever asked about an engine
+        // this call starts or reuses; answering false keeps the test hermetic.
         let result = resolve_base_with(Engine::Rustxng, |_| false);
         std::env::remove_var("RUSTXNG_BIN");
         for item in saved.into_iter().flatten() {
@@ -1143,8 +1167,38 @@ mod tests {
                 None => std::env::remove_var(item.0),
             }
         }
-        assert!(result.is_err(), "rustxng must not fall back to searxng");
+        // An instance this profile already recorded is reused, so either an
+        // error or that loopback engine is acceptable; another engine is not.
+        match result {
+            Err(_) => {}
+            Ok(url) => assert!(
+                url.starts_with("http://127.0.0.1:"),
+                "rustxng must not fall back to searxng: {url}"
+            ),
+        }
+        std::env::remove_var("DSH_HOME");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // --engine rustxng must not answer with an engine it cannot reach: the
+    // URL it resolves has to answer, otherwise the search reports a failure
+    // instead of quietly switching to SearXNG.
+    #[test]
+    fn explicit_rustxng_reports_an_unreachable_engine() {
+        let _lock = engine_env_lock();
+        let port = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .and_then(|l| l.local_addr())
+            .map(|a| a.port())
+            .unwrap();
+        let _env = EngineEnvGuard::apply(&[(
+            "RUSTXNG_URL",
+            Some(format!("http://127.0.0.1:{port}").as_str()),
+        )]);
+        let failure = resolve_base_with(Engine::Rustxng, |_| false).unwrap_err();
+        assert!(
+            failure.to_string().contains("RUSTXNG_UNRESPONSIVE"),
+            "{failure}"
+        );
     }
 
     /// Serialises the environment-touching resolution tests in this module.

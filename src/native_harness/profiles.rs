@@ -414,38 +414,52 @@ pub(super) mod tests {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(5)))
                     .unwrap();
-                let mut bytes = vec![];
-                let (end, length) = loop {
+                // Read the whole request first. On Windows a client that has what
+                // it needs closes with a reset, which can discard bytes the mock has
+                // already queued; reading to the end avoids losing the request.
+                let mut bytes = Vec::new();
+                let mut last_error = None;
+                loop {
                     let mut b = [0; 4096];
-                    let n = stream.read(&mut b).unwrap();
-                    assert!(n > 0);
-                    bytes.extend_from_slice(&b[..n]);
-                    if let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") {
-                        let headers = String::from_utf8_lossy(&bytes[..end]);
-                        let length: usize = headers
-                            .lines()
-                            .find_map(|l| {
-                                l.to_lowercase()
-                                    .strip_prefix("content-length:")
-                                    .map(|s| s.trim().parse().unwrap())
-                            })
-                            .unwrap();
-                        break (end + 4, length);
+                    match stream.read(&mut b) {
+                        Ok(0) => break,
+                        Ok(n) => bytes.extend_from_slice(&b[..n]),
+                        Err(e) => {
+                            // A reset that arrives after the whole request is no loss;
+                            // one before any byte still fails the assertions below.
+                            eprintln!("mock: read stopped: {e} ({} bytes)", bytes.len());
+                            last_error = Some(e);
+                            break;
+                        }
                     }
-                };
-                while bytes.len() < end + length {
-                    let mut b = [0; 4096];
-                    let n = stream.read(&mut b).unwrap();
-                    assert!(n > 0);
-                    bytes.extend_from_slice(&b[..n]);
+                    if bytes.windows(4).any(|w| w == b"\r\n\r\n") {
+                        break;
+                    }
                 }
+                let end = bytes
+                    .windows(4)
+                    .position(|b| b == b"\r\n\r\n")
+                    .unwrap_or_else(|| panic!("mock read no headers: {last_error:?}"));
+                let headers = String::from_utf8_lossy(&bytes[..end]);
+                let length: usize = headers
+                    .lines()
+                    .find_map(|l| {
+                        l.to_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(|s| s.trim().parse().unwrap())
+                    })
+                    .expect("mock request needs a content-length");
+                let end = end + 4;
                 requests.push((
                     String::from_utf8(bytes[..end].to_vec()).unwrap(),
                     serde_json::from_slice(&bytes[end..end + length]).unwrap(),
                 ));
                 let body = serde_json::to_vec(&reply).unwrap();
-                write!(stream,"HTTP/1.1 {code} Test\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n",body.len()).unwrap();
-                stream.write_all(&body).unwrap();
+                // The client can be gone already (it reset the request); a closed
+                // connection is not a reason to fail the test.
+                let head = format!("HTTP/1.1 {code} Test\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n", body.len());
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&body);
             }
             requests
         });

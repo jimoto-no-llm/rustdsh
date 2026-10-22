@@ -42,7 +42,9 @@ impl Fixture {
             .env("RDSH_ORIG_BIN", self.0.join("no-original-dsh"))
             // Search tests pin their own fixture engine; a hermetic run must
             // never download the sidecar through the on-demand installer.
-            .env("RUSTXNG_SKIP_INSTALL", "1");
+            .env("RUSTXNG_SKIP_INSTALL", "1")
+            // Never reach a sidecar another test on this machine recorded.
+            .env("RUSTXNG_BIN", self.0.join("no-rustxng"));
         cmd
     }
     fn run(&self, args: &[&str], input: &[u8]) -> Output {

@@ -189,7 +189,15 @@ pub fn base_url() -> Option<String> {
     if let Some(url) = env("RUSTXNG_URL") {
         return Some(url.trim_end_matches('/').to_string());
     }
-    configured_port().map(url_for)
+    if let Some(port) = configured_port() {
+        // A configured port the user already occupies is not ours to call;
+        // keep walking to the recorded sidecar instead of mistaking the
+        // occupant for an engine.
+        if !port_in_use(port) {
+            return Some(url_for(port));
+        }
+    }
+    recorded_state().map(|(port, _)| url_for(port))
 }
 
 /// The state file that remembers the port of the instance rdsh started, so a
@@ -263,7 +271,7 @@ fn probe_port(port: u16, timeout: Duration) -> bool {
 }
 
 /// The port from RUSTXNG_PORT, when it is a usable nonzero u16.
-fn configured_port() -> Option<u16> {
+pub(crate) fn configured_port() -> Option<u16> {
     env("RUSTXNG_PORT")
         .and_then(|port| port.parse::<u16>().ok())
         .filter(|port| *port != 0)
@@ -1483,6 +1491,41 @@ pub(crate) mod tests {
         let url = ensure().expect("a healthy recorded instance is reused");
         assert_eq!(url, base);
         assert_eq!(read_state(&state), Some((port, Some(999_999))));
+    }
+
+    // A configured port owned by another process must not be handed back as an
+    // engine: base_url falls through to the recorded instance instead.
+    #[test]
+    fn base_url_skips_an_occupied_configured_port() {
+        let _lock = env_lock();
+        let dir = test_dir("base-url-port");
+        let home = dir.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        let occupied = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let occupied_port = occupied.local_addr().unwrap().port();
+        let recorded = free_port().unwrap();
+        write_state(&home.join("rustxng.port"), recorded, Some(4242)).unwrap();
+        let _env = EnvGuard::apply(&[
+            ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
+            ("RUSTXNG_URL", None),
+            ("RUSTXNG_PORT", Some(occupied_port.to_string().as_str())),
+        ]);
+        assert_eq!(base_url(), Some(url_for(recorded)));
+    }
+
+    // With nothing recorded there is no engine to name.
+    #[test]
+    fn base_url_is_none_without_a_configured_or_recorded_port() {
+        let _lock = env_lock();
+        let dir = test_dir("base-url-none");
+        let home = dir.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        let _env = EnvGuard::apply(&[
+            ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
+            ("RUSTXNG_URL", None),
+            ("RUSTXNG_PORT", None),
+        ]);
+        assert_eq!(base_url(), None);
     }
 
     // A configured RUSTXNG_URL is returned when it answers and never spawned
