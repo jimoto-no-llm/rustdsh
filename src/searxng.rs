@@ -527,12 +527,16 @@ mod tests {
     }
 
     #[test]
-    fn probe_finds_a_listening_socket_and_misses_a_closed_one() {
+    fn probe_finds_listener_and_rejects_bound_non_listener() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         assert!(probe("127.0.0.1", port, PROBE_TIMEOUT));
-        drop(listener);
-        assert!(!probe("127.0.0.1", port, PROBE_TIMEOUT));
+        // Keep the negative port reserved without listening. Dropping a
+        // listener lets another parallel test immediately reuse its port.
+        let reserved = tokio::net::TcpSocket::new_v4().unwrap();
+        reserved.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let unused_port = reserved.local_addr().unwrap().port();
+        assert!(!probe("127.0.0.1", unused_port, PROBE_TIMEOUT));
     }
 
     #[test]

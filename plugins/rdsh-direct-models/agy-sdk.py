@@ -4,6 +4,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import sys
 import tempfile
 
@@ -48,7 +49,7 @@ def main():
         try:
             payload = json.loads(raw)
             # SDK output must never corrupt the machine protocol or expose auth.
-            with contextlib.redirect_stdout(open(os.devnull, 'w')), contextlib.redirect_stderr(open(os.devnull, 'w')):
+            with open(os.devnull, 'w') as sink, contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
                 result = asyncio.run(run(payload))
         except ModuleNotFoundError:
             result = {'error': 'SDK_NOT_INSTALLED'}
@@ -62,6 +63,13 @@ def main():
                 status = getattr(error, 'code', None)
             if isinstance(status, int) and not isinstance(status, bool) and 400 <= status <= 599:
                 result['httpStatus'] = status
+            # The official local SDK wraps API failures in AntigravityExecutionError.
+            # Inspect only for fixed classifications; never expose its stderr/message.
+            message = str(error).lower()
+            if re.search(r'\b429\b', message) and ('quota' in message or 'resource_exhausted' in message):
+                result['httpStatus'] = 429
+                if 'requestsperday' in message or 'requests_per_day' in message:
+                    result['quotaScope'] = 'daily'
     sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 if __name__ == '__main__':

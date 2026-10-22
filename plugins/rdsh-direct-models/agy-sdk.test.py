@@ -1,6 +1,8 @@
 """Authentication preflight with fake SDK modules; no SDK or provider runs."""
 import asyncio
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
 import sys
@@ -88,6 +90,23 @@ class AuthenticationTests(unittest.TestCase):
         workspace = Path(self.configurations[-1]['save_dir'])
         self.assertEqual(workspace.parent, self.home)
         self.assertFalse(workspace.exists())
+
+    def test_wrapped_daily_quota_is_classified_without_exposing_sdk_stderr(self):
+        error = RuntimeError('Harness stderr: 429 RESOURCE_EXHAUSTED quota RequestsPerDay synthetic-secret-value')
+        output = io.StringIO()
+        with patch.object(self.bridge, 'run', side_effect=error), patch.object(sys, 'stdin', types.SimpleNamespace(buffer=io.BytesIO(b'{}'))), patch.object(sys, 'stdout', output):
+            self.bridge.main()
+        result = json.loads(output.getvalue())
+        self.assertEqual(result['httpStatus'], 429)
+        self.assertEqual(result['quotaScope'], 'daily')
+        self.assertNotIn('synthetic-secret-value', output.getvalue())
+        self.assertNotIn('stderr', output.getvalue())
+
+    def test_unclassified_error_never_exposes_its_message(self):
+        output = io.StringIO()
+        with patch.object(self.bridge, 'run', side_effect=RuntimeError('synthetic-secret-value')), patch.object(sys, 'stdin', types.SimpleNamespace(buffer=io.BytesIO(b'{}'))), patch.object(sys, 'stdout', output):
+            self.bridge.main()
+        self.assertEqual(json.loads(output.getvalue()), {'error': 'SDK_REQUEST_FAILED', 'exceptionClass': 'RuntimeError'})
 
 
 if __name__ == '__main__':

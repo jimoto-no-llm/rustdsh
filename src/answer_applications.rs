@@ -979,9 +979,9 @@ pub fn record_answer_application(
     let Some(decision) = decision else {
         return Ok(());
     };
-    if !decision
+    if decision
         .get("consumer_id")
-        .is_some_and(|value| !value.is_null())
+        .is_none_or(|value| value.is_null())
     {
         return Ok(());
     }
