@@ -189,7 +189,15 @@ pub fn base_url() -> Option<String> {
     if let Some(url) = env("RUSTXNG_URL") {
         return Some(url.trim_end_matches('/').to_string());
     }
-    configured_port().map(url_for)
+    if let Some(port) = configured_port() {
+        // A configured port the user already occupies is not ours to call;
+        // keep walking to the recorded sidecar instead of mistaking the
+        // occupant for an engine.
+        if !port_in_use(port) {
+            return Some(url_for(port));
+        }
+    }
+    recorded_state().map(|(port, _)| url_for(port))
 }
 
 /// The state file that remembers the port of the instance rdsh started, so a
@@ -263,7 +271,7 @@ fn probe_port(port: u16, timeout: Duration) -> bool {
 }
 
 /// The port from RUSTXNG_PORT, when it is a usable nonzero u16.
-fn configured_port() -> Option<u16> {
+pub(crate) fn configured_port() -> Option<u16> {
     env("RUSTXNG_PORT")
         .and_then(|port| port.parse::<u16>().ok())
         .filter(|port| *port != 0)
