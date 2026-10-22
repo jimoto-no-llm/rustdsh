@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-22
+
 ### Security
 
 - リリースビルドの `uses:` を 40桁コミット SHA に固定しました。可変 ref の上流書き換えで
