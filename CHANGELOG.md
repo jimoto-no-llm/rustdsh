@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-22
+
 ### Added
 
 - サイドバーの **Feedback** 行を隠す `plugins/rdsh-no-feedback-client` を追加しました。DSH の
