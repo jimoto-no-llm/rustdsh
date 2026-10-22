@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-no-feedback-client
+      name: "rdsh-no-feedback-client"
+      config: {}

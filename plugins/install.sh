@@ -73,6 +73,7 @@ Essential plugins (always installed, listed first)
   rdsh-answer-guard                         restate reasoning-only replies as text
   rdsh-update-banner                        Web release banner (PROFILE=web only)
   rdsh-no-feedback                          disable the DSH Like/Dislike and /feedback
+  rdsh-no-feedback-client                   hide the sidebar Feedback row (browser half of the above)
                                             surface (added unless features.feedback=true)
 
 Recommended plugins (optional; choose with --recommended)
@@ -283,6 +284,12 @@ fi
 # get the same behavior.
 if feedback_feature_off; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-no-feedback"
+fi
+# The browser half hides the sidebar Feedback row the patch layer cannot
+# remove; it ships as its own package so the client module graph keys it
+# apart from the loader-tree patch layer.
+if feedback_feature_off; then
+  ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-no-feedback-client"
 fi
 
 RECOMMENDED_BUNDLED=""

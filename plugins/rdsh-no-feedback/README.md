@@ -27,6 +27,11 @@ two served Remotes with no reader. The three rows are a set.
 
 Disabling an entry does not remove it from the composed tree: the row keeps its
 `name` and `config` and gains `disabled: true`, which the loader honors.
+
+### Why the sidebar row needed a client half
+
+`@deepseek-ai/dsh-client-ui-settings-account` builds the signed-out sidebar menu from a fixed list — Settings, Feedback, Sign in — inside the component. Disabling the three packages above removes the Remote, the dialog and `/feedback`, but not that launcher row, which then opens a form this profile cannot serve. No slot or config removes it, so `client.js` hides it in the signed-out menu the component marks with its module-scoped `signedOutMenu` class, matching the label and the paper-plane glyph together so another bundle's row is never touched. A signed-in menu is left alone.
+
 Existing messages, the action strip's other buttons and every other Remote are
 untouched.
 
