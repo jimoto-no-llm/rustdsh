@@ -106,6 +106,7 @@ upstream). Every other row is attached on every run.
 | `rdsh-answer-guard` | When a turn ends with the reply only in the reasoning channel, the reader sees no answer and the agent looks stuck. The guard steers one reminder so the model restates it as text. `rdsh features off answer_guard` disables it — see [its README](rdsh-answer-guard/README.md). |
 | `rdsh-update-banner` | Release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5). |
 | `rdsh-no-feedback` | Turn off DSH's Like/Dislike on assistant messages and the `/feedback` dialog and command. Attached by default (`rdsh features on feedback` restores the surface — see [its README](rdsh-no-feedback/README.md). |
+| `rdsh-no-feedback-client` | Hide the sidebar **Feedback** row, which DSH hard-codes and the patch layer cannot remove. Attached with `rdsh-no-feedback`; the Web profile is the only one with a browser. |
 
 The upstream entries were verified present in the shipped dsh distribution and
 absent from the `dsh-base` bundle, so each one adds real capability. The

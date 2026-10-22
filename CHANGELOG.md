@@ -5,6 +5,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- サイドバーの **Feedback** 行を隠す `plugins/rdsh-no-feedback-client` を追加しました。DSH の
+  アカウントメニューは Settings / Feedback / Sign in を固定で組み立てており、既存の3パッケージ
+  無効化では行だけが残って機能しないフォームを開いていました。サインアウト時のメニューに限って
+  非表示にします（サインイン中のメニューは変更しません）。`features.feedback` が off のとき
+  `rdsh-no-feedback` と一緒に導入されます。
+
 ### Security
 
 - リリースビルドの `uses:` を 40桁コミット SHA に固定しました。可変 ref の上流書き換えで

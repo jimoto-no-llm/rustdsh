@@ -1,0 +1,22 @@
+{
+  "name": "rdsh-no-feedback-client",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Browser half of rdsh-no-feedback: hides the sidebar Feedback row",
+  "exports": {
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "rdsh feedback row off",
+    "description": "サイドバーの Feedback 行を隠します（rdsh-no-feedback のブラウザ側）。"
+  }
+}
