@@ -11,17 +11,21 @@ The host half turns the feedback surface off, but that launcher row is hard-code
 component, so it survives and opens a request form against a Remote this profile never
 serves. No slot, option or config removes it.
 
-This bundle's client script watches the menu and hides the row whose label is
-`Feedback` / `意见反馈` / `フィードバック` **and** which carries the paper-plane glyph. It only
-acts on the signed-out menu (`[data-signed-out="true"]` on the trigger) and leaves a
-signed-in menu untouched. The pass is idempotent, so re-renders keep the row hidden.
+This bundle's client script hides the row whose label is `Feedback` / `意见反馈` /
+`フィードバック` **and** which carries the paper-plane glyph. It acts only on the signed-out
+menu, which the component marks with its `signedOutMenu` CSS-module class; the menu is
+portalled out of the trigger, so the trigger's `data-signed-out` flag is not an ancestor.
+A signed-in menu is left untouched, and the pass is idempotent across re-renders.
 
 ## Why a separate package
 
-The client module graph keys on package name, and a package that declares both
-`dsh.bundle.patch` and `dsh.client` gets one graph id for two different jobs. Keeping the
-browser half in its own package gives each half its own row: the host bundle owns the
-patch layer, this package owns the browser module.
+The client module graph keys each registered factory by the Loader entry name, and a
+package that is both a patch layer and a browser module answers to two different ids.
+Keeping the browser half in its own package gives the host bundle the patch layer and
+this package the client row.
+
+The row id must equal that Loader entry name (`rdsh-no-feedback-client`). A scoped id
+loads without registering, and the whole application batch fails with it.
 
 ## Install
 

@@ -2,7 +2,8 @@
 //
 // DSH hard-codes Settings / Feedback / Sign in in its account menu, and the
 // bundle's patch layer cannot remove that row. The client half hides it once it
-// appears; these tests pin the matching rules and the signed-out guard.
+// appears; these tests pin the matching rules, the signed-out guard, and the
+// declaration of that menu, which a live run of the shipped UI corrected.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -14,23 +15,25 @@ function fakeRow(label, { icon = true } = {}) {
     hidden: false,
     attributes: {},
     dataset: {},
+    styles: {},
     querySelector: (selector) => (icon && selector === 'svg' ? { found: true } : null),
     setAttribute(name, value) {
       row.attributes[name] = value;
+    }
+  };
+  row.style = {
+    setProperty(name, value, priority) {
+      row.styles[name] = { value, priority };
     },
   };
   return row;
 }
 
-// The trigger carries the flag itself, so the bundle self-matches it. A fake
-// that answered querySelector here would pass while the browser stayed broken.
+// The menu is portalled out of the trigger and carries the component's
+// `signedOutMenu` CSS-module class; the trigger flag is not its ancestor.
 function fakeMenu(rows, { signedOut }) {
-  const anchor = {
-    matches: (selector) => selector === '[data-signed-out="true"]' && signedOut,
-    querySelector: () => null,
-  };
   return {
-    parentElement: anchor,
+    className: signedOut ? '_surface_ri079_1 _list_4ub78_7 yHnPSG_signedOutMenu' : '_surface_ri079_1 _list_4ub78_7 yHnPSG_signedInMenu',
     querySelectorAll: () => rows,
   };
 }
@@ -76,6 +79,9 @@ test('the feedback row is hidden in the signed-out menu only', async () => {
 
   const { dispose, alive } = await applyWith(signedOut);
   assert.equal(feedback.hidden, true);
+  // The row ships with `display: flex`, so `hidden` alone loses; the style
+  // attribute has to carry `!important`.
+  assert.deepEqual(feedback.styles.display, { value: 'none', priority: 'important' });
   assert.equal(feedback.attributes['aria-hidden'], 'true');
   assert.equal(feedback.dataset.rdshNoFeedback, '1');
   assert.equal(settings.hidden, false);

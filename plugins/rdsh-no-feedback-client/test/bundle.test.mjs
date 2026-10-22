@@ -16,9 +16,12 @@ function load() {
   return specs[0];
 }
 
-test('the bundle registers itself as a client module', () => {
+// A live run of the shipped UI rejected the original id: the module system
+// keys the registered factory by the Loader entry name, so a scoped id loaded
+// without registering and the whole application batch failed with it.
+test('the bundle registers under the Loader entry name', () => {
   const spec = load();
-  assert.equal(spec.id, '@local/rdsh-no-feedback-client');
+  assert.equal(spec.id, 'rdsh-no-feedback-client');
   assert.equal(typeof spec.factory, 'function');
 });
 
@@ -29,16 +32,15 @@ test('the factory needs no host module and returns apply()', () => {
   assert.equal(typeof plugin.apply, 'function');
 });
 
-// The trigger carries the signed-out flag itself. querySelector only visits
-// descendants, so a descendant lookup finds nothing and the row stays visible;
-// this test pins the self-match a real Chromium run verified.
-test('the signed-out check matches the trigger itself', () => {
+// The menu is portalled out of the trigger, so the signed-out flag is not an
+// ancestor; the shipped component marks the menu itself instead.
+test('the signed-out menu is recognised by its CSS-module class', () => {
   assert.ok(
-    source.includes('anchor.matches(\'[data-signed-out="true"]\')'),
-    'the check must be a self-match on the trigger',
+    source.includes('signedOutMenu'),
+    'the guard must key on the signedOutMenu class tail',
   );
   assert.ok(
-    !/anchor\.querySelector\('[^']*signed-out[^']*'\)/.test(source),
-    'querySelector cannot see the trigger own attribute',
+    !source.includes('data-signed-out'),
+    'the trigger is not an ancestor of the portalled menu',
   );
 });

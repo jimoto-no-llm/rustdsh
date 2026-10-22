@@ -5,10 +5,14 @@
   "license": "MIT",
   "description": "Browser half of rdsh-no-feedback: hides the sidebar Feedback row",
   "exports": {
+    ".": "./index.js",
     "./client": "./client.js",
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
