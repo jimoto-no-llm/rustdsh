@@ -28,8 +28,10 @@ window.__ModuleLoader__.load({
     function hideRows() {
       for (const menu of document.querySelectorAll(MENU)) {
         const anchor = menu.parentElement;
-        // Signed-out menus only: the sign-out row is absent from them.
-        if (anchor && anchor.querySelector('[data-signed-out="true"]') === null) continue;
+        // Signed-out menus only: the sign-out row is absent from them. The
+        // flag sits on the trigger itself, and querySelector only looks at
+        // descendants, so the check has to be a self-match.
+        if (anchor && !anchor.matches('[data-signed-out="true"]')) continue;
         for (const row of menu.querySelectorAll(ROW)) {
           if (!isFeedbackRow(row) || row.hidden) continue;
           row.hidden = true;

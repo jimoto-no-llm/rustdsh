@@ -22,10 +22,12 @@ function fakeRow(label, { icon = true } = {}) {
   return row;
 }
 
+// The trigger carries the flag itself, so the bundle self-matches it. A fake
+// that answered querySelector here would pass while the browser stayed broken.
 function fakeMenu(rows, { signedOut }) {
   const anchor = {
-    querySelector: (selector) =>
-      selector === '[data-signed-out="true"]' && signedOut ? { signedOut: true } : null,
+    matches: (selector) => selector === '[data-signed-out="true"]' && signedOut,
+    querySelector: () => null,
   };
   return {
     parentElement: anchor,
