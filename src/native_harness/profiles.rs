@@ -417,8 +417,18 @@ pub(super) mod tests {
                 let mut bytes = vec![];
                 let (end, length) = loop {
                     let mut b = [0; 4096];
-                    let n = stream.read(&mut b).unwrap();
-                    assert!(n > 0);
+                    // The client can close the connection once it has what it
+                    // needs, and Windows reports that as a reset rather than EOF;
+                    // neither is a failure, so stop reading and let the assertions
+                    // below report what actually arrived.
+                    let n = match stream.read(&mut b) {
+                        Ok(0) => break (bytes.len(), 0),
+                        Ok(n) => n,
+                        Err(e) => {
+                            assert!(!bytes.is_empty(), "mock read before headers: {e}");
+                            break (bytes.len(), 0);
+                        }
+                    };
                     bytes.extend_from_slice(&b[..n]);
                     if let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") {
                         let headers = String::from_utf8_lossy(&bytes[..end]);
