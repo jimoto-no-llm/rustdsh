@@ -1180,6 +1180,27 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    // --engine rustxng must not answer with an engine it cannot reach: the
+    // URL it resolves has to answer, otherwise the search reports a failure
+    // instead of quietly switching to SearXNG.
+    #[test]
+    fn explicit_rustxng_reports_an_unreachable_engine() {
+        let _lock = engine_env_lock();
+        let port = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .and_then(|l| l.local_addr())
+            .map(|a| a.port())
+            .unwrap();
+        let _env = EngineEnvGuard::apply(&[(
+            "RUSTXNG_URL",
+            Some(format!("http://127.0.0.1:{port}").as_str()),
+        )]);
+        let failure = resolve_base_with(Engine::Rustxng, |_| false).unwrap_err();
+        assert!(
+            failure.to_string().contains("RUSTXNG_UNRESPONSIVE"),
+            "{failure}"
+        );
+    }
+
     /// Serialises the environment-touching resolution tests in this module.
     fn engine_env_lock() -> crate::test_support::EnvLock {
         crate::test_support::env_lock()

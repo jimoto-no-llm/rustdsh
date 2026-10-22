@@ -1493,6 +1493,41 @@ pub(crate) mod tests {
         assert_eq!(read_state(&state), Some((port, Some(999_999))));
     }
 
+    // A configured port owned by another process must not be handed back as an
+    // engine: base_url falls through to the recorded instance instead.
+    #[test]
+    fn base_url_skips_an_occupied_configured_port() {
+        let _lock = env_lock();
+        let dir = test_dir("base-url-port");
+        let home = dir.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        let occupied = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let occupied_port = occupied.local_addr().unwrap().port();
+        let recorded = free_port().unwrap();
+        write_state(&home.join("rustxng.port"), recorded, Some(4242)).unwrap();
+        let _env = EnvGuard::apply(&[
+            ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
+            ("RUSTXNG_URL", None),
+            ("RUSTXNG_PORT", Some(occupied_port.to_string().as_str())),
+        ]);
+        assert_eq!(base_url(), Some(url_for(recorded)));
+    }
+
+    // With nothing recorded there is no engine to name.
+    #[test]
+    fn base_url_is_none_without_a_configured_or_recorded_port() {
+        let _lock = env_lock();
+        let dir = test_dir("base-url-none");
+        let home = dir.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        let _env = EnvGuard::apply(&[
+            ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
+            ("RUSTXNG_URL", None),
+            ("RUSTXNG_PORT", None),
+        ]);
+        assert_eq!(base_url(), None);
+    }
+
     // A configured RUSTXNG_URL is returned when it answers and never spawned
     // into; a dead one is an explicit error, not a silent fallback.
     #[test]
