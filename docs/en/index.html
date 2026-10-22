@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rdsh — a fast launcher for DeepSeek Harness</title>
+<meta name="description" content="rdsh starts DeepSeek Harness (dsh) in 0.90 ms with 2.9 MB peak memory. A Rust launcher, single binary, 1.97 MB.">
+<meta name="author" content="jimoto-no-llm">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#f7f7f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="rdsh — a fast launcher for DeepSeek Harness">
+<meta property="og:description" content="0.90 ms startup, 2.9 MB peak memory. A Rust launcher that passes every dsh argument through.">
+<meta property="og:image" content="../../assets/dashboard-dark.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://github.com/jimoto-no-llm/rustdsh">
+<link rel="alternate" hreflang="ja" href="../index.html">
+<link rel="alternate" hreflang="en" href="./index.html">
+<link rel="alternate" hreflang="x-default" href="./index.html">
+<link rel="icon" href="../../assets/icon.png" type="image/png">
+<link rel="apple-touch-icon" href="../../assets/icon.png">
+<link rel="manifest" href="../../site.webmanifest">
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"rdsh","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows, WSL","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/jimoto-no-llm/rustdsh","softwareVersion":"0.3.3","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="app">
+  <header class="titlebar">
+    <a class="vault" href="../../index.html">
+      <img class="vault-icon" src="../../assets/icon.png" alt="" width="18" height="18">
+      <span class="vault-name">rustdsh</span>
+      <span class="vault-ver">v0.3.3</span>
+    </a>
+
+    <nav class="tabs" aria-label="Documents">
+      <button type="button" class="tab" data-doc="readme" aria-controls="doc-readme">README.md</button>
+      <button type="button" class="tab" data-doc="bench" aria-controls="doc-bench">BENCHMARKS.md</button>
+      <button type="button" class="tab" data-doc="commands" aria-controls="doc-commands">COMMANDS.md</button>
+      <button type="button" class="tab" data-doc="safety" aria-controls="doc-safety">SAFETY.md</button>
+      <button type="button" class="tab" data-doc="web" aria-controls="doc-web">WEB.md</button>
+      <button type="button" class="tab" data-doc="screens" aria-controls="doc-screens">SCREENS.md</button>
+    </nav>
+
+    <div class="titlebar-tools">
+      <button type="button" class="search-trigger" id="search-open">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.4 10.4 3.1 3.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span class="search-label">Search</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <div class="lang" role="group" aria-label="Language">
+        <a class="lang-item" id="lang-switch" href="../index.html" data-base="../index.html" hreflang="ja" lang="ja">JA</a>
+        <span class="lang-item" aria-current="true" lang="en">EN</span>
+      </div>
+      <button type="button" class="icon-btn" id="theme-toggle" aria-label="Theme">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 6.2 6.2A5 5 0 0 1 8 1.8Z" fill="currentColor"/></svg>
+      </button>
+      <a class="btn" href="https://github.com/jimoto-no-llm/rustdsh" rel="noopener">GitHub ↗</a>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar" aria-label="File tree">
+      <div class="tree">
+        <p class="tree-heading">rustdsh</p>
+        <ul class="tree-list">
+          <li><button type="button" class="tree-file" data-doc="readme"><span class="tree-dot"></span>README.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="bench"><span class="tree-dot"></span>BENCHMARKS.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="commands"><span class="tree-dot"></span>COMMANDS.md</button></li>
+        </ul>
+        <p class="tree-heading">docs</p>
+        <ul class="tree-list">
+          <li><button type="button" class="tree-file" data-doc="safety"><span class="tree-dot"></span>SAFETY.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="web"><span class="tree-dot"></span>WEB.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="screens"><span class="tree-dot"></span>SCREENS.md</button></li>
+        </ul>
+        <p class="tree-heading">external</p>
+        <ul class="tree-list">
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/ARCHITECTURE.md" rel="noopener">ARCHITECTURE.md</a></li>
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG.md</a></li>
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/releases" rel="noopener">releases</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-foot">
+        <p>MIT · Rust 1.85+</p>
+        <p><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/README.md" rel="noopener">README.md ↗</a></p>
+      </div>
+    </aside>
+
+    <main id="content" class="content" tabindex="-1">
+      <div class="doc-crumbs" aria-hidden="true"><span>rustdsh</span><span class="crumb-sep">/</span><span id="crumb-file">README.md</span></div>
+
+      <article id="doc-readme" class="doc" aria-labelledby="readme-h">
+        <h1 id="readme-h">rdsh</h1>
+        <p class="lede">
+          A launcher for <a href="https://github.com/deepseek-ai/deepseek-harness" rel="noopener">DeepSeek Harness</a>.
+          Frequently used commands are implemented in Rust; conversations and model execution stay in upstream dsh.
+          Existing arguments pass through unchanged.
+        </p>
+        <div class="chips">
+          <span class="chip">single binary</span>
+          <span class="chip">MIT</span>
+          <span class="chip">Linux / macOS / WSL / Windows</span>
+        </div>
+
+        <div class="props">
+          <div class="prop"><span>Repository</span><p><a href="https://github.com/jimoto-no-llm/rustdsh" rel="noopener">jimoto-no-llm/rustdsh</a></p></div>
+          <div class="prop"><span>Version</span><p class="mono">0.3.3</p></div>
+          <div class="prop"><span>Language</span><p>Rust 1.85+</p></div>
+          <div class="prop"><span>Binary</span><p class="mono">1.97 MB</p></div>
+        </div>
+
+        <h2>Install</h2>
+        <div class="codeblock codeblock--wrap" data-code-group="install">
+          <div class="codeblock-head">
+            <div class="seg" role="group" aria-label="Platform">
+              <button type="button" class="seg-item is-active" data-code="unix" aria-pressed="true">Unix</button>
+              <button type="button" class="seg-item" data-code="windows" aria-pressed="false">Windows</button>
+            </div>
+            <button type="button" class="copy" data-copy="unix">Copy</button>
+          </div>
+          <pre data-code-panel="unix"><code>curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release</code></pre>
+          <pre data-code-panel="windows" hidden><code>$f = Join-Path $env:TEMP 'rdsh-install.ps1'
+Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+&amp; $f -FromRelease</code></pre>
+        </div>
+
+        <h2>Running</h2>
+        <table class="table">
+          <thead><tr><th scope="col">Goal</th><th scope="col">Command</th></tr></thead>
+          <tbody>
+            <tr><td>Check the install</td><td><code>rdsh --version &amp;&amp; rdsh doctor</code></td></tr>
+            <tr><td>Start the TUI</td><td><code>rdsh tui</code></td></tr>
+            <tr><td>Web profile</td><td><code>rdsh --profile web</code></td></tr>
+            <tr><td>Replace dsh</td><td><code>./install.sh --as-dsh</code></td></tr>
+            <tr><td>Undo the replacement</td><td><code>./install.sh --restore</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout">
+          <p class="callout-title">Note</p>
+          <p><code>--as-dsh</code> replaces the <code>dsh</code> command with rdsh. The original stays available as <code>dsh-orig</code>, and <code>--restore</code> puts it back.</p>
+        </div>
+
+        <h2>How it fits</h2>
+        <table class="table">
+          <tbody>
+            <tr><th scope="row">Language</th><td>Rust. Runs as a single binary</td></tr>
+            <tr><th scope="row">Upstream</th><td>dsh arguments and subcommands are forwarded unchanged</td></tr>
+            <tr><th scope="row">Out of scope</th><td>Conversation loops and model execution belong to upstream</td></tr>
+            <tr><th scope="row">Numbers</th><td><a href="#bench" data-jump="bench">BENCHMARKS.md</a></td></tr>
+            <tr><th scope="row">Safety</th><td><a href="#safety" data-jump="safety">SAFETY.md</a></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article id="doc-bench" class="doc" aria-labelledby="bench-h" hidden>
+        <h1 id="bench-h">BENCHMARKS.md</h1>
+        <p class="lede">Measured on Linux x86_64. No estimates or conversions.</p>
+
+        <table class="table table--num">
+          <caption class="sr">rdsh against upstream dsh</caption>
+          <thead>
+            <tr><th scope="col">Item</th><th scope="col">rdsh</th><th scope="col">upstream dsh</th><th scope="col">ratio</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>--version</code> startup</th><td><span class="bar" style="--v:1%"></span><b>0.90 ms</b></td><td>88 ms</td><td class="ratio">98×</td></tr>
+            <tr><th scope="row">Peak memory</th><td><span class="bar" style="--v:4%"></span><b>2.9 MB</b></td><td>66 MB</td><td class="ratio">1/23</td></tr>
+            <tr><th scope="row">Hook-equivalent memory</th><td><span class="bar" style="--v:6%"></span><b>2.7 MB</b></td><td>45 MB</td><td class="ratio">1/16</td></tr>
+            <tr><th scope="row">Code search</th><td><span class="bar" style="--v:41%"></span><b>17 ms</b></td><td>41 ms</td><td class="ratio">2.4×</td></tr>
+            <tr><th scope="row">Token estimate</th><td><span class="bar" style="--v:34%"></span><b>12 ms</b></td><td>35 ms</td><td class="ratio">2.9×</td></tr>
+            <tr><th scope="row">Session list</th><td><span class="bar" style="--v:25%"></span><b>0.41 s</b></td><td>1.65 s</td><td class="ratio">4.0×</td></tr>
+            <tr><th scope="row">Distribution</th><td><span class="bar" style="--v:1%"></span><b>1.97 MB</b></td><td>508 MB</td><td class="ratio">—</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--info">
+          <p class="callout-title">Reproduce</p>
+          <p>Run <code>rdsh bench --n 5</code>. Setup and raw data live in <a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/BENCHMARKS.md" rel="noopener">docs/BENCHMARKS.md</a>.</p>
+        </div>
+
+        <h2>How to read it</h2>
+        <ul class="list">
+          <li>Startup time is the median of five runs on a warm cache.</li>
+          <li>Memory is peak RSS right after start-up.</li>
+          <li>Search, tokens and sessions use the same input on both sides.</li>
+          <li>Distribution size is one binary; upstream is the whole Node.js tree.</li>
+        </ul>
+      </article>
+
+      <article id="doc-commands" class="doc" aria-labelledby="commands-h" hidden>
+        <h1 id="commands-h">COMMANDS.md</h1>
+        <p class="lede">Commands that finish without starting Node.js. Arguments match dsh.</p>
+
+        <div class="filterbar">
+          <label class="sr" for="cmd-filter">Filter commands</label>
+          <input id="cmd-filter" type="search" placeholder="Filter (e.g. token, search)" autocomplete="off">
+          <span class="filter-count" id="cmd-count"></span>
+        </div>
+
+        <table class="table" id="cmd-table">
+          <thead><tr><th scope="col">Command</th><th scope="col">Purpose</th><th scope="col">Output</th></tr></thead>
+          <tbody>
+            <tr><td><code>tokens</code></td><td>Token estimate. CJK counts as one token per character.</td><td>number</td></tr>
+            <tr><td><code>prune</code></td><td>Trim context to a token budget.</td><td>text</td></tr>
+            <tr><td><code>search</code></td><td>Parallel text search.</td><td>matches</td></tr>
+            <tr><td><code>sessions</code></td><td>Session list with token estimates.</td><td>table</td></tr>
+            <tr><td><code>compact</code></td><td>Compact a session JSONL. The source file stays.</td><td>file</td></tr>
+            <tr><td><code>doctor</code></td><td>Checks dsh, the environment and paths.</td><td>diagnosis</td></tr>
+            <tr><td><code>profiles</code></td><td>Available profiles.</td><td>list</td></tr>
+            <tr><td><code>skills</code></td><td>Available skills.</td><td>list</td></tr>
+            <tr><td><code>desktop</code></td><td>Detect the Desktop app and attach plugins.</td><td>state</td></tr>
+            <tr><td><code>bench</code></td><td>Startup comparison between rdsh and dsh.</td><td>table</td></tr>
+            <tr><td><code>features</code></td><td>Feature switches and their defaults.</td><td>list</td></tr>
+            <tr><td><code>auth</code></td><td>Inspect login state and import credentials.</td><td>state</td></tr>
+            <tr><td><code>guard</code></td><td>Runs as a hook and blocks dangerous commands.</td><td>verdict</td></tr>
+            <tr><td><code>context</code></td><td>Build, inject and remember turn context.</td><td>JSON</td></tr>
+            <tr><td><code>deps</code></td><td>Dependency graph and change impact.</td><td>graph</td></tr>
+            <tr><td><code>serve</code></td><td>Local-only status page.</td><td>HTTP</td></tr>
+          </tbody>
+        </table>
+        <p class="table-note" id="cmd-empty" hidden>No matching command.</p>
+
+        <h2>Examples</h2>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="examples">Copy</button></div>
+          <pre data-code-panel="examples"><code>rdsh tokens ./README.md
+rdsh search TODO --dir . --max 100
+rdsh sessions --limit 20 --tokens
+rdsh bench --n 5
+rdsh features</code></pre>
+        </div>
+
+        <div class="callout callout--warn">
+          <p class="callout-title">Requirement</p>
+          <p><code>guard</code> and <code>context</code> run from dsh <code>hooks.json</code>. <code>context hook install</code> appends without removing existing hooks and keeps a backup next to the file it rewrites.</p>
+        </div>
+      </article>
+
+      <article id="doc-safety" class="doc" aria-labelledby="safety-h" hidden>
+        <h1 id="safety-h">SAFETY.md</h1>
+        <p class="lede">Nothing breaks by default. Risky behaviour is opt-in.</p>
+
+        <h2>Principles</h2>
+        <ol class="steps">
+          <li><b>Upstream fidelity</b><span>Conversation loops and agent logic are never reimplemented; they go straight to dsh.</span></li>
+          <li><b>Non-destructive</b><span>Read paths such as tokens, search, sessions and compact never modify source files.</span></li>
+          <li><b>Explicit auth</b><span>Credentials are not sent externally or synced automatically. Only approved items are imported.</span></li>
+          <li><b>Tool sandboxing (opt-in)</b><span>On Linux, <code>--share-file</code> shows only the files you share, read-only and without network.</span></li>
+          <li><b>Explicit defaults</b><span>Update checks are on. <code>serve</code>, <code>search-web</code>, <code>context_engine</code> and <code>agent_tool_sandbox</code> are opt-in.</span></li>
+        </ol>
+
+        <h2>Blocking with a hook</h2>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="guard">Copy</button></div>
+          <pre data-code-panel="guard"><code>echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"</code></pre>
+        </div>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">hooks.json</span><button type="button" class="copy" data-copy="hook">Copy</button></div>
+          <pre data-code-panel="hook"><code>{ "matcher": "Bash",
+  "hooks": [{ "type": "command",
+              "command": "rdsh guard --deny \"rm -rf /*\"" }] }</code></pre>
+        </div>
+
+        <h2>Feature switches</h2>
+        <table class="table">
+          <thead><tr><th scope="col">ID</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>update_check</code></td><td>on</td><td>Update check and notifications</td></tr>
+            <tr><td><code>serve</code></td><td>off</td><td>Local status page</td></tr>
+            <tr><td><code>search-web</code></td><td>off</td><td>Search through SearXNG</td></tr>
+            <tr><td><code>context_engine</code></td><td>off</td><td>Turn context assembly</td></tr>
+            <tr><td><code>agent_tool_sandbox</code></td><td>off</td><td>Runs that only see shared files</td></tr>
+          </tbody>
+        </table>
+        <p class="table-note"><code>rdsh features on &lt;id&gt;</code> enables one; <code>rdsh features</code> lists them.</p>
+      </article>
+
+      <article id="doc-web" class="doc" aria-labelledby="web-h" hidden>
+        <h1 id="web-h">WEB.md</h1>
+        <p class="lede">Web UI, dashboard and Desktop app wiring. All of it stays local.</p>
+
+        <h2>Lightweight status page</h2>
+        <p class="body-text">A small page bound to localhost (default <code>:38080</code>, no conflict with DSH on <code>:3080</code>). Requests need a one-time token.</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="serve">Copy</button></div>
+          <pre data-code-panel="serve"><code>rdsh settings set extras.enable serve
+rdsh serve</code></pre>
+        </div>
+
+        <h2>Dashboard</h2>
+        <p class="body-text">An optional Node.js dashboard (22+) for project metrics and human-in-the-loop questions. On Windows it lives in the system tray.</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="dash">Copy</button></div>
+          <pre data-code-panel="dash"><code>rdsh-dashboard project --project &lt;directory&gt;</code></pre>
+        </div>
+
+        <h2>Desktop app</h2>
+        <p class="body-text">DeepSeek Harness Desktop is an Electron shell around the Web app. It owns a separate profile, so rdsh only detects it and forwards plugin attachment; it never rewrites the profile.</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="desktop">Copy</button></div>
+          <pre data-code-panel="desktop"><code>rdsh desktop status
+rdsh desktop install --plugins-dir .
+rdsh desktop verify</code></pre>
+        </div>
+
+        <div class="callout callout--info">
+          <p class="callout-title">Order</p>
+          <p>Quit the app before attaching plugins and reopen it afterwards. The in-app Plugins page installs the same packages directly.</p>
+        </div>
+      </article>
+
+      <article id="doc-screens" class="doc" aria-labelledby="screens-h" hidden>
+        <h1 id="screens-h">SCREENS.md</h1>
+        <p class="lede">Screenshots from this repository. Click to enlarge.</p>
+
+        <figure class="figure">
+          <button type="button" class="figure-zoom" data-full="../../assets/dashboard-dark.png" data-caption="plugins/rdsh-agent-ui — panel inside a chat (dark)">
+            <img src="../../assets/dashboard-dark.png" alt="rdsh-agent-ui panel, dark" width="1280" height="757" loading="lazy">
+          </button>
+          <figcaption>plugins/rdsh-agent-ui — panel inside a chat (dark)</figcaption>
+        </figure>
+
+        <figure class="figure">
+          <button type="button" class="figure-zoom" data-full="../../assets/dashboard-light.png" data-caption="plugins/rdsh-agent-ui — the same panel (light)">
+            <img src="../../assets/dashboard-light.png" alt="rdsh-agent-ui panel, light" width="1180" height="1400" loading="lazy">
+          </button>
+          <figcaption>plugins/rdsh-agent-ui — the same panel (light)</figcaption>
+        </figure>
+</article>
+
+      <nav class="docnav" id="docnav" aria-label="Document navigation">
+        <button type="button" class="docnav-btn" id="docnav-prev">
+          <span class="docnav-dir">Previous</span>
+          <span class="docnav-name"></span>
+        </button>
+        <button type="button" class="docnav-btn docnav-next" id="docnav-next">
+          <span class="docnav-dir">Next</span>
+          <span class="docnav-name"></span>
+        </button>
+      </nav>
+    </main>
+
+    <aside class="rail" aria-label="Outline and links">
+      <section class="rail-block">
+        <h2>Outline</h2>
+        <ul class="outline" id="outline"></ul>
+      </section>
+      <section class="rail-block">
+        <h2>Links</h2>
+        <ul class="rail-links">
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/releases" rel="noopener">Releases ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/SECURITY.md" rel="noopener">SECURITY ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/LICENSE" rel="noopener">LICENSE ↗</a></li>
+        </ul>
+      </section>
+      <p class="rail-note">Community project. Not an official DeepSeek or DeepSeek Harness project.</p>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status-file">README.md</span>
+    <span class="sep" aria-hidden="true"></span>
+    <span>Markdown</span>
+    <span class="sep" aria-hidden="true"></span>
+    <span>UTF-8</span>
+    <span class="status-right">
+      <button type="button" class="status-btn" id="print">Print</button>
+      <span class="sep" aria-hidden="true"></span>
+      <span>v0.3.3</span>
+    </span>
+  </footer>
+</div>
+
+<dialog class="palette" id="palette" aria-label="Quick switcher">
+  <div class="palette-inner">
+    <div class="palette-input">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.4 10.4 3.1 3.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input id="palette-input" type="search" placeholder="Search files, headings and commands" autocomplete="off" aria-label="Search">
+      <kbd>Esc</kbd>
+    </div>
+    <ul class="palette-list" id="palette-list" role="listbox" aria-label="Results"></ul>
+    <p class="palette-empty" id="palette-empty" hidden>No results</p>
+  </div>
+</dialog>
+
+<dialog class="lightbox" id="lightbox" aria-label="Image">
+  <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close">Close</button>
+  <img id="lightbox-img" src="../../assets/icon.png" alt="">
+  <p id="lightbox-caption"></p>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../../app.js"></script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ja" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rdsh — DeepSeek Harness の高速ランチャー</title>
+<meta name="description" content="rdsh は DeepSeek Harness (dsh) を高速に起動する Rust 製ランチャー。起動 0.90 ms、ピークメモリ 2.9 MB、単一バイナリ 1.97 MB。">
+<meta name="author" content="jimoto-no-llm">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#f7f7f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="rdsh — DeepSeek Harness の高速ランチャー">
+<meta property="og:description" content="起動 0.90 ms、ピークメモリ 2.9 MB。dsh の引数はそのまま通る Rust 製ランチャー。">
+<meta property="og:image" content="../assets/dashboard-dark.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://github.com/jimoto-no-llm/rustdsh">
+<link rel="alternate" hreflang="ja" href="./index.html">
+<link rel="alternate" hreflang="en" href="./en/index.html">
+<link rel="alternate" hreflang="x-default" href="./en/index.html">
+<link rel="icon" href="../assets/icon.png" type="image/png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="stylesheet" href="../style.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"rdsh","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows, WSL","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/jimoto-no-llm/rustdsh","softwareVersion":"0.3.3","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+</head>
+<body>
+<noscript><p class="noscript">このページはタブ切り替えに JavaScript を使います。全文は <a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/README.ja.md">README.ja.md</a> にあります。</p></noscript>
+<a class="skip" href="#content">本文へ</a>
+
+<div class="app">
+  <header class="titlebar">
+    <a class="vault" href="../index.html">
+      <img class="vault-icon" src="../assets/icon.png" alt="" width="18" height="18">
+      <span class="vault-name">rustdsh</span>
+      <span class="vault-ver">v0.3.3</span>
+    </a>
+
+    <nav class="tabs" aria-label="ドキュメント">
+      <button type="button" class="tab" data-doc="readme" aria-controls="doc-readme">README.md</button>
+      <button type="button" class="tab" data-doc="bench" aria-controls="doc-bench">BENCHMARKS.md</button>
+      <button type="button" class="tab" data-doc="commands" aria-controls="doc-commands">COMMANDS.md</button>
+      <button type="button" class="tab" data-doc="safety" aria-controls="doc-safety">SAFETY.md</button>
+      <button type="button" class="tab" data-doc="web" aria-controls="doc-web">WEB.md</button>
+      <button type="button" class="tab" data-doc="screens" aria-controls="doc-screens">SCREENS.md</button>
+    </nav>
+
+    <div class="titlebar-tools">
+      <button type="button" class="search-trigger" id="search-open">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.4 10.4 3.1 3.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span class="search-label">検索</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <div class="lang" role="group" aria-label="言語">
+        <span class="lang-item" aria-current="true" lang="ja">JA</span>
+        <a class="lang-item" id="lang-switch" href="./en/index.html" data-base="./en/index.html" hreflang="en" lang="en">EN</a>
+      </div>
+      <button type="button" class="icon-btn" id="theme-toggle" aria-label="テーマを切り替える">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 6.2 6.2A5 5 0 0 1 8 1.8Z" fill="currentColor"/></svg>
+      </button>
+      <a class="btn" href="https://github.com/jimoto-no-llm/rustdsh" rel="noopener">GitHub ↗</a>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar" aria-label="ファイルツリー">
+      <div class="tree">
+        <p class="tree-heading">rustdsh</p>
+        <ul class="tree-list">
+          <li><button type="button" class="tree-file" data-doc="readme"><span class="tree-dot"></span>README.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="bench"><span class="tree-dot"></span>BENCHMARKS.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="commands"><span class="tree-dot"></span>COMMANDS.md</button></li>
+        </ul>
+        <p class="tree-heading">docs</p>
+        <ul class="tree-list">
+          <li><button type="button" class="tree-file" data-doc="safety"><span class="tree-dot"></span>SAFETY.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="web"><span class="tree-dot"></span>WEB.md</button></li>
+          <li><button type="button" class="tree-file" data-doc="screens"><span class="tree-dot"></span>SCREENS.md</button></li>
+        </ul>
+        <p class="tree-heading">外部</p>
+        <ul class="tree-list">
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/ARCHITECTURE.md" rel="noopener">ARCHITECTURE.md</a></li>
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG.md</a></li>
+          <li><a class="tree-file tree-file--ext" href="https://github.com/jimoto-no-llm/rustdsh/releases" rel="noopener">releases</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-foot">
+        <p>MIT · Rust 1.85+</p>
+        <p><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/README.ja.md" rel="noopener">README.ja.md ↗</a></p>
+      </div>
+    </aside>
+
+    <main id="content" class="content" tabindex="-1">
+      <div class="doc-crumbs" aria-hidden="true"><span>rustdsh</span><span class="crumb-sep">/</span><span id="crumb-file">README.md</span></div>
+
+      <article id="doc-readme" class="doc" aria-labelledby="readme-h">
+        <h1 id="readme-h">rdsh</h1>
+        <p class="lede">
+          <a href="https://github.com/deepseek-ai/deepseek-harness" rel="noopener">DeepSeek Harness</a>
+          のランチャー。よく使うコマンドを Rust で実装し、会話とモデル実行は上流の dsh に渡す。引数はそのまま通る。
+        </p>
+        <div class="chips">
+          <span class="chip">単一バイナリ</span>
+          <span class="chip">MIT</span>
+          <span class="chip">Linux / macOS / WSL / Windows</span>
+        </div>
+
+        <div class="props">
+          <div class="prop"><span>リポジトリ</span><p><a href="https://github.com/jimoto-no-llm/rustdsh" rel="noopener">jimoto-no-llm/rustdsh</a></p></div>
+          <div class="prop"><span>バージョン</span><p class="mono">0.3.3</p></div>
+          <div class="prop"><span>言語</span><p>Rust 1.85+</p></div>
+          <div class="prop"><span>バイナリ</span><p class="mono">1.97 MB</p></div>
+        </div>
+
+        <h2>インストール</h2>
+        <div class="codeblock codeblock--wrap" data-code-group="install">
+          <div class="codeblock-head">
+            <div class="seg" role="group" aria-label="プラットフォーム">
+              <button type="button" class="seg-item is-active" data-code="unix" aria-pressed="true">Unix</button>
+              <button type="button" class="seg-item" data-code="windows" aria-pressed="false">Windows</button>
+            </div>
+            <button type="button" class="copy" data-copy="unix">コピー</button>
+          </div>
+          <pre data-code-panel="unix"><code>curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release</code></pre>
+          <pre data-code-panel="windows" hidden><code>$f = Join-Path $env:TEMP 'rdsh-install.ps1'
+Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+&amp; $f -FromRelease</code></pre>
+        </div>
+
+        <h2>起動</h2>
+        <table class="table">
+          <thead><tr><th scope="col">目的</th><th scope="col">コマンド</th></tr></thead>
+          <tbody>
+            <tr><td>動作確認</td><td><code>rdsh --version &amp;&amp; rdsh doctor</code></td></tr>
+            <tr><td>TUI で開始</td><td><code>rdsh tui</code></td></tr>
+            <tr><td>Web プロファイル</td><td><code>rdsh --profile web</code></td></tr>
+            <tr><td>dsh と置き換え</td><td><code>./install.sh --as-dsh</code></td></tr>
+            <tr><td>元に戻す</td><td><code>./install.sh --restore</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout">
+          <p class="callout-title">注意</p>
+          <p><code>--as-dsh</code> は <code>dsh</code> コマンドを rdsh に差し替える。元のコマンドは <code>dsh-orig</code> として残り、<code>--restore</code> で戻せる。</p>
+        </div>
+
+        <h2>構成</h2>
+        <table class="table">
+          <tbody>
+            <tr><th scope="row">言語</th><td>Rust。単一バイナリで動作する</td></tr>
+            <tr><th scope="row">上流</th><td>dsh の引数とサブコマンドをそのまま転送する</td></tr>
+            <tr><th scope="row">対象外</th><td>会話ループとモデル実行は上流が担当する</td></tr>
+            <tr><th scope="row">計測値</th><td><a href="#bench" data-jump="bench">BENCHMARKS.md</a></td></tr>
+            <tr><th scope="row">安全設計</th><td><a href="#safety" data-jump="safety">SAFETY.md</a></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article id="doc-bench" class="doc" aria-labelledby="bench-h" hidden>
+        <h1 id="bench-h">BENCHMARKS.md</h1>
+        <p class="lede">Linux x86_64 での実測値。推定値や換算は含まない。</p>
+
+        <table class="table table--num">
+          <caption class="sr">rdsh と上流 dsh の計測値</caption>
+          <thead>
+            <tr><th scope="col">項目</th><th scope="col">rdsh</th><th scope="col">上流 dsh</th><th scope="col">比</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>--version</code> 起動</th><td><span class="bar" style="--v:1%"></span><b>0.90 ms</b></td><td>88 ms</td><td class="ratio">98×</td></tr>
+            <tr><th scope="row">ピークメモリ</th><td><span class="bar" style="--v:4%"></span><b>2.9 MB</b></td><td>66 MB</td><td class="ratio">1/23</td></tr>
+            <tr><th scope="row">フック相当メモリ</th><td><span class="bar" style="--v:6%"></span><b>2.7 MB</b></td><td>45 MB</td><td class="ratio">1/16</td></tr>
+            <tr><th scope="row">コード検索</th><td><span class="bar" style="--v:41%"></span><b>17 ms</b></td><td>41 ms</td><td class="ratio">2.4×</td></tr>
+            <tr><th scope="row">トークン見積もり</th><td><span class="bar" style="--v:34%"></span><b>12 ms</b></td><td>35 ms</td><td class="ratio">2.9×</td></tr>
+            <tr><th scope="row">セッション一覧</th><td><span class="bar" style="--v:25%"></span><b>0.41 s</b></td><td>1.65 s</td><td class="ratio">4.0×</td></tr>
+            <tr><th scope="row">配布物</th><td><span class="bar" style="--v:1%"></span><b>1.97 MB</b></td><td>508 MB</td><td class="ratio">—</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--info">
+          <p class="callout-title">再現</p>
+          <p><code>rdsh bench --n 5</code> で測定する。条件と生データは <a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/BENCHMARKS.md" rel="noopener">docs/BENCHMARKS.md</a> にある。</p>
+        </div>
+
+        <h2>読み方</h2>
+        <ul class="list">
+          <li>起動時間は 5 回の中央値。ウォームキャッシュ。</li>
+          <li>メモリは起動直後のピーク RSS。</li>
+          <li>検索・トークン・セッションは同じ入力で比較している。</li>
+          <li>配布物のサイズは単一バイナリ。上流は Node.js のツリー全体。</li>
+        </ul>
+      </article>
+
+      <article id="doc-commands" class="doc" aria-labelledby="commands-h" hidden>
+        <h1 id="commands-h">COMMANDS.md</h1>
+        <p class="lede">Node.js を起動せずに終わるコマンド。引数は dsh と同じ。</p>
+
+        <div class="filterbar">
+          <label class="sr" for="cmd-filter">コマンドを絞り込む</label>
+          <input id="cmd-filter" type="search" placeholder="絞り込み（例: token, 検索）" autocomplete="off">
+          <span class="filter-count" id="cmd-count"></span>
+        </div>
+
+        <table class="table" id="cmd-table">
+          <thead><tr><th scope="col">コマンド</th><th scope="col">役割</th><th scope="col">出力</th></tr></thead>
+          <tbody>
+            <tr><td><code>tokens</code></td><td>トークン数の見積もり。CJK は 1 文字 1 トークン。</td><td>数値</td></tr>
+            <tr><td><code>prune</code></td><td>トークン予算に収まるよう文脈を削る。</td><td>テキスト</td></tr>
+            <tr><td><code>search</code></td><td>並列のテキスト検索。</td><td>一致行</td></tr>
+            <tr><td><code>sessions</code></td><td>セッション一覧とトークン見積もり。</td><td>表</td></tr>
+            <tr><td><code>compact</code></td><td>セッション JSONL の圧縮。元ファイルは残る。</td><td>ファイル</td></tr>
+            <tr><td><code>doctor</code></td><td>dsh 本体・環境・パスの点検。</td><td>診断</td></tr>
+            <tr><td><code>profiles</code></td><td>利用可能なプロファイル一覧。</td><td>一覧</td></tr>
+            <tr><td><code>skills</code></td><td>利用可能なスキル一覧。</td><td>一覧</td></tr>
+            <tr><td><code>desktop</code></td><td>Desktop アプリの検出とプラグイン接続。</td><td>状態</td></tr>
+            <tr><td><code>bench</code></td><td>rdsh と dsh の起動比較。</td><td>表</td></tr>
+            <tr><td><code>features</code></td><td>機能スイッチと既定値。</td><td>一覧</td></tr>
+            <tr><td><code>auth</code></td><td>認証状態の確認と取り込み。</td><td>状態</td></tr>
+            <tr><td><code>guard</code></td><td>フックとして動き、危険なコマンドを止める。</td><td>判定</td></tr>
+            <tr><td><code>context</code></td><td>ターン文脈の組み立て・注入・記憶。</td><td>JSON</td></tr>
+            <tr><td><code>deps</code></td><td>依存グラフと変更の影響範囲。</td><td>グラフ</td></tr>
+            <tr><td><code>serve</code></td><td>ローカル専用の状態ページ。</td><td>HTTP</td></tr>
+          </tbody>
+        </table>
+        <p class="table-note" id="cmd-empty" hidden>一致するコマンドがない。</p>
+
+        <h2>例</h2>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="examples">コピー</button></div>
+          <pre data-code-panel="examples"><code>rdsh tokens ./README.md
+rdsh search TODO --dir . --max 100
+rdsh sessions --limit 20 --tokens
+rdsh bench --n 5
+rdsh features</code></pre>
+        </div>
+
+        <div class="callout callout--warn">
+          <p class="callout-title">前提</p>
+          <p><code>guard</code> と <code>context</code> は dsh の <code>hooks.json</code> に登録して使う。<code>context hook install</code> は既存フックを残したまま追記し、書き換えたファイルの隣にバックアップを置く。</p>
+        </div>
+      </article>
+
+      <article id="doc-safety" class="doc" aria-labelledby="safety-h" hidden>
+        <h1 id="safety-h">SAFETY.md</h1>
+        <p class="lede">既定で壊さないことを優先する。危険な操作は明示的に有効化する。</p>
+
+        <h2>設計原則</h2>
+        <ol class="steps">
+          <li><b>上流への忠実さ</b><span>会話ループとエージェント処理は再実装せず、dsh にそのまま委譲する。</span></li>
+          <li><b>非破壊</b><span>tokens・search・sessions・compact といった読み取り系は元ファイルを変更しない。</span></li>
+          <li><b>認証は明示</b><span>認証情報を外部へ送らず、自動同期もしない。取り込むのは承認済みの項目だけ。</span></li>
+          <li><b>ツール隔離（任意）</b><span>Linux では <code>--share-file</code> が共有したファイルだけを読み取り専用・ネットワーク無しで見せる。</span></li>
+          <li><b>既定値の明示</b><span>更新確認は既定で有効。<code>serve</code>・<code>search-web</code>・<code>context_engine</code>・<code>agent_tool_sandbox</code> は任意で有効化する。</span></li>
+        </ol>
+
+        <h2>フックで止める</h2>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="guard">コピー</button></div>
+          <pre data-code-panel="guard"><code>echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"</code></pre>
+        </div>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">hooks.json</span><button type="button" class="copy" data-copy="hook">コピー</button></div>
+          <pre data-code-panel="hook"><code>{ "matcher": "Bash",
+  "hooks": [{ "type": "command",
+              "command": "rdsh guard --deny \"rm -rf /*\"" }] }</code></pre>
+        </div>
+
+        <h2>機能スイッチ</h2>
+        <table class="table">
+          <thead><tr><th scope="col">ID</th><th scope="col">既定</th><th scope="col">内容</th></tr></thead>
+          <tbody>
+            <tr><td><code>update_check</code></td><td>有効</td><td>更新確認と通知</td></tr>
+            <tr><td><code>serve</code></td><td>無効</td><td>ローカル状態ページ</td></tr>
+            <tr><td><code>search-web</code></td><td>無効</td><td>SearXNG 経由の検索</td></tr>
+            <tr><td><code>context_engine</code></td><td>無効</td><td>ターン文脈の組み立て</td></tr>
+            <tr><td><code>agent_tool_sandbox</code></td><td>無効</td><td>共有ファイルだけを見せる実行</td></tr>
+          </tbody>
+        </table>
+        <p class="table-note"><code>rdsh features on &lt;id&gt;</code> で有効化、<code>rdsh features</code> で一覧。</p>
+      </article>
+
+      <article id="doc-web" class="doc" aria-labelledby="web-h" hidden>
+        <h1 id="web-h">WEB.md</h1>
+        <p class="lede">Web UI、ダッシュボード、Desktop アプリの接続。いずれもローカルで動く。</p>
+
+        <h2>軽量な状態ページ</h2>
+        <p class="body-text">localhost だけで動く小さな画面（既定 <code>:38080</code>。DSH の <code>:3080</code> とは衝突しない）。起動時に一度きりのトークンで保護される。</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="serve">コピー</button></div>
+          <pre data-code-panel="serve"><code>rdsh settings set extras.enable serve
+rdsh serve</code></pre>
+        </div>
+
+        <h2>ダッシュボード</h2>
+        <p class="body-text">プロジェクト指標と人間への確認を扱う任意の Node.js ダッシュボード（Node.js 22 以降）。Windows ではタスクトレイに常駐する。</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="dash">コピー</button></div>
+          <pre data-code-panel="dash"><code>rdsh-dashboard project --project &lt;directory&gt;</code></pre>
+        </div>
+
+        <h2>Desktop アプリ</h2>
+        <p class="body-text">DeepSeek Harness Desktop は Web アプリを包んだ Electron 製。CLI とは別のプロファイルを持つため、rdsh は検出と転送だけを行い、プロファイルを書き換えない。</p>
+        <div class="codeblock">
+          <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="desktop">コピー</button></div>
+          <pre data-code-panel="desktop"><code>rdsh desktop status
+rdsh desktop install --plugins-dir .
+rdsh desktop verify</code></pre>
+        </div>
+
+        <div class="callout callout--info">
+          <p class="callout-title">順序</p>
+          <p>プラグインを接続する前にアプリを終了し、接続後に開き直す。アプリ内の Plugins ページから同じパッケージを直接入れてもよい。</p>
+        </div>
+      </article>
+
+      <article id="doc-screens" class="doc" aria-labelledby="screens-h" hidden>
+        <h1 id="screens-h">SCREENS.md</h1>
+        <p class="lede">リポジトリ内のスクリーンショット。クリックで拡大する。</p>
+
+        <figure class="figure">
+          <button type="button" class="figure-zoom" data-full="../assets/dashboard-dark.png" data-caption="plugins/rdsh-agent-ui — チャット内パネル（ダーク）">
+            <img src="../assets/dashboard-dark.png" alt="rdsh-agent-ui のパネル（ダーク）" width="1280" height="757" loading="lazy">
+          </button>
+          <figcaption>plugins/rdsh-agent-ui — チャット内パネル（ダーク）</figcaption>
+        </figure>
+
+        <figure class="figure">
+          <button type="button" class="figure-zoom" data-full="../assets/dashboard-light.png" data-caption="plugins/rdsh-agent-ui — 同パネル（ライト）">
+            <img src="../assets/dashboard-light.png" alt="rdsh-agent-ui のパネル（ライト）" width="1180" height="1400" loading="lazy">
+          </button>
+          <figcaption>plugins/rdsh-agent-ui — 同パネル（ライト）</figcaption>
+        </figure>
+</article>
+      <nav class="docnav" id="docnav" aria-label="ドキュメント移動">
+        <button type="button" class="docnav-btn" id="docnav-prev">
+          <span class="docnav-dir">前</span>
+          <span class="docnav-name"></span>
+        </button>
+        <button type="button" class="docnav-btn docnav-next" id="docnav-next">
+          <span class="docnav-dir">次</span>
+          <span class="docnav-name"></span>
+        </button>
+      </nav>
+    </main>
+
+    <aside class="rail" aria-label="アウトラインとリンク">
+      <section class="rail-block">
+        <h2>アウトライン</h2>
+        <ul class="outline" id="outline"></ul>
+      </section>
+      <section class="rail-block">
+        <h2>リンク</h2>
+        <ul class="rail-links">
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/releases" rel="noopener">Releases ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/SECURITY.md" rel="noopener">SECURITY ↗</a></li>
+          <li><a href="https://github.com/jimoto-no-llm/rustdsh/blob/main/LICENSE" rel="noopener">LICENSE ↗</a></li>
+        </ul>
+      </section>
+      <p class="rail-note">コミュニティ製。DeepSeek および DeepSeek Harness の公式プロジェクトではない。</p>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status-file">README.md</span>
+    <span class="sep" aria-hidden="true"></span>
+    <span>Markdown</span>
+    <span class="sep" aria-hidden="true"></span>
+    <span>UTF-8</span>
+    <span class="status-right">
+      <button type="button" class="status-btn" id="print">印刷</button>
+      <span class="sep" aria-hidden="true"></span>
+      <span>v0.3.3</span>
+    </span>
+  </footer>
+</div>
+
+<dialog class="palette" id="palette" aria-label="クイックスイッチャー">
+  <div class="palette-inner">
+    <div class="palette-input">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.4 10.4 3.1 3.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input id="palette-input" type="search" placeholder="ファイル・見出し・コマンドを検索" autocomplete="off" aria-label="検索">
+      <kbd>Esc</kbd>
+    </div>
+    <ul class="palette-list" id="palette-list" role="listbox" aria-label="候補"></ul>
+    <p class="palette-empty" id="palette-empty" hidden>候補なし</p>
+  </div>
+</dialog>
+
+<dialog class="lightbox" id="lightbox" aria-label="画像">
+  <button type="button" class="lightbox-close" id="lightbox-close" aria-label="閉じる">閉じる</button>
+  <img id="lightbox-img" src="../assets/icon.png" alt="">
+  <p id="lightbox-caption"></p>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../app.js"></script>
+</body>
+</html>

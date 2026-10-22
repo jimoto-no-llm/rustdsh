@@ -1,0 +1,16 @@
+{
+  "name": "rdsh — DeepSeek Harness の高速ランチャー",
+  "short_name": "rdsh",
+  "description": "rdsh は DeepSeek Harness (dsh) を高速に起動する Rust 製ランチャー。",
+  "start_url": "./",
+  "display": "minimal-ui",
+  "background_color": "#f7f7f6",
+  "theme_color": "#1e1e1e",
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    }
+  ]
+}
