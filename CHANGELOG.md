@@ -5,6 +5,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- `curl … | sh` で入れた環境でも、同梱プラグイン（設定の **rdsh** タブ、更新バナー、
+  モバイル幅レイアウトなど）が付くようにしました。従来は checkout 上でしか
+  `plugins/install.sh` を実行できず、リリースの tar.gz にはバイナリしか入っていないため、
+  設定タブも更新バナーも現れませんでした。
+- リリースに `rdsh-plugins.tar.gz` を追加し、`install.sh` が同じタグから取得して
+  `PREFIX/share/rdsh/plugins` に展開してから同梱インストーラを実行します。ダイジェストは
+  新しい台帳 `release-plugins-digests.tsv` で検証します（`release-digests.tsv` は 4 つの
+  Unix アーカイブ専用のままでなければ、公開済みの旧インストーラが全体を拒否します）。
+- 展開先は `PREFIX/share/rdsh/plugins` なので、以後の `rdsh plugins install` も
+  同じ tree を見つけられます（従来は `not in .../share/rdsh/plugins` で失敗）。
+
 ### Added
 
 - サブエージェントの **provider・model・reasoning effort** を設定画面から選べるようにしました。

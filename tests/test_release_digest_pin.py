@@ -25,7 +25,9 @@ DIGESTS = {
     "rdsh-macos-x64.tar.gz": "d" * 64,
 }
 WINDOWS_DIGEST = "e" * 64
-ALL_DIGESTS = dict(DIGESTS, **{pin_release_digests.WINDOWS_ASSET: WINDOWS_DIGEST})
+PLUGIN_DIGEST = "f" * 64
+ALL_DIGESTS = dict(DIGESTS, **{pin_release_digests.WINDOWS_ASSET: WINDOWS_DIGEST},
+                  **{pin_release_digests.PLUGIN_ASSET: PLUGIN_DIGEST})
 REGISTRY = """# Trusted SHA-256 registry for the exact release archives supported by install.sh.
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
 latest v0.3.2
@@ -44,6 +46,15 @@ latest v0.3.2
 v0.3.2 rdsh-windows-x64.zip {a}
 v0.3.1 rdsh-windows-x64.zip {b}
 """.format(a="1" * 64, b="2" * 64)
+PLUGIN_REGISTRY = """# Trusted SHA-256 registry for the bundled plugins archive (install.sh).
+# A release whose archive is not pinned here installs the binary alone: the
+# rdsh settings tab and the update banner come from these plugins, so a
+# curl-installed profile has neither until an entry exists.
+# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
+latest v0.3.2
+v0.3.2 rdsh-plugins.tar.gz {a}
+v0.3.1 rdsh-plugins.tar.gz {b}
+""".format(a="8" * 64, b="9" * 64)
 
 
 def row(version, asset, digest):
@@ -63,11 +74,13 @@ def pin_windows(text, tag, digests=ALL_DIGESTS, **kwargs):
     )
 
 
-def cli_fixture(directory, windows_text=WINDOWS_REGISTRY):
+def cli_fixture(directory, windows_text=WINDOWS_REGISTRY, plugins_text=PLUGIN_REGISTRY):
     unix_path = directory / "unix.tsv"
     windows_path = directory / "windows.tsv"
+    plugins_path = directory / "plugins.tsv"
     unix_path.write_text(REGISTRY, encoding="utf-8")
     windows_path.write_text(windows_text, encoding="utf-8")
+    plugins_path.write_text(plugins_text, encoding="utf-8")
     assets = [{"name": name,
                "digest": "sha256:" + hashlib.sha256(f"fixture {name}".encode()).hexdigest()}
               for name in pin_release_digests.ASSETS]
@@ -75,8 +88,9 @@ def cli_fixture(directory, windows_text=WINDOWS_REGISTRY):
     assets_path.write_text(json.dumps({"assets": assets}), encoding="utf-8")
     command = [sys.executable, "-B", str(SCRIPT),
                "--registry", str(unix_path), "--windows-registry", str(windows_path),
+               "--plugins-registry", str(plugins_path),
                "--from-json", str(assets_path)]
-    return unix_path, windows_path, assets, command
+    return unix_path, windows_path, plugins_path, assets, command
 
 
 class PinReleaseDigestsTest(unittest.TestCase):
@@ -253,7 +267,7 @@ class PinReleaseDigestsTest(unittest.TestCase):
 
     def test_candidate_cli_then_stable_pin_preserves_exact_fixture_digests(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            unix_path, windows_path, assets, command = cli_fixture(Path(tmp))
+            unix_path, windows_path, plugins_path, assets, command = cli_fixture(Path(tmp))
             candidate = "v0.4.0-rc.1"
             for arguments in ((candidate, "--allow-prerelease"), ("v0.4.0",)):
                 result = subprocess.run(command + list(arguments), capture_output=True, text=True)
@@ -262,8 +276,11 @@ class PinReleaseDigestsTest(unittest.TestCase):
             windows_text = windows_path.read_text(encoding="utf-8")
             self.assertIn("latest v0.4.0\n", unix_text)
             self.assertIn("latest v0.4.0\n", windows_text)
+            plugins_text = plugins_path.read_text(encoding="utf-8")
             for asset in assets:
-                text = windows_text if asset["name"] == pin_release_digests.WINDOWS_ASSET else unix_text
+                text = (windows_text if asset["name"] == pin_release_digests.WINDOWS_ASSET
+                        else plugins_text if asset["name"] == pin_release_digests.PLUGIN_ASSET
+                        else unix_text)
                 for tag in (candidate, "v0.4.0"):
                     self.assertIn(row(tag, asset["name"], asset["digest"].removeprefix("sha256:")),
                                   text.splitlines())
@@ -275,8 +292,10 @@ class PinReleaseDigestsTest(unittest.TestCase):
         for windows_text, dry_run in ((WINDOWS_REGISTRY, True),
                                      ("\n".join(pin_release_digests.WINDOWS_HEADER) + "\n", False)):
             with self.subTest(dry_run=dry_run), tempfile.TemporaryDirectory() as tmp:
-                unix_path, windows_path, _assets, command = cli_fixture(Path(tmp), windows_text)
-                before = (unix_path.read_bytes(), windows_path.read_bytes())
+                unix_path, windows_path, plugins_path, _assets, command = cli_fixture(
+                    Path(tmp), windows_text)
+                before = (unix_path.read_bytes(), windows_path.read_bytes(),
+                          plugins_path.read_bytes())
                 args = ["v0.4.0-rc.1", "--allow-prerelease"] + (["--dry-run"] if dry_run else [])
                 result = subprocess.run(command + args, capture_output=True, text=True)
                 if dry_run:
@@ -285,7 +304,8 @@ class PinReleaseDigestsTest(unittest.TestCase):
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("stable latest", result.stderr)
-                self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes()), before)
+                self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes(),
+                                  plugins_path.read_bytes()), before)
 
     def test_candidate_cli_refuses_each_missing_or_invalid_asset_without_writing(self) -> None:
         for asset_name in pin_release_digests.ASSETS:
@@ -293,7 +313,7 @@ class PinReleaseDigestsTest(unittest.TestCase):
                 with self.subTest(asset=asset_name, invalid_digest=invalid_digest), \
                         tempfile.TemporaryDirectory() as tmp:
                     directory = Path(tmp)
-                    unix_path, windows_path, assets, command = cli_fixture(directory)
+                    unix_path, windows_path, plugins_path, assets, command = cli_fixture(directory)
                     if invalid_digest:
                         for asset in assets:
                             if asset["name"] == asset_name:
@@ -301,13 +321,15 @@ class PinReleaseDigestsTest(unittest.TestCase):
                     else:
                         assets = [asset for asset in assets if asset["name"] != asset_name]
                     (directory / "assets.json").write_text(json.dumps({"assets": assets}), encoding="utf-8")
-                    before = (unix_path.read_bytes(), windows_path.read_bytes())
+                    before = (unix_path.read_bytes(), windows_path.read_bytes(),
+                          plugins_path.read_bytes())
                     result = subprocess.run(command + ["v0.4.0-rc.1", "--allow-prerelease"],
                                             capture_output=True, text=True)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("unusable digest" if invalid_digest else "missing required assets",
                                   result.stderr)
-                    self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes()), before)
+                    self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes(),
+                                  plugins_path.read_bytes()), before)
 
     def test_refuses_missing_assets(self) -> None:
         with self.assertRaises(SystemExit):
