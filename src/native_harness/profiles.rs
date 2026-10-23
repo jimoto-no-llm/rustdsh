@@ -416,6 +416,10 @@ pub(super) mod tests {
                         }
                     };
                     let (mut stream, _) = accepted;
+                    // The listener is non-blocking so accept() can poll, and on
+                    // Windows the accepted socket inherits that flag: read() then
+                    // returns WSAEWOULDBLOCK instead of waiting out the timeout.
+                    stream.set_nonblocking(false).unwrap();
                     stream
                         .set_read_timeout(Some(Duration::from_secs(5)))
                         .unwrap();
