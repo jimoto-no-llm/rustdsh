@@ -102,6 +102,7 @@ means the settings flow passed, not that mobile UX was accepted.
 
 For an existing browser installation, set `RDSH_CHROME_PATH`; an environment with
 bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
+Set `RDSH_E2E_RECORD_VIDEO=1` to retain the browser recording alongside the PNGs.
 
 `npm run test:language` uses the same `RDSH_HARNESS_BIN` with a DSH version that
 supports `locale.addLanguage`. It checks the actual Language menu, Japanese
