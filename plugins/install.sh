@@ -39,7 +39,7 @@ UI_COMFORT="${UI_COMFORT:-0}"
 INTELLIGENT_UI="${INTELLIGENT_UI:-$BROWSER_PLUGINS_DEFAULT}"
 TRANSLATION="${TRANSLATION:-$BROWSER_PLUGINS_DEFAULT}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-RECOMMENDED_IDS="translation compute easy-work subagents ui-comfort sound gitview intelligent-ui"
+RECOMMENDED_IDS="translation compute easy-work subagents ui-comfort subagent-route sound gitview intelligent-ui"
 
 usage() {
   cat <<EOF
@@ -123,13 +123,14 @@ rec_translation="$TRANSLATION"
 rec_compute="$COMPUTE"
 rec_easy_work="$EASY_WORK"
 rec_subagents="$SUBAGENTS"
+rec_subagent_route="${SUBAGENT_ROUTE:-0}"
 rec_ui_comfort="$UI_COMFORT"
 rec_intelligent_ui="$INTELLIGENT_UI"
 rec_sound="$SOUND"
 rec_gitview="$GITVIEW"
 
 recommended_all() {
-  rec_translation=1; rec_compute=1; rec_easy_work=1; rec_subagents=1; rec_ui_comfort=1; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
+  rec_translation=1; rec_compute=1; rec_easy_work=1; rec_subagents=1; rec_ui_comfort=1; rec_subagent_route=1; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
 }
 # The beginner starter set: what a newcomer from Codex or Claude Code expects
 # without configuring anything. Plugins that change a familiar default (Enter
@@ -138,7 +139,7 @@ recommended_starter() {
   rec_translation=1; rec_compute=0; rec_easy_work=0; rec_subagents=1; rec_ui_comfort=0; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
 }
 recommended_none() {
-  rec_translation=0; rec_compute=0; rec_easy_work=0; rec_subagents=0; rec_ui_comfort=0; rec_intelligent_ui=0; rec_sound=0; rec_gitview=0
+  rec_translation=0; rec_compute=0; rec_easy_work=0; rec_subagents=0; rec_ui_comfort=0; rec_subagent_route=0; rec_intelligent_ui=0; rec_sound=0; rec_gitview=0
 }
 
 apply_recommended_spec() {
@@ -155,6 +156,7 @@ apply_recommended_spec() {
           easy-work|easy_work|rdsh-easy-work) rec_easy_work=1 ;;
           subagents|subagent|rdsh-subagent-optimizer) rec_subagents=1 ;;
           ui-comfort|ui_comfort|rdsh-ui-comfort) rec_ui_comfort=1 ;;
+          subagent-route|subagent_route|rdsh-subagent-route) rec_subagent_route=1 ;;
           intelligent-ui|intelligent_ui|dsh-intelligent-ui) rec_intelligent_ui=1 ;;
           sound|dsh-sound-notifications) rec_sound=1 ;;
           gitview|dsh-gitview) rec_gitview=1 ;;
@@ -185,6 +187,7 @@ select_recommended_individually() {
   if prompt_yes_no "rdsh-easy-work (file organization)" "$rec_easy_work"; then rec_easy_work=1; else rec_easy_work=0; fi
   if prompt_yes_no "rdsh-subagent-optimizer (bounded subagents)" "$rec_subagents"; then rec_subagents=1; else rec_subagents=0; fi
   if prompt_yes_no "rdsh-ui-comfort (deliberate Enter in the Web chat)" "$rec_ui_comfort"; then rec_ui_comfort=1; else rec_ui_comfort=0; fi
+  if prompt_yes_no "rdsh-subagent-route (pick the model and effort for new child agents)" "$rec_subagent_route"; then rec_subagent_route=1; else rec_subagent_route=0; fi
   if prompt_yes_no "github:cwd514/dsh-sound-notifications" "$rec_sound"; then rec_sound=1; else rec_sound=0; fi
   if prompt_yes_no "github:yugapor/dsh-gitview" "$rec_gitview"; then rec_gitview=1; else rec_gitview=0; fi
   if prompt_yes_no "github:cwd514/dsh-intelligent-ui" "$rec_intelligent_ui"; then rec_intelligent_ui=1; else rec_intelligent_ui=0; fi
@@ -298,6 +301,7 @@ if [ "$rec_compute" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh
 if [ "$rec_easy_work" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-easy-work"; fi
 if [ "$rec_subagents" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-subagent-optimizer"; fi
 if [ "$rec_ui_comfort" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-ui-comfort"; fi
+if [ "$rec_subagent_route" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-subagent-route"; fi
 
 # The Desktop profile is owned by the Electron application. The npm dsh CLI
 # refuses to manage it, so every package goes through the Desktop-installed

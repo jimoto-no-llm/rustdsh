@@ -1,0 +1,29 @@
+{
+  "name": "rdsh-subagent-route",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Pick the provider, model and reasoning effort new child agents start with",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "サブエージェントのルート",
+    "description": "新しく起動する子エージェントの provider・model・effort を設定します。"
+  }
+}

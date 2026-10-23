@@ -112,6 +112,12 @@
       "why": "deliberate Enter in the Web chat"
     },
     {
+      "id": "subagent-route",
+      "package": "rdsh-subagent-route",
+      "bundled": true,
+      "why": "pick the provider, model and effect new child agents start with"
+    },
+    {
       "id": "sound",
       "package": "github:cwd514/dsh-sound-notifications",
       "starter": true,
