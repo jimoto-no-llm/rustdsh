@@ -10,7 +10,7 @@ import { mkdir, readFile, writeFile, rename, lstat, unlink } from 'node:fs/promi
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { readRoute, writeRoute } from './route.js';
+import { entries, readRoute, writeRoute } from './route.js';
 
 const MAX_BODY = 4096;
 const MAX_FIELD = 128;
@@ -44,7 +44,9 @@ async function readPatch(env) {
     if (file.size > 1024 * 1024) throw fail('RDSH_SUBAGENT_ROUTE_TOO_LARGE');
     return await readFile(patchPath(env), 'utf8');
   } catch (error) {
-    if (error.code === 'ENOENT') return null;
+    // A profile that never customized its patch layer starts from an empty
+    // document; the first save creates it.
+    if (error.code === 'ENOENT') return '';
     throw error;
   }
 }
@@ -120,19 +122,25 @@ export function apply(ctx, config = {}) {
             const patch = await readPatch(env);
             return json(res, 200, {
               ok: true,
-              supported: patch !== null,
+              supported: true,
               patch: isAbsolute(patchPath(env)) ? patchPath(env) : resolve(patchPath(env)),
-              route: patch === null ? null : readRoute(patch),
+              route: readRoute(patch),
               efforts: EFFORTS.filter(Boolean),
             });
           }
           if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method-not-allowed' });
           const { clear, route } = routeFromBody(await readBody(req));
           const patch = await readPatch(env);
-          if (patch === null) return json(res, 409, { ok: false, error: 'RDSH_SUBAGENT_ROUTE_NO_PROFILE' });
+          // Only an entry the profile declares itself can be pinned. A tool that
+          // comes straight from a bundle layer is out of reach: writing a
+          // top-level twin would land on the disabled base entry and change
+          // nothing, so the caller is told instead.
+          if (entries(patch.split('\n')).length === 0) {
+            return json(res, 409, { ok: false, error: 'RDSH_SUBAGENT_ROUTE_NO_ENTRY' });
+          }
           const next = writeRoute(patch, clear ? null : route);
           if (next !== patch) await writePatch(next, env);
-          return json(res, 200, { ok: true, route: clear ? null : readRoute(next) });
+          return json(res, 200, { ok: true, route: readRoute(next) });
         } catch (error) {
           const code = typeof error?.code === 'string' && error.code.startsWith('RDSH_') ? error.code : 'RDSH_SUBAGENT_ROUTE_FAILED';
           return json(res, 400, { ok: false, error: code });
