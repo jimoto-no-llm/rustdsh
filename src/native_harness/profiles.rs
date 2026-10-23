@@ -436,10 +436,12 @@ pub(super) mod tests {
                         break;
                     }
                 }
-                let end = bytes
-                    .windows(4)
-                    .position(|b| b == b"\r\n\r\n")
-                    .unwrap_or_else(|| panic!("mock read no headers: {last_error:?}"));
+                // A reset can arrive before the headers do; retry that request
+                // instead of failing the whole test.
+                let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") else {
+                    eprintln!("mock: no headers in the request: {last_error:?}");
+                    continue;
+                };
                 let headers = String::from_utf8_lossy(&bytes[..end]);
                 let length: usize = headers
                     .lines()
