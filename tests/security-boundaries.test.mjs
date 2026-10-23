@@ -22,6 +22,7 @@ function auditedRuntimeEnvironment() {
     rc2: process.env.RDSH_AUDITED_RUNTIME_RC2,
     alpha1: process.env.RDSH_AUDITED_RUNTIME_ALPHA1,
     alpha3: process.env.RDSH_AUDITED_RUNTIME_ALPHA3,
+    rc3: process.env.RDSH_AUDITED_RUNTIME_RC3,
   };
 }
 
@@ -44,16 +45,20 @@ function runPreload(runtime, adapter, extra = {}) {
 
 test('audited preload accepts registered versions and the legacy unset rc2 adapter', t => {
   const runtimes = auditedRuntimeEnvironment();
-  if (Object.values(runtimes).some(value => !value)) {
-    t.skip('official audited runtime paths are supplied by the Linux security matrix');
-    return;
-  }
-  for (const [runtime, adapter] of [
+  // One audited release per run is enough: a machine normally carries a single
+  // installed tree, and the Linux security matrix still supplies every pair.
+  const pairs = [
     [runtimes.rc2, undefined],
     [runtimes.rc2, 'dsh-tools-0.2.0-rc.2'],
     [runtimes.alpha1, 'dsh-tools-0.2.1-alpha.1'],
     [runtimes.alpha3, 'dsh-tools-0.2.1-alpha.3'],
-  ]) {
+    [runtimes.rc3, 'dsh-tools-0.2.1-rc.3'],
+  ].filter(([runtime]) => runtime);
+  if (pairs.length === 0) {
+    t.skip('official audited runtime paths are supplied by the Linux security matrix');
+    return;
+  }
+  for (const [runtime, adapter] of pairs) {
     const result = runPreload(runtime, adapter, { RDSH_LANG: 'en' });
     assert.equal(result.status, 0, result.stderr);
   }
@@ -61,7 +66,7 @@ test('audited preload accepts registered versions and the legacy unset rc2 adapt
 
 test('audited preload rejects unknown, modified and cross-version runtimes with localized codes', t => {
   const runtimes = auditedRuntimeEnvironment();
-  if (Object.values(runtimes).some(value => !value)) {
+  if (!runtimes.rc2 || !runtimes.alpha1) {
     t.skip('official audited runtime paths are supplied by the Linux security matrix');
     return;
   }
@@ -87,11 +92,18 @@ test('audited preload rejects unknown, modified and cross-version runtimes with 
   const crossVersion = runPreload(runtimes.alpha1, 'dsh-tools-0.2.0-rc.2', { RDSH_LANG: 'en' });
   assert.notEqual(crossVersion.status, 0);
   assert.match(crossVersion.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
+  if (runtimes.rc3) {
+    // rc.3 carries a different dsh-tools digest, so the alpha.3 adapter must
+    // not accept it.
+    const crossRc3 = runPreload(runtimes.rc3, 'dsh-tools-0.2.1-alpha.3', { RDSH_LANG: 'en' });
+    assert.notEqual(crossRc3.status, 0);
+    assert.match(crossRc3.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
+  }
 });
 
 test('audited preload rejects a different known runtime swapped in during loading', t => {
   const runtimes = auditedRuntimeEnvironment();
-  if (Object.values(runtimes).some(value => !value)) {
+  if (!runtimes.rc2 || !runtimes.alpha1) {
     t.skip('official audited runtime paths are supplied by the Linux security matrix');
     return;
   }
