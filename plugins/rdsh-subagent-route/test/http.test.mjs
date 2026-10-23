@@ -102,14 +102,17 @@ test('a bad effort is a 400, not a write', async (t) => {
   assert.equal(readFileSync(patch, 'utf8'), PATCH);
 });
 
-test('a profile without a patch reports unsupported instead of creating one', async (t) => {
+test('a profile that declares no delegation entry is refused, not guessed at', async (t) => {
   const root = mkdtempSync(path.join(tmpdir(), 'rdsh-subagent-route-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  mkdirSync(path.join(root, 'profiles', 'web'), { recursive: true });
+  const dir = path.join(root, 'profiles', 'web');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, 'cordis.patch.yml'), ['- id: llm-pi-ai', '  config: {}', ''].join('\n'));
   const handler = serve({ DSH_HOME: root });
-  const value = await request(handler, 'GET');
-  assert.equal(value.body.supported, false);
-  const post = await request(handler, 'POST', { model: 'm' });
-  assert.equal(post.status, 409);
-  assert.equal(post.body.error, 'RDSH_SUBAGENT_ROUTE_NO_PROFILE');
+  const before = await request(handler, 'GET');
+  assert.equal(before.body.supported, true);
+  assert.equal(before.body.route, null);
+  const saved = await request(handler, 'POST', { model: 'm' });
+  assert.equal(saved.status, 409);
+  assert.equal(saved.body.error, 'RDSH_SUBAGENT_ROUTE_NO_ENTRY');
 });

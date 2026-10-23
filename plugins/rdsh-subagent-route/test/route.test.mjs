@@ -81,10 +81,11 @@ test('clearing removes the pin and leaves the rest intact', () => {
   assert.match(cleared, /modelSelectionSettings: true/);
 });
 
-test('a patch without a delegation entry is returned unchanged', () => {
+test('a patch without a delegation entry is left alone', () => {
   const other = ['- id: llm-pi-ai', '  config:', '    providers: {}', ''].join('\n');
   assert.equal(writeRoute(other, ROUTE), other);
   assert.equal(readRoute(other), null);
+  assert.equal(writeRoute(other, null), other);
 });
 
 test('the route editor survives the real profile patch', t => {
@@ -98,3 +99,6 @@ test('the route editor survives the real profile patch', t => {
   assert.deepEqual(readRoute(pinned), ROUTE);
   assert.equal(writeRoute(writeRoute(pinned, null), null), writeRoute(pinned, null));
 });
+
+
+
