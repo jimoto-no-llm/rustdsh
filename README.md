@@ -624,13 +624,17 @@ Two optional plugins extend the existing Desktop/Web runtime:
   extension-based categories, copy after confirmation, and archive the copies
   to undo. Originals stay in place. Execution currently requires Linux;
   Windows and macOS support preview only. No AI connection is needed.
+- [Subagent route](plugins/rdsh-subagent-route/README.md): pick the provider,
+  model and reasoning effort every new child agent starts with, from
+  **Settings → Subagents**. Opt-in with `--recommended=subagent-route`
+  (`SUBAGENT_ROUTE=1`).
 - [Bounded exploration subagents](plugins/rdsh-subagent-optimizer/README.md):
   fresh context, bounded concurrency and output, and active duplicate suppression
   through the native DSH `spawn` provider (0.2.0-rc.2).
 
 The subagents plugin is part of the web/desktop starter set (see
 [plugins/recommended.md](plugins/recommended.md#starter-set-on-by-default-for-web-and-desktop));
-file organization stays opt-in. Use the app's Plugins page to add the
+file organization and the subagent route stay opt-in. Use the app's Plugins page to add the
 corresponding directory, or select them with
 `./plugins/install.sh --recommended=easy-work,subagents` (`EASY_WORK=1` /
 `SUBAGENTS=1` still work).
