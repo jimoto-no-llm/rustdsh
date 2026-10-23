@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- サブエージェントの **provider・model・reasoning effort** を設定画面から選べるようにしました。
+  `plugins/rdsh-subagent-route` がプロファイルの `cordis.patch.yml` にある `tool-subagent`
+  の `agentOptions` を読み書きし、DSH 自身が次の子から適用します。推奨ティア（既定 off）に
+  追加したので `rdsh plugins install --recommended=subagent-route` で入ります。
+
 ### Changed
 
 - 厳格なツール境界（`features.agent_tool_sandbox` / `RDSH_SECURITY=1`）が DSH **0.2.1-rc.3** を

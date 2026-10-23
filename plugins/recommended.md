@@ -127,6 +127,7 @@ check its duplicate-ID behavior before migrating existing profiles.
 | `compute` | `rdsh-compute` | off | Web compute bridge (`rdsh features on compute`) |
 | `easy-work` | `rdsh-easy-work` | off | Guided file-organization workflow entry points |
 | `subagents` | `rdsh-subagent-optimizer` | web, desktop | Bounded exploration subagents |
+| `subagent-route` | `rdsh-subagent-route` | off | Provider, model and reasoning effort every new child agent starts with, picked in **Settings -> Subagents** |
 | `ui-comfort` | `rdsh-ui-comfort` | off | Deliberate Enter in the DSH Web chat: the composer sends on a second Enter within 1.5 s instead of the first, and the goal editor keeps Enter from committing the edit; both toggle live in the **rdsh 入力** settings section through `localStorage`. |
 | `sound` | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | web, desktop | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. |
 | `gitview` | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | web, desktop | Git panel in the Web sidebar: working-tree changes, staging and commits, unified/side-by-side diffs, commit graph, branches, blame, reflog, and CI status. |
@@ -149,6 +150,12 @@ Notes:
   at install time. It is part of the web/desktop starter set; skip it with
   `INTELLIGENT_UI=0` or `rdsh desktop install --no-intelligent-ui`. It has no
   `features.*` veto in `rdsh.json`.
+- `subagent-route` is off by default. It writes the `agentOptions` block of the
+  profile's `tool-subagent` loader entry, so DSH itself pins the provider, model and
+  effort a child starts with; a child that is already running keeps the route it
+  started with. A profile whose delegation tool comes straight from a bundle layer
+  has no entry to write, and the section reports that instead of saving. See
+  [its README](rdsh-subagent-route/README.md).
 - `ui-comfort` is a Web client plugin that deliberately replaces the stock
   Enter-to-send in the composer, so it stays **off** by default and never enters
   the web/desktop default set: opt in with `--recommended=ui-comfort` (or
