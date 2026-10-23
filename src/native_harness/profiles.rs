@@ -402,7 +402,7 @@ pub(super) mod tests {
                 // A connection that dies before its headers arrive is not the
                 // request this reply belongs to. Wait for the next one instead of
                 // spending the reply on a probe the client already abandoned.
-                let (mut stream, bytes, end) = loop {
+                let (mut stream, mut bytes, end) = loop {
                     let accepted = loop {
                         match listener.accept() {
                             Ok(s) => break s,
@@ -456,10 +456,29 @@ pub(super) mod tests {
                             .map(|s| s.trim().parse().unwrap())
                     })
                     .expect("mock request needs a content-length");
-                let end = end + 4;
+                let body_start = end + 4;
+                let body_end = body_start + length;
+                // Headers and body can arrive in separate segments; a short body
+                // here used to panic the mock thread and leave the client waiting.
+                while bytes.len() < body_end {
+                    let mut b = [0; 4096];
+                    match stream.read(&mut b) {
+                        Ok(0) => break,
+                        Ok(n) => bytes.extend_from_slice(&b[..n]),
+                        Err(e) => {
+                            eprintln!("mock: body read stopped: {e} ({} bytes)", bytes.len());
+                            break;
+                        }
+                    }
+                }
+                assert!(
+                    bytes.len() >= body_end,
+                    "mock: short body ({} of {length} bytes)",
+                    bytes.len().saturating_sub(body_start)
+                );
                 requests.push((
-                    String::from_utf8(bytes[..end].to_vec()).unwrap(),
-                    serde_json::from_slice(&bytes[end..end + length]).unwrap(),
+                    String::from_utf8(bytes[..body_start].to_vec()).unwrap(),
+                    serde_json::from_slice(&bytes[body_start..body_end]).unwrap(),
                 ));
                 let body = serde_json::to_vec(&reply).unwrap();
                 // The client can be gone already (it reset the request); a closed
