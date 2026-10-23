@@ -5,6 +5,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- 厳格なツール境界（`features.agent_tool_sandbox` / `RDSH_SECURITY=1`）が DSH **0.2.1-rc.3** を
+  監査済みランタイムとして認識するようにしました。dsh 本体と `@deepseek-ai/dsh-tools` の
+  マニフェスト、およびツール実行ファイルの SHA-256 を rc.3 の実物から記録しています。rc.3 では
+  `dsh-tools` のエントリ内容が alpha.3 と変わったため、旧アダプターのままでは委譲実行が
+  `UNSUPPORTED_RUNTIME` で拒否されていました。
+- `rdsh-mcp-exposure` と `rdsh-llm-muse-code-subscription` の peer 範囲に `0.2.1-rc.3` を
+  加えました。rc.3 環境で導入しても不一致の警告が出ません。
+
 ## [0.11.0] - 2026-10-22
 
 ### Added

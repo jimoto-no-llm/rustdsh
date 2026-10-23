@@ -399,48 +399,53 @@ pub(super) mod tests {
             let mut requests = vec![];
             for (code, reply) in replies {
                 let start = std::time::Instant::now();
-                let (mut stream, _) = loop {
-                    match listener.accept() {
-                        Ok(s) => break s,
-                        Err(e)
-                            if e.kind() == std::io::ErrorKind::WouldBlock
-                                && start.elapsed() < Duration::from_secs(10) =>
-                        {
-                            std::thread::sleep(Duration::from_millis(5))
+                // A connection that dies before its headers arrive is not the
+                // request this reply belongs to. Wait for the next one instead of
+                // spending the reply on a probe the client already abandoned.
+                let (mut stream, bytes, end) = loop {
+                    let accepted = loop {
+                        match listener.accept() {
+                            Ok(s) => break s,
+                            Err(e)
+                                if e.kind() == std::io::ErrorKind::WouldBlock
+                                    && start.elapsed() < Duration::from_secs(10) =>
+                            {
+                                std::thread::sleep(Duration::from_millis(5))
+                            }
+                            Err(e) => panic!("mock accept: {e}"),
                         }
-                        Err(e) => panic!("mock accept: {e}"),
-                    }
-                };
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .unwrap();
-                // Read the whole request first. On Windows a client that has what
-                // it needs closes with a reset, which can discard bytes the mock has
-                // already queued; reading to the end avoids losing the request.
-                let mut bytes = Vec::new();
-                let mut last_error = None;
-                loop {
-                    let mut b = [0; 4096];
-                    match stream.read(&mut b) {
-                        Ok(0) => break,
-                        Ok(n) => bytes.extend_from_slice(&b[..n]),
-                        Err(e) => {
-                            // A reset that arrives after the whole request is no loss;
-                            // one before any byte still fails the assertions below.
-                            eprintln!("mock: read stopped: {e} ({} bytes)", bytes.len());
-                            last_error = Some(e);
+                    };
+                    let (mut stream, _) = accepted;
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(5)))
+                        .unwrap();
+                    let mut bytes = Vec::new();
+                    let mut last_error = None;
+                    loop {
+                        let mut b = [0; 4096];
+                        match stream.read(&mut b) {
+                            Ok(0) => break,
+                            Ok(n) => bytes.extend_from_slice(&b[..n]),
+                            Err(e) => {
+                                eprintln!("mock: read stopped: {e} ({} bytes)", bytes.len());
+                                last_error = Some(e);
+                                break;
+                            }
+                        }
+                        if bytes.windows(4).any(|w| w == b"\r\n\r\n") {
                             break;
                         }
                     }
-                    if bytes.windows(4).any(|w| w == b"\r\n\r\n") {
-                        break;
+                    match bytes.windows(4).position(|b| b == b"\r\n\r\n") {
+                        Some(end) => break (stream, bytes, end),
+                        None => {
+                            eprintln!("mock: request without headers: {last_error:?}");
+                            assert!(
+                                start.elapsed() < Duration::from_secs(10),
+                                "mock: no complete request arrived"
+                            );
+                        }
                     }
-                }
-                // A reset can arrive before the headers do; retry that request
-                // instead of failing the whole test.
-                let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") else {
-                    eprintln!("mock: no headers in the request: {last_error:?}");
-                    continue;
                 };
                 let headers = String::from_utf8_lossy(&bytes[..end]);
                 let length: usize = headers

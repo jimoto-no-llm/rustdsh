@@ -24,7 +24,7 @@ struct AuditedAdapter {
     bin_sha256: &'static str,
 }
 
-const AUDITED_ADAPTERS: [AuditedAdapter; 3] = [
+const AUDITED_ADAPTERS: [AuditedAdapter; 4] = [
     AuditedAdapter {
         id: "dsh-tools-0.2.0-rc.2",
         dsh_version: "0.2.0-rc.2",
@@ -41,6 +41,13 @@ const AUDITED_ADAPTERS: [AuditedAdapter; 3] = [
         id: "dsh-tools-0.2.1-alpha.3",
         dsh_version: "0.2.1-alpha.3",
         tools_version: "0.2.1-alpha.3",
+        bin_sha256: "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+    },
+    AuditedAdapter {
+        id: "dsh-tools-0.2.1-rc.3",
+        dsh_version: "0.2.1-rc.3",
+        tools_version: "0.2.1-rc.3",
+        // bin.js is byte-identical to 0.2.1-alpha.3; dsh-tools moved on.
         bin_sha256: "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
     },
 ];
@@ -563,10 +570,21 @@ mod tests {
                 "dsh-tools-0.2.1-alpha.3",
                 "RDSH_AUDITED_RUNTIME_ALPHA3",
             ),
+            (
+                "RDSH_AUDITED_DSH_RC3",
+                "dsh-tools-0.2.1-rc.3",
+                "RDSH_AUDITED_RUNTIME_RC3",
+            ),
         ];
-        if matrix.iter().any(|(entry, _, runtime)| {
-            std::env::var_os(entry).is_none() || std::env::var_os(runtime).is_none()
-        }) {
+        // One release per run is enough: a machine normally carries a single
+        // installed tree, and CI can still provide every pair at once.
+        let matrix = matrix
+            .into_iter()
+            .filter(|(entry, _, runtime)| {
+                std::env::var_os(entry).is_some() && std::env::var_os(runtime).is_some()
+            })
+            .collect::<Vec<_>>();
+        if matrix.is_empty() {
             return;
         }
         for (entry_variable, expected_adapter, runtime_variable) in matrix {
