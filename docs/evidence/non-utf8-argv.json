@@ -1,0 +1,84 @@
+{
+  "before": {
+    "binary_sha256": "26aa6ed13760df511afb28d80f10e61a3563bb7dbc0754f803def4d42d504b70",
+    "argv": [
+      {
+        "passthrough": "0",
+        "argument_hex": [
+          "2d2d70726f66696c65",
+          "686561646c657373",
+          "",
+          "612062",
+          "6c696e650a627265616b",
+          "e697a5e69cace8aa9e",
+          "2d2d",
+          "2d2d68656c70",
+          "6e6f6e757466382dff"
+        ],
+        "exit_code": -6,
+        "stdout_hex": "",
+        "stderr": "\nthread 'main' (310371) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/env.rs:878:51:\ncalled `Result::unwrap()` on an `Err` value: \"nonutf8-\\xFF\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+        "exact": false
+      },
+      {
+        "passthrough": "1",
+        "argument_hex": [
+          "2d2d70726f66696c65",
+          "686561646c657373",
+          "",
+          "612062",
+          "6c696e650a627265616b",
+          "e697a5e69cace8aa9e",
+          "2d2d",
+          "2d2d68656c70",
+          "6e6f6e757466382dff"
+        ],
+        "exit_code": -6,
+        "stdout_hex": "",
+        "stderr": "\nthread 'main' (310372) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/env.rs:878:51:\ncalled `Result::unwrap()` on an `Err` value: \"nonutf8-\\xFF\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+        "exact": false
+      }
+    ]
+  },
+  "after": {
+    "binary_sha256": "0f57b34d1518448acade0d0b200316df586a95c6b3756193b115fb98d1205ef3",
+    "argv": [
+      {
+        "passthrough": "0",
+        "argument_hex": [
+          "2d2d70726f66696c65",
+          "686561646c657373",
+          "",
+          "612062",
+          "6c696e650a627265616b",
+          "e697a5e69cace8aa9e",
+          "2d2d",
+          "2d2d68656c70",
+          "6e6f6e757466382dff"
+        ],
+        "exit_code": 23,
+        "stdout_hex": "2d2d70726f66696c6500686561646c6573730000612062006c696e650a627265616b00e697a5e69cace8aa9e002d2d002d2d68656c70006e6f6e757466382dff00",
+        "stderr": "original stderr 日本語\n",
+        "exact": true
+      },
+      {
+        "passthrough": "1",
+        "argument_hex": [
+          "2d2d70726f66696c65",
+          "686561646c657373",
+          "",
+          "612062",
+          "6c696e650a627265616b",
+          "e697a5e69cace8aa9e",
+          "2d2d",
+          "2d2d68656c70",
+          "6e6f6e757466382dff"
+        ],
+        "exit_code": 23,
+        "stdout_hex": "2d2d70726f66696c6500686561646c6573730000612062006c696e650a627265616b00e697a5e69cace8aa9e002d2d002d2d68656c70006e6f6e757466382dff00",
+        "stderr": "original stderr 日本語\n",
+        "exact": true
+      }
+    ]
+  }
+}

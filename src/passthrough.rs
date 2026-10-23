@@ -1,6 +1,7 @@
 //! Env overrides for drop-in `dsh` mode (see install.sh --as-dsh).
 //! RDSH_PASSTHROUGH=1 disables slim env; RDSH_DRY_RUN=1 only prints the exec.
 use crate::executable::is_executable as is_executable_candidate;
+use std::ffi::{OsStr, OsString};
 
 pub fn env_passthrough() -> bool {
     std::env::var("RDSH_PASSTHROUGH").is_ok_and(|v| v == "1")
@@ -487,13 +488,17 @@ fn find_frontend_assets_dir(orig: &str) -> Option<std::path::PathBuf> {
 /// Read the DSH profile from delegated arguments (`--profile web` / `--profile=web`).
 ///
 /// Only the profile flag is inspected; every other argument is left to DSH.
-fn profile_of(args: &[String]) -> Option<&str> {
+fn profile_of<T: AsRef<OsStr>>(args: &[T]) -> Option<&str> {
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
+        let arg = arg.as_ref();
         if arg == "--profile" {
-            return iter.next().map(String::as_str);
+            return iter.next().and_then(|value| value.as_ref().to_str());
         }
-        if let Some(value) = arg.strip_prefix("--profile=") {
+        if let Some(value) = arg
+            .to_str()
+            .and_then(|value| value.strip_prefix("--profile="))
+        {
             return Some(value);
         }
     }
@@ -818,15 +823,17 @@ pub fn exec_dump_config(
 }
 
 /// Raw verbatim delegation (used when invoked as `dsh`): no arg rewriting.
-pub fn exec_raw(args: &[String], dry: bool, slim: bool) -> anyhow::Result<()> {
+pub fn exec_raw(args: &[OsString], dry: bool, slim: bool) -> anyhow::Result<()> {
     // Same first-boot guidance as exec_boot: `dsh` (shadowed) is the usual
     // first thing a newcomer runs.
 
     let orig = find_original_dsh().ok_or_else(|| {
         anyhow::anyhow!("original dsh not found (set DSH_ORIG_BIN or reinstall with install.sh)")
     })?;
-    let metadata_only =
-        args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V" | "--help" | "-h");
+    let metadata_only = args.len() == 1
+        && ["--version", "-V", "--help", "-h"]
+            .iter()
+            .any(|flag| args[0] == OsStr::new(flag));
     let mut cmd = base_cmd(&orig, dry, metadata_only, crate::locale::Locale::English)?;
     if !dry {
         crate::auth::pre_boot(true, crate::locale::Locale::English);
@@ -913,7 +920,7 @@ mod tests {
         // Unrelated arguments must not be mistaken for the profile.
         assert_eq!(profile_of(&sv(&["--port", "3080"])), None);
         assert_eq!(profile_of(&sv(&["--profile"])), None);
-        assert_eq!(profile_of(&[]), None);
+        assert_eq!(profile_of::<String>(&[]), None);
         // A later flag does not override the first one found.
         assert_eq!(
             profile_of(&sv(&["--profile", "tui", "--profile", "web"])),
