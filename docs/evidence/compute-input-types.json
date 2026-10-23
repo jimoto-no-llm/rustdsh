@@ -1,0 +1,112 @@
+{
+  "before": {
+    "binary_sha256": "26aa6ed13760df511afb28d80f10e61a3563bb7dbc0754f803def4d42d504b70",
+    "compute": {
+      "requests": [
+        {
+          "v": 1,
+          "id": "number-text",
+          "op": "tokens.estimate",
+          "text": 123
+        },
+        {
+          "v": 1,
+          "id": "string-budget",
+          "op": "tokens.prune",
+          "text": "retain me",
+          "max_tokens": "bad"
+        },
+        {
+          "v": 1,
+          "id": "recovered",
+          "op": "tokens.estimate",
+          "text": "日本語abc"
+        }
+      ],
+      "exit_code": 0,
+      "responses": [
+        {
+          "v": 1,
+          "id": "number-text",
+          "ok": true,
+          "op": "tokens.estimate",
+          "tokens": 0,
+          "chars": 0,
+          "elapsed_us": 87
+        },
+        {
+          "v": 1,
+          "id": "string-budget",
+          "ok": true,
+          "op": "tokens.prune",
+          "pruned": "retain me",
+          "before": 3,
+          "after": 3,
+          "budget": 4000,
+          "elapsed_us": 12
+        },
+        {
+          "v": 1,
+          "id": "recovered",
+          "ok": true,
+          "op": "tokens.estimate",
+          "tokens": 4,
+          "chars": 6,
+          "elapsed_us": 4
+        }
+      ]
+    }
+  },
+  "after": {
+    "binary_sha256": "0f57b34d1518448acade0d0b200316df586a95c6b3756193b115fb98d1205ef3",
+    "compute": {
+      "requests": [
+        {
+          "v": 1,
+          "id": "number-text",
+          "op": "tokens.estimate",
+          "text": 123
+        },
+        {
+          "v": 1,
+          "id": "string-budget",
+          "op": "tokens.prune",
+          "text": "retain me",
+          "max_tokens": "bad"
+        },
+        {
+          "v": 1,
+          "id": "recovered",
+          "op": "tokens.estimate",
+          "text": "日本語abc"
+        }
+      ],
+      "exit_code": 0,
+      "responses": [
+        {
+          "v": 1,
+          "id": "number-text",
+          "ok": false,
+          "code": "bad_text",
+          "error": "text must be a string"
+        },
+        {
+          "v": 1,
+          "id": "string-budget",
+          "ok": false,
+          "code": "bad_budget",
+          "error": "max_tokens must be an integer in 1..=200000"
+        },
+        {
+          "v": 1,
+          "id": "recovered",
+          "ok": true,
+          "op": "tokens.estimate",
+          "tokens": 4,
+          "chars": 6,
+          "elapsed_us": 6
+        }
+      ]
+    }
+  }
+}
