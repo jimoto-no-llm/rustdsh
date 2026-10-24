@@ -165,7 +165,6 @@ jobs:
           toolchain: stable
       - run: cargo build --locked --release --target x86_64-unknown-linux-gnu
       - name: Build the .deb and .rpm
-        env:
         run: |
           set -euo pipefail
           # nfpm cannot carry the tag's leading v, so strip it here.
