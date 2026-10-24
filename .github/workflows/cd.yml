@@ -5,13 +5,26 @@ name: cd
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    # Re-run the release pipeline for an existing tag. The workflow file is
+    # taken from the dispatched ref (main), not from the tag, so a broken CD
+    # step can be fixed and retried without moving the published tag.
+    inputs:
+      tag:
+        description: 'Existing annotated release tag, e.g. v0.12.0'
+        required: true
+        type: string
 
 permissions:
   actions: read
   contents: read
 
+# A tag push knows its tag from the ref; a manual run names it as an input.
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
 concurrency:
-  group: cd-${{ github.ref }}
+  group: cd-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -24,20 +37,23 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - name: Require an annotated version tag, main ancestry, and successful CI
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_SHA: ${{ github.sha }}
+          PUSHED_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
         run: |
           set -euo pipefail
+          git fetch --force --tags origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
-          test "$tag_sha" = "$RELEASE_SHA"
+          # A tag push states the commit it delivered; a manual run trusts the tag.
+          if [ -n "$PUSHED_SHA" ]; then test "$tag_sha" = "$PUSHED_SHA"; fi
+          echo "RELEASE_SHA=$tag_sha" >> "$GITHUB_ENV"
           git fetch --no-tags origin main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "$RELEASE_SHA" refs/remotes/origin/main; then
+          if ! git merge-base --is-ancestor "$tag_sha" refs/remotes/origin/main; then
             echo "Release tag $RELEASE_TAG does not point to a commit on main" >&2
             exit 1
           fi
@@ -45,8 +61,6 @@ jobs:
       - name: Wait for the tag-push ci workflow to succeed
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_SHA: ${{ github.sha }}
         # The tag run includes browser-e2e (~15 min) and the isolated install, so
         # 900s expired while a healthy CI was finishing. 30 min still fails fast
         # on a broken run and comfortably covers a green one.
@@ -55,7 +69,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
@@ -91,6 +104,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
@@ -129,6 +144,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Pinned together with nfpm: nfpm v2.48.0 declares go 1.26.4.
@@ -149,7 +166,6 @@ jobs:
       - run: cargo build --locked --release --target x86_64-unknown-linux-gnu
       - name: Build the .deb and .rpm
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           # nfpm cannot carry the tag's leading v, so strip it here.
@@ -198,6 +214,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: release-*
@@ -206,7 +224,6 @@ jobs:
       - name: Verify all assets and compose the v0.2.0 release format
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           directory="$RUNNER_TEMP/rdsh-release-check"
@@ -216,7 +233,6 @@ jobs:
       - name: Upload to a draft and publish with the correct channel
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           directory="$RUNNER_TEMP/rdsh-release-check"
@@ -259,13 +275,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
       - name: Publish rdsh to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           # Fail closed: a release without the crate is the bug this job fixes.
