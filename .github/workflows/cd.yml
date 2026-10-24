@@ -180,7 +180,9 @@ jobs:
             plugins
           cd dist
           sha256sum rdsh-plugins.tar.gz > rdsh-plugins.tar.gz.sha256
-          tar --list --gzip --file rdsh-plugins.tar.gz | head -5
+          # List the archive to prove it is readable; redirect rather than
+          # piping to head, whose early exit would SIGPIPE tar into a failure.
+          tar --list --gzip --file rdsh-plugins.tar.gz > /dev/null
           ls -l rdsh-plugins.tar.gz
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
