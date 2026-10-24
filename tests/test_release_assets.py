@@ -25,6 +25,7 @@ class ReleaseAssetsTests(unittest.TestCase):
             (self.root / name).write_text("DUMMY_INSTALLER")
         for name in release.ARCHIVES:
             self.package(name)
+        self.plugins_archive()
         for name in self.native_package_names:
             self.native_package(name)
 
@@ -63,6 +64,41 @@ class ReleaseAssetsTests(unittest.TestCase):
                     entry.size = len(content)
                     package.addfile(entry, io.BytesIO(content))
         self.checksum(name)
+
+    def plugins_archive(self, members=("plugins/install.sh", "plugins/rdsh-settings/package.json"),
+                        link=False):
+        content = b"DUMMY_PLUGIN"
+        with tarfile.open(self.root / release.PLUGINS, "w:gz") as package:
+            directory = tarfile.TarInfo("plugins")
+            directory.type = tarfile.DIRTYPE
+            package.addfile(directory)
+            for member in members:
+                entry = tarfile.TarInfo(member)
+                if link:
+                    entry.type = tarfile.SYMTYPE
+                    entry.linkname = "/DUMMY_OUTSIDE"
+                    package.addfile(entry)
+                else:
+                    entry.size = len(content)
+                    package.addfile(entry, io.BytesIO(content))
+        self.checksum(release.PLUGINS)
+
+    def test_plugins_archive_requires_the_installer(self):
+        self.plugins_archive(members=("plugins/rdsh-settings/package.json",))
+        with self.assertRaisesRegex(ValueError, "no plugins/install.sh"):
+            release.verify(self.root)
+
+    def test_plugins_archive_refuses_paths_outside_plugins(self):
+        for member in ("plugins/../escape", "/abs/install.sh", "other/install.sh"):
+            with self.subTest(member=member):
+                self.plugins_archive(members=(member,))
+                with self.assertRaisesRegex(ValueError, "escapes plugins/"):
+                    release.verify(self.root)
+
+    def test_plugins_archive_refuses_links(self):
+        self.plugins_archive(link=True)
+        with self.assertRaisesRegex(ValueError, "contains links"):
+            release.verify(self.root)
 
     def test_complete_valid_release(self):
         release.verify(self.root)
@@ -111,11 +147,11 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_draft_retry_reuses_identical_files_and_uploads_only_missing(self):
         with tempfile.TemporaryDirectory() as temporary:
             existing = Path(temporary)
-            self.assertEqual(len(release.missing_assets(self.root, existing)), 16)
+            self.assertEqual(len(release.missing_assets(self.root, existing)), 18)
             for name in release.INSTALLERS:
                 (existing / name).write_bytes((self.root / name).read_bytes())
             pending = release.missing_assets(self.root, existing)
-            self.assertEqual(len(pending), 14)
+            self.assertEqual(len(pending), 16)
             self.assertFalse(any(path.name in release.INSTALLERS for path in pending))
             for path in pending:
                 (existing / path.name).write_bytes(path.read_bytes())
@@ -149,7 +185,7 @@ class ReleaseAssetsTests(unittest.TestCase):
                                      "--existing-directory", str(existing), "--missing-output", str(output)],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(len(output.read_text().splitlines()), 16)
+            self.assertEqual(len(output.read_text().splitlines()), 18)
 
     def test_missing_or_duplicated_native_package(self):
         deb = self.root / "rdsh_0.6.0_amd64.deb"

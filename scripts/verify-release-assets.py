@@ -16,6 +16,11 @@ ARCHIVES = (
     "rdsh-windows-x64.zip",
 )
 INSTALLERS = ("install.sh", "install.ps1")
+# The bundled plugin tree, so a curl install can attach the rdsh settings tab
+# and the update banner without a checkout.
+PLUGINS = "rdsh-plugins.tar.gz"
+# A plugin tree is many small files; the binary archives are one.
+PLUGINS_MAX_BYTES = 64 * 1024 * 1024
 # The native packages carry the release version in their file name, so their
 # expected set is a glob: exactly one .deb and exactly one .rpm, each with the
 # same sha256 sidecar the archives use.
@@ -80,7 +85,8 @@ def missing_assets(directory, existing):
     verify(directory)
     packages = package_names(directory)
     names = (*ARCHIVES, *(name + ".sha256" for name in ARCHIVES),
-             *packages, *(name + ".sha256" for name in packages), *INSTALLERS)
+             *packages, *(name + ".sha256" for name in packages), *INSTALLERS,
+             PLUGINS, PLUGINS + ".sha256")
     for path in existing.iterdir():
         if path.name not in names:
             raise ValueError(f"unexpected draft asset: {path.name}")
@@ -114,8 +120,29 @@ def verify(directory):
                         or not entries[0].isfile()
                         or not 0 < entries[0].size <= 64 * 1024 * 1024):
                     raise ValueError(f"invalid binary archive: {name}")
+    verify_plugins(directory)
     for name in package_names(directory):
         verify_package(directory, name)
+
+
+def verify_plugins(directory):
+    """The plugins archive must be a tree rooted at plugins/ with its installer."""
+    archive = Path(directory) / PLUGINS
+    regular_file(archive)
+    verify_checksum(directory, PLUGINS)
+    if not 0 < archive.stat().st_size <= PLUGINS_MAX_BYTES:
+        raise ValueError(f"invalid plugins archive size: {PLUGINS}")
+    with tarfile.open(archive, "r:gz") as package:
+        entries = package.getmembers()
+        names = [entry.name for entry in entries]
+        if not entries or any(
+                name != "plugins" and not name.startswith("plugins/")
+                or ".." in Path(name).parts for name in names):
+            raise ValueError(f"plugins archive escapes plugins/: {PLUGINS}")
+        if any(entry.issym() or entry.islnk() for entry in entries):
+            raise ValueError(f"plugins archive contains links: {PLUGINS}")
+        if "plugins/install.sh" not in names:
+            raise ValueError(f"plugins archive has no plugins/install.sh: {PLUGINS}")
 
 
 if __name__ == "__main__":
@@ -131,4 +158,5 @@ if __name__ == "__main__":
         arguments.missing_output.write_text("".join(f"{path}\n" for path in pending), encoding="utf-8")
     else:
         verify(arguments.directory)
-    print("Verified 5 binary archives, 5 checksums, 2 native packages and 2 installers")
+    print("Verified 5 binary archives, 5 checksums, 2 native packages, the plugins "
+          "archive and 2 installers")
