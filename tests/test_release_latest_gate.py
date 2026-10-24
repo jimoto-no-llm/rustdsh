@@ -68,6 +68,24 @@ class CdRetryTest(unittest.TestCase):
             "a manual run must check out the tag, not the dispatched branch",
         )
 
+
+class BundledPluginsLocationTest(unittest.TestCase):
+    """The installer and the launcher must agree on where the plugin tree lives."""
+
+    def test_install_sh_unpacks_beside_the_prefix_the_way_the_launcher_probes(self):
+        installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'share_root="$PREFIX/../share/rdsh"',
+            installer,
+            "the plugins archive must land in <prefix>/../share/rdsh",
+        )
+        launcher = (ROOT / "src" / "desktop.rs").read_text(encoding="utf-8")
+        self.assertIn(
+            'dir.join("..").join("share").join("rdsh")',
+            launcher,
+            "the launcher probes <exe dir>/../share/rdsh",
+        )
+
 class LatestGateTest(unittest.TestCase):
     def test_cd_never_marks_a_fresh_release_latest(self):
         text = (WORKFLOWS / "cd.yml").read_text(encoding="utf-8")
