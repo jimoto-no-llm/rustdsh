@@ -1,6 +1,6 @@
 {
   "before": {
-    "binary_sha256": "26aa6ed13760df511afb28d80f10e61a3563bb7dbc0754f803def4d42d504b70",
+    "binary_sha256": "6127913e4233acfeac21292f2f2dbd6f7078791d70364129f94cc173249aa603",
     "compute": {
       "requests": [
         {
@@ -32,7 +32,7 @@
           "op": "tokens.estimate",
           "tokens": 0,
           "chars": 0,
-          "elapsed_us": 87
+          "elapsed_us": 29
         },
         {
           "v": 1,
@@ -43,7 +43,7 @@
           "before": 3,
           "after": 3,
           "budget": 4000,
-          "elapsed_us": 12
+          "elapsed_us": 2
         },
         {
           "v": 1,
@@ -52,13 +52,13 @@
           "op": "tokens.estimate",
           "tokens": 4,
           "chars": 6,
-          "elapsed_us": 4
+          "elapsed_us": 2
         }
       ]
     }
   },
   "after": {
-    "binary_sha256": "0f57b34d1518448acade0d0b200316df586a95c6b3756193b115fb98d1205ef3",
+    "binary_sha256": "5d9f03a2dfe942fd06e919cdc2507130f7c238f4444844f870248a186951123b",
     "compute": {
       "requests": [
         {
@@ -104,9 +104,12 @@
           "op": "tokens.estimate",
           "tokens": 4,
           "chars": 6,
-          "elapsed_us": 6
+          "elapsed_us": 3
         }
       ]
     }
-  }
+  },
+  "base_main": "698f565c3ba3ce666538eacd04d3dc7b77e1e2b5",
+  "tested_code_head": "42501b78b695a98b26a3b5b941ec290475354e5f",
+  "date": "2026-10-24"
 }
