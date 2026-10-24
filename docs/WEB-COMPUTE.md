@@ -26,6 +26,13 @@ Web GUI → DSH Host/Plugin → plugins/rdsh-compute → stdio → rdsh compute
 
 プロトコルは `src/compute.rs` の版付き NDJSON（`rdsh-compute/1`）です。
 未知の版・操作・巨大な入力・非 UTF-8 は実行せずに拒否します。
+`tokens.estimate` と `tokens.prune` の `text` は文字列で、異なる型は
+`bad_text` になります。省略時は従来どおり空文字列です。
+`tokens.prune` の `max_tokens` は `1..=200000` の整数で、異なる型や
+範囲外の値は `bad_budget` になります。省略時だけ既定の `4000` を使います。
+`null` も型不一致として拒否します。拒否後も同じワーカーで次の行を処理します。
+[実バイナリの修正前後比較](evidence/compute-input-types.json) に、不正な型の拒否と
+後続の正常要求への応答を保存しています。
 
 ## 計測（採否の式）
 
