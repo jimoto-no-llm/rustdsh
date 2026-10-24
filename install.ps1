@@ -17,6 +17,9 @@
 #   .\install.ps1 -Desktop         # also attach the rdsh starter + default third-party (sound, gitview, intelligent-ui) plugins to Desktop
 #   .\install.ps1 -NoSetup         # skip the first-run setup screen and the Start menu shortcut
 # -FromRelease verifies the Windows archive against this repository's
+# The bundled plugins archive (rdsh-plugins.tar.gz) is fetched from the same
+# release and verified against release-plugins-digests.tsv, so a release-only
+# install still gets the rdsh settings tab; skip it with RDSH_SKIP_PLUGINS=1.
 # release-digests-windows.tsv, fetched from its fixed canonical URL; the release
 # origin's .sha256 sidecar is never trusted. RDSH_RELEASE_BASE only moves the
 # download, it never moves the registry. The four Unix archives stay in
@@ -44,6 +47,10 @@ $OriginFile = Join-Path $env:USERPROFILE '.config/rdsh/origin'
 $ReleaseDigestsUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests-windows.tsv'
 $ReleaseAsset = 'rdsh-windows-x64.zip'
 $ReleaseMember = 'rdsh.exe'
+# The bundled plugin tree, so a release-only install can attach the rdsh
+# settings tab and the update banner without a checkout.
+$PluginDigestsUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-plugins-digests.tsv'
+$PluginAsset = 'rdsh-plugins.tar.gz'
 
 function Ensure-Cargo {
   if (Get-Command cargo -ErrorAction SilentlyContinue) { return }
@@ -169,6 +176,129 @@ function Assert-ReleaseArchiveMembers([string]$Archive) {
   }
 }
 
+function Save-ReleaseAsset([string]$Uri, [string]$OutFile) {
+  # A file:// release base exists only for the offline installer fixtures;
+  # everything else is https. Invoke-WebRequest cannot read file:// URLs.
+  if ($Uri -clike 'file://*') {
+    $path = $Uri.Substring('file://'.Length)
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "no local release asset at $path" }
+    Copy-Item -LiteralPath $path -Destination $OutFile -Force
+    return
+  }
+  Invoke-WebRequest -Uri $Uri -OutFile $OutFile
+}
+
+function Get-PluginDigestManifest([string]$Destination) {
+  # The bundled plugins archive has its own ledger, fetched from the same fixed
+  # canonical URL as the Windows one. Same trust rule: only a file:// release
+  # base (tests) may substitute a local copy, so a remote origin never chooses
+  # the digests that verify its own archive.
+  $source = $env:RDSH_PLUGIN_DIGESTS
+  if (-not [string]::IsNullOrEmpty($source)) {
+    if ($env:RDSH_RELEASE_BASE -cnotlike 'file://*') {
+      Write-Host 'warning: ignoring RDSH_PLUGIN_DIGESTS (needs a file:// RDSH_RELEASE_BASE)'
+      $source = ''
+    } elseif (-not [System.IO.Path]::IsPathRooted($source)) {
+      Write-Host "warning: ignoring RDSH_PLUGIN_DIGESTS=$source (needs an absolute path)"
+      $source = ''
+    }
+  }
+  if (-not [string]::IsNullOrEmpty($source)) {
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "no local plugins digest registry at $source" }
+    Copy-Item -LiteralPath $source -Destination $Destination -Force
+    return
+  }
+  Invoke-WebRequest -Uri $PluginDigestsUrl -OutFile $Destination
+}
+
+function Read-PluginDigestManifest([string]$Path) {
+  # Same shape as Read-ReleaseDigestManifest, but a ledger with no rows is the
+  # state before any release publishes the archive: it means 'nothing to
+  # install', not 'the ledger is broken'.
+  # Returns @{ Latest = 'vX.Y.Z' or ''; Digests = @{ '<version> <asset>' = '<sha256>' } }
+  # or $null when the ledger must be refused.
+  $versionPattern = '\Av[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?\z'
+  $latest = ''
+  $latestRows = 0
+  $latestAssets = 0
+  $rows = 0
+  $digests = @{}
+  $versions = @{}
+  foreach ($line in @(Get-Content -LiteralPath $Path)) {
+    if ($line -match '^[ \t]*#' -or $line.Trim().Length -eq 0) { continue }
+    $fields = $line.Trim() -split '[ \t]+'
+    if ($fields[0] -ceq 'latest') {
+      $latestRows++
+      if ($latestRows -ne 1 -or $fields.Count -ne 2 -or $fields[1] -cnotmatch $versionPattern -or $fields[1].Contains('-')) { return $null }
+      $latest = $fields[1]
+      continue
+    }
+    if ($fields.Count -ne 3 -or $fields[0] -cnotmatch $versionPattern -or $fields[1] -cne $PluginAsset -or $fields[2] -cnotmatch '\A[0-9a-fA-F]{64}\z') { return $null }
+    $key = "$($fields[0]) $($fields[1])"
+    if ($digests.ContainsKey($key)) { return $null }
+    $digests[$key] = $fields[2]
+    $versions[$fields[0]] = $true
+    $rows++
+    if ($fields[0] -ceq $latest) { $latestAssets++ }
+  }
+  if ($rows -eq 0 -and $latestRows -eq 0) { return @{ Latest = ''; Digests = @{} } }
+  if ($latestRows -ne 1 -or -not $versions.ContainsKey($latest) -or $latestAssets -ne 1) { return $null }
+  return @{ Latest = $latest; Digests = $digests }
+}
+
+function Install-ReleasePlugins([string]$Base, [string]$RequestedVersion, [string]$ShareRoot) {
+  # Fetch the bundled plugins archive for the release and unpack it next to the
+  # binary, where the launcher already probes for bundled plugins. Returns the
+  # plugins directory, or $null when this release ships no archive.
+  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('rdsh-plugins-' + [Guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  try {
+    $ledger = Join-Path $tmp 'release-plugins-digests.tsv'
+    Get-PluginDigestManifest $ledger
+    $manifest = Read-PluginDigestManifest $ledger
+    if ($null -eq $manifest) { throw 'trusted plugins digest registry is invalid' }
+    if ($manifest.Digests.Count -eq 0) { return $null }
+    if ([string]::IsNullOrEmpty($RequestedVersion) -or $RequestedVersion -ceq 'latest') { $version = $manifest.Latest }
+    else {
+      $version = $RequestedVersion
+      if (-not $version.StartsWith('v')) { $version = "v$version" }
+    }
+    if (-not [regex]::IsMatch($version, '\A[0-9A-Za-z.-]+\z') -or
+        -not [regex]::IsMatch($version, '\Av[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?\z')) {
+      throw "invalid release version: $version"
+    }
+    $expected = $manifest.Digests["$version $PluginAsset"]
+    if ([string]::IsNullOrEmpty($expected)) { throw "no pinned plugins archive for release $version" }
+    $archive = Join-Path $tmp 'plugins.tar.gz'
+    $url = "$Base/download/$version/$PluginAsset"
+    Write-Host "fetching release asset $version/$PluginAsset"
+    Save-ReleaseAsset $url $archive
+    Assert-ReleaseSha256 $archive $expected
+    $tar = Get-Command tar -ErrorAction SilentlyContinue
+    if (-not $tar) { throw 'tar.exe is required to unpack the plugins archive' }
+    # List before extracting so a traversal entry can never be written.
+    $members = @(& $tar.Source -tzf $archive)
+    if ($LASTEXITCODE -ne 0) { throw 'could not list the plugins archive' }
+    $installerSeen = $false
+    foreach ($member in $members) {
+      $name = ($member -replace '\\', '/').TrimEnd('/')
+      if ($name -ceq 'plugins' -or $name.StartsWith('plugins/')) {
+        if ($name -ceq 'plugins/install.sh') { $installerSeen = $true }
+        continue
+      }
+      throw "plugins archive contains a path outside plugins/: $name"
+    }
+    if (-not $installerSeen) { throw 'plugins archive has no plugins/install.sh' }
+    $destination = Join-Path $ShareRoot 'plugins'
+    New-Item -ItemType Directory -Force -Path $ShareRoot | Out-Null
+    if (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Recurse -Force }
+    & $tar.Source -xzf $archive -C $ShareRoot plugins
+    if ($LASTEXITCODE -ne 0) { throw 'could not unpack the plugins archive' }
+    if (-not (Test-Path -LiteralPath (Join-Path $destination 'install.sh') -PathType Leaf)) { throw 'plugins archive has no plugins/install.sh' }
+    return $destination
+  } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Confirm-ChecksumBypass([string]$Version, [string]$Asset) {
   # The escape hatch stays explicit and interactive: -NoChecksum alone is not
   # enough, and the answer must be exactly YES at a terminal.
@@ -277,6 +407,37 @@ if ($Wsl) {
 
 Write-Host '--- rdsh doctor ---'
 & (Join-Path $Prefix 'rdsh.exe') doctor | Select-Object -First 12
+
+# The web profile gets the essential rdsh plugins (Settings -> rdsh tab, update
+# banner, phone-width layout). A checkout attaches them from its own plugins/
+# directory; a release-only install fetches the bundled tree that CD publishes
+# next to the release archives. Neither path fails the install.
+$rdshExe = Join-Path $Prefix 'rdsh.exe'
+if ($env:RDSH_SKIP_PLUGINS -ne '1') {
+  $checkoutPlugins = Join-Path $Repo 'plugins'
+  $pluginsAttached = $false
+  if (Test-Path -LiteralPath (Join-Path $checkoutPlugins 'install.sh') -PathType Leaf) {
+    & $rdshExe plugins install --profile web --plugins-dir $checkoutPlugins
+    $pluginsAttached = ($LASTEXITCODE -eq 0)
+  } else {
+    if ([string]::IsNullOrEmpty($base)) { $base = 'https://github.com/jimoto-no-llm/rustdsh/releases' }
+    $shareRoot = Join-Path (Split-Path -Parent $Prefix) 'share/rdsh'
+    try {
+      $unpackedPlugins = Install-ReleasePlugins $base $Version $shareRoot
+      if ($null -eq $unpackedPlugins) {
+        Write-Host 'note: this release ships no bundled plugins archive; the rdsh settings tab stays off'
+      } else {
+        & $rdshExe plugins install --profile web
+        $pluginsAttached = ($LASTEXITCODE -eq 0)
+      }
+    } catch {
+      Write-Host "note: could not fetch the bundled plugins archive ($($_.Exception.Message))"
+      Write-Host 'next: clone the repository and run rdsh plugins install --profile web --plugins-dir .\plugins'
+    }
+  }
+  if ($pluginsAttached) { Write-Host 'note: restart the web UI to load the settings tab and the update banner' }
+  else { Write-Host 'note: the rdsh settings tab stays off until the plugins are attached' }
+}
 
 # DeepSeek Harness Desktop (Electron) keeps its own reserved profile; the npm
 # dsh CLI cannot manage it, so plugin attachment goes through the Desktop

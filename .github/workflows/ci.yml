@@ -432,6 +432,9 @@ jobs:
           if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
           ./tests/installer-security.ps1
           ./tests/installer-security.ps1 -Version v0.0.0-rc.1
+          # The bundled plugins archive is what gives a release-only install
+          # the rdsh settings tab; its ledger and unpacking are checked here.
+          ./tests/installer-plugins.ps1
           ./tests/icon-assets.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'

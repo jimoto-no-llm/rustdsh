@@ -7,6 +7,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- Windows の `install.ps1` でも、`-FromRelease` で入れた環境に同梱プラグイン（設定の
+  **rdsh** タブ、更新バナーなど）が付くようにしました。従来は `-Desktop` 指定時だけ
+  Desktop プロファイルへプラグインを入れており、Web プロファイルは空のままでした。
+- リリースの `rdsh-plugins.tar.gz` を `release-plugins-digests.tsv` で検証し、
+  `%LOCALAPPDATA%\rdsh\share\rdsh` へ展開してから `rdsh plugins install --profile web` を
+  実行します。展開前に `tar` で一覧を取り、`plugins/` の外へ出るパスを拒否します。
+- checkout 上で実行した場合は従来どおり手元の `plugins/` を使います。取得に失敗しても
+  インストール自体は止めず、理由と次の一手を表示します（`RDSH_SKIP_PLUGINS=1` で抑止）。
 - `curl … | sh` で入れた環境でも、同梱プラグイン（設定の **rdsh** タブ、更新バナー、
   モバイル幅レイアウトなど）が付くようにしました。従来は checkout 上でしか
   `plugins/install.sh` を実行できず、リリースの tar.gz にはバイナリしか入っていないため、
