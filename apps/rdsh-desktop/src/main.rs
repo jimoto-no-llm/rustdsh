@@ -336,12 +336,6 @@ fn main() {
     });
 }
 
-
-
-
-
-
-
 /// Switch the model of one conversation (used by tests and by the operator).
 fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<String> {
     let mut chat = app::Chat::connect(|_step| {})?;
@@ -363,7 +357,6 @@ fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<St
     }))?)
 }
 
-
 /// Write the Web UI URL where a background service user can read it.
 fn publish_web_url(url: &str) -> anyhow::Result<()> {
     let path = match std::env::var_os("RDSH_DESKTOP_WEB_URL_FILE") {
@@ -372,7 +365,8 @@ fn publish_web_url(url: &str) -> anyhow::Result<()> {
             let base = std::env::var_os("XDG_CACHE_HOME")
                 .map(std::path::PathBuf::from)
                 .or_else(|| {
-                    std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+                    std::env::var_os("HOME")
+                        .map(|home| std::path::PathBuf::from(home).join(".cache"))
                 })
                 .ok_or_else(|| anyhow::anyhow!("neither XDG_CACHE_HOME nor HOME is set"))?;
             base.join("rdsh-desktop").join("webui.url")
@@ -389,8 +383,16 @@ fn publish_web_url(url: &str) -> anyhow::Result<()> {
 /// Report which harness launcher the app would use and whether it answers.
 fn check_host(online: bool) -> anyhow::Result<String> {
     let (binary, version) = host::resolve_launcher()?;
-    let latest = if online { host::latest_published() } else { None };
-    let newest = if online { host::newest_published() } else { None };
+    let latest = if online {
+        host::latest_published()
+    } else {
+        None
+    };
+    let newest = if online {
+        host::newest_published()
+    } else {
+        None
+    };
     let chat = app::Chat::connect(|_step| {})?;
     let newer = newest
         .as_ref()
@@ -407,51 +409,6 @@ fn check_host(online: bool) -> anyhow::Result<String> {
         "newestPublished": newest,
         "updateAvailable": newer,
     }))?)
-}
-
-/// Highest published harness version, including prereleases.
-fn newest_published() -> Option<String> {
-    let mut command = std::process::Command::new("npm");
-    command.args(["view", "@deepseek-ai/dsh", "versions", "--json"]);
-    if let Some(path) = std::env::var_os("PATH") {
-        command.env("PATH", path);
-    }
-    let output = command.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    let versions: Vec<String> = match serde_json::from_str::<serde_json::Value>(text.trim()) {
-        Ok(serde_json::Value::Array(values)) => values
-            .into_iter()
-            .filter_map(|value| value.as_str().map(str::to_string))
-            .collect(),
-        Ok(serde_json::Value::String(single)) => vec![single],
-        _ => Vec::new(),
-    };
-    versions.into_iter().reduce(|best, candidate| {
-        if host::compare_versions(&candidate, &best).is_gt() {
-            candidate
-        } else {
-            best
-        }
-    })
-}
-
-/// Newest published harness version, when npm can answer.
-fn latest_published() -> Option<String> {
-    let mut command = std::process::Command::new("npm");
-    command.args(["view", "@deepseek-ai/dsh", "version"]);
-    if let Some(path) = std::env::var_os("PATH") {
-        command.env("PATH", path);
-    }
-    let output = command.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    let version = text.split_whitespace().last()?.trim().to_string();
-    (!version.is_empty()).then_some(version)
 }
 
 /// Verify that conversation titles resolve (the window fills them in the
@@ -546,7 +503,11 @@ fn dump_session(session: Option<&str>) -> anyhow::Result<String> {
                         .get("parentSessionId")
                         .is_none_or(|value| value.is_null())
             })
-            .max_by_key(|item| item.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0))
+            .max_by_key(|item| {
+                item.get("updatedAt")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0)
+            })
             .and_then(|item| item.get("sessionId").and_then(serde_json::Value::as_str))
             .unwrap_or_default()
             .to_string(),
@@ -561,7 +522,10 @@ fn dump_session(session: Option<&str>) -> anyhow::Result<String> {
     )?;
     let opening = mux.read()?;
     let _ = mux.cancel(&stream);
-    let snapshot = opening.get("value").cloned().unwrap_or(serde_json::Value::Null);
+    let snapshot = opening
+        .get("value")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     let records = snapshot
         .get("records")
         .and_then(serde_json::Value::as_array)
@@ -721,9 +685,16 @@ fn probe() -> anyhow::Result<String> {
     let newest = items
         .iter()
         .filter(|item| {
-            item.get("origin").is_none() && item.get("parentSessionId").is_none_or(|value| value.is_null())
+            item.get("origin").is_none()
+                && item
+                    .get("parentSessionId")
+                    .is_none_or(|value| value.is_null())
         })
-        .max_by_key(|item| item.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0))
+        .max_by_key(|item| {
+            item.get("updatedAt")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0)
+        })
         .cloned();
     let mut conversation = serde_json::json!({ "session": newest.is_none() });
     if let Some(session) = newest.clone() {
@@ -759,7 +730,10 @@ fn probe() -> anyhow::Result<String> {
             .and_then(serde_json::Value::as_array)
             .map(Vec::len)
             .unwrap_or(0);
-        let cursor = snapshot.get("cursor").cloned().unwrap_or(serde_json::Value::Null);
+        let cursor = snapshot
+            .get("cursor")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
         // The opening cursor is the log cut for session/page.
         let through = cursor
             .as_i64()
@@ -848,7 +822,11 @@ fn send_probe(
     let newest = |candidates: Vec<&serde_json::Value>| {
         candidates
             .into_iter()
-            .max_by_key(|item| item.get("updatedAt").and_then(serde_json::Value::as_i64).unwrap_or(0))
+            .max_by_key(|item| {
+                item.get("updatedAt")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0)
+            })
             .cloned()
     };
     let target = match session {
@@ -889,8 +867,11 @@ fn send_probe(
     // A session that does not exist yet is created by the prompt, so send first
     // and follow afterwards; existing sessions are followed before prompting so
     // the snapshot is the pre-prompt history.
-    let is_new = target.get("new").and_then(serde_json::Value::as_bool).unwrap_or(false);
-    let mut follow = |mux: &mut mux::Mux| -> anyhow::Result<String> {
+    let is_new = target
+        .get("new")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let follow = |mux: &mut mux::Mux| -> anyhow::Result<String> {
         let stream = mux.open(
             "session/follow",
             serde_json::json!({
@@ -903,7 +884,11 @@ fn send_probe(
         }
         Ok(stream)
     };
-    let mut stream = if is_new { None } else { Some(follow(&mut mux)?) };
+    let mut stream = if is_new {
+        None
+    } else {
+        Some(follow(&mut mux)?)
+    };
 
     // Selecting a model is optional; the session keeps its default otherwise.
     let selected = match model {
@@ -985,11 +970,8 @@ fn send_probe(
                                     .get("chunk")
                                     .cloned()
                                     .unwrap_or(serde_json::Value::Null);
-                                let text = payload
-                                    .to_string()
-                                    .chars()
-                                    .take(160)
-                                    .collect::<String>();
+                                let text =
+                                    payload.to_string().chars().take(160).collect::<String>();
                                 if !chunks.contains(&text) {
                                     chunks.push(text);
                                 }
@@ -1026,6 +1008,3 @@ fn send_probe(
         "ended": ended,
     }))?)
 }
-
-
-

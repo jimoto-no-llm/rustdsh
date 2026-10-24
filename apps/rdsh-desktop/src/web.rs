@@ -52,6 +52,7 @@ const PAGE: &str = include_str!("webui.html");
 const TOKEN_PLACEHOLDER: &str = "__RDSH_TOKEN__";
 
 /// The embedded page with this server's token substituted in.
+#[cfg(test)]
 pub fn serve_page(token: &str) -> String {
     serve_page_with(token, None)
 }
@@ -454,7 +455,9 @@ impl Default for WebState {
 
 impl WebState {
     fn events(&self) -> MutexGuard<'_, Hub> {
-        self.events.lock().unwrap_or_else(|poison| poison.into_inner())
+        self.events
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
     }
 
     fn publish(&self, event: &str, data: &Value) {
@@ -462,19 +465,31 @@ impl WebState {
     }
 
     fn set_pending(&self, pending: Option<Value>) {
-        *self.pending.lock().unwrap_or_else(|poison| poison.into_inner()) = pending;
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = pending;
     }
 
     fn set_streaming(&self, text: String) {
-        *self.streaming.lock().unwrap_or_else(|poison| poison.into_inner()) = text;
+        *self
+            .streaming
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = text;
     }
 
     fn set_selected(&self, session: Option<String>) {
-        *self.selected.lock().unwrap_or_else(|poison| poison.into_inner()) = session;
+        *self
+            .selected
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = session;
     }
 
     fn set_client_id(&self, client: String) {
-        *self.client_id.lock().unwrap_or_else(|poison| poison.into_inner()) = client;
+        *self
+            .client_id
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = client;
     }
 
     fn client_id(&self) -> String {
@@ -485,7 +500,10 @@ impl WebState {
     }
 
     fn note(&self, text: String) {
-        let mut notes = self.notes.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut notes = self
+            .notes
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         notes.push(text);
         while notes.len() > 12 {
             notes.remove(0);
@@ -494,14 +512,20 @@ impl WebState {
 
     /// Publish the snapshot the worker just built from its live connection.
     fn set_snapshot(&self, snapshot: Value) {
-        *self.snapshot.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(snapshot);
+        *self
+            .snapshot
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = Some(snapshot);
     }
 
     /// The whole page state as one JSON document, with the live pending and
     /// streaming values merged over the last harness snapshot.
     pub fn state_json(&self) -> Value {
         let view = self.view();
-        let guard = self.snapshot.lock().unwrap_or_else(|poison| poison.into_inner());
+        let guard = self
+            .snapshot
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         match guard.as_ref() {
             Some(snapshot) => merge_view(snapshot, &view),
             None => {
@@ -570,7 +594,10 @@ fn merge_view(snapshot: &Value, view: &View) -> Value {
     let Some(object) = merged.as_object_mut() else {
         return merged;
     };
-    object.insert("streaming".to_string(), Value::String(view.streaming.clone()));
+    object.insert(
+        "streaming".to_string(),
+        Value::String(view.streaming.clone()),
+    );
     object.insert(
         "pending".to_string(),
         view.pending.clone().unwrap_or(Value::Null),
@@ -667,8 +694,7 @@ pub(crate) fn build_state(chat: &Chat, view: &View) -> Value {
         .clone()
         .or_else(|| chat.selected_session().map(|session| session.id.clone()));
     let current = chat.selected_session();
-    let running =
-        chat.sessions.iter().any(|session| session.running) || !view.streaming.is_empty();
+    let running = chat.sessions.iter().any(|session| session.running) || !view.streaming.is_empty();
     let groups: Vec<Value> = chat
         .groups()
         .iter()
@@ -993,7 +1019,7 @@ fn run_work(
         WebCommand::Model {
             provider, model, ..
         } => chat
-            .select_model(&provider, &model)
+            .select_model(provider, model)
             .map_err(|error| format!("{error:#}")),
         WebCommand::Approve { allow, .. } => {
             let pending = state.view().pending;
@@ -1029,7 +1055,7 @@ fn run_work(
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_string();
-                    chat.answer_question(&session_id, &call_id, &answers)
+                    chat.answer_question(&session_id, &call_id, answers)
                         .map_err(|error| format!("{error:#}"))
                 }
                 None => Err("回答待ちはありません".to_string()),
@@ -1242,9 +1268,10 @@ fn handle_action(
             (WebCommand::Cancel { reply }, receiver)
         }
         Route::Model => {
-            let (Some(provider), Some(model)) =
-                (field(&request.body, "provider"), field(&request.body, "model"))
-            else {
+            let (Some(provider), Some(model)) = (
+                field(&request.body, "provider"),
+                field(&request.body, "model"),
+            ) else {
                 return (
                     400,
                     json!({ "error": "provider と model が必要です" }).to_string(),
@@ -1392,16 +1419,6 @@ mod tests {
 
     fn request_line(line: &str) -> Result<RawRequest, u16> {
         parse_request(line, &[])
-    }
-
-    /// A view with no live activity, which is what the page sees at rest.
-    fn quiet_view() -> View {
-        View {
-            pending: None,
-            streaming: String::new(),
-            notes: vec![],
-            selected: None,
-        }
     }
 
     #[test]
@@ -1736,7 +1753,9 @@ mod tests {
         let state = WebState::default();
         let (id, receiver) = state.events().subscribe();
         state.publish("delta", &json!({ "text": "x" }));
-        let frame = receiver.recv_timeout(Duration::from_millis(200)).expect("a frame");
+        let frame = receiver
+            .recv_timeout(Duration::from_millis(200))
+            .expect("a frame");
         assert_eq!(frame, "event: delta\ndata: {\"text\":\"x\"}\n\n");
         state.events().unsubscribe(id);
         // Publishing with no subscribers must not panic or block.

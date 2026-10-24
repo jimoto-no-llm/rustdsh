@@ -86,7 +86,8 @@ impl Mux {
 
     pub fn cancel(&mut self, stream_id: &str) -> Result<()> {
         let message = json!({ "type": "cancel", "streamId": stream_id });
-        self.socket.send(Message::Text(message.to_string().into()))?;
+        self.socket
+            .send(Message::Text(message.to_string().into()))?;
         Ok(())
     }
 
@@ -177,37 +178,6 @@ impl Mux {
             }
         }
     }
-
-    /// Read until the stream ends, returning every value seen for it.
-    pub fn drain(&mut self, stream_id: &str, limit: usize) -> Result<Vec<Value>> {
-        let mut values = Vec::new();
-        while values.len() < limit {
-            let message = self.read()?;
-            let kind = message.get("type").and_then(Value::as_str).unwrap_or_default();
-            let id = message
-                .get("streamId")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            if id != stream_id {
-                continue;
-            }
-            match kind {
-                "item" => values.push(message.get("value").cloned().unwrap_or(Value::Null)),
-                "end" => break,
-                "error" => {
-                    return Err(anyhow!(
-                        "stream {stream_id} failed: {}",
-                        message
-                            .get("error")
-                            .map(|error| error.to_string())
-                            .unwrap_or_else(|| message.to_string())
-                    ))
-                }
-                _ => continue,
-            }
-        }
-        Ok(values)
-    }
 }
 
 /// A socket read timeout surfaces as one of these two io errors.
@@ -224,8 +194,7 @@ mod tests {
 
     #[test]
     fn treats_a_read_timeout_as_no_data() {
-        let would_block =
-            std::io::Error::from(std::io::ErrorKind::WouldBlock);
+        let would_block = std::io::Error::from(std::io::ErrorKind::WouldBlock);
         let timed_out = std::io::Error::from(std::io::ErrorKind::TimedOut);
         let broken = std::io::Error::from(std::io::ErrorKind::BrokenPipe);
         assert!(is_would_block(&would_block));
