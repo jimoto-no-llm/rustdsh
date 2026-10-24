@@ -1,0 +1,19 @@
+{
+  "base_main": "698f565c3ba3ce666538eacd04d3dc7b77e1e2b5",
+  "scope": "same VM; local stub delegation; valid compute frames; elapsed_us excluded from equality; no model latency or speedup claim",
+  "delegation_ms": {
+    "before": {
+      "samples": 30,
+      "median": 0.9878,
+      "min": 0.9304,
+      "max": 1.5829
+    },
+    "after": {
+      "samples": 30,
+      "median": 0.9736,
+      "min": 0.9227,
+      "max": 1.1696
+    }
+  },
+  "valid_compute_outputs_equal": null
+}
