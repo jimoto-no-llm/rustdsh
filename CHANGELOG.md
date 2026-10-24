@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-24
+
 ### Fixed
 
 - Windows の `install.ps1` でも、`-FromRelease` で入れた環境に同梱プラグイン（設定の
