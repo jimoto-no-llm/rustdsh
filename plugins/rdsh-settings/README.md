@@ -12,6 +12,8 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ�
 ## 画面の構成
 
 設定画面は横並びのカードとして表示し、幅が足りないときは自動で縦に積みます。各カードは見出しをボタンにしていて、押すと本文だけを開閉します（見出しは常に残ります）。
+幅640px以下では、rdsh設定の表示中は設定モーダルのナビゲーションを上に置き、カードと入力欄を1列に並べます。
+実DSHでの保存・再読込と390px幅の[検証記録・実画面](../../docs/evidence/settings-mobile-anchor/README.md)を保存しています。
 
 - 接続とプロバイダの共有（`search.dsh_search_provider` と `serve.port`）
 - モデル（`tokens.default_budget` と `compact.max_tokens`）

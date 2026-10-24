@@ -5,6 +5,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- スマートフォン幅でrdsh設定本文が狭くなる問題を修正し、既存のモバイルレイアウトを適用しました。
+
 ## [0.12.0] - 2026-10-24
 
 ### Fixed
