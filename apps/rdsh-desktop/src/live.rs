@@ -3,6 +3,7 @@
 //! Two background threads keep sockets open and forward what they see:
 //!   * events:  the $events logical stream (approvals, questions, list activity)
 //!   * follow:  the selected conversation (assistant deltas, durable events)
+//!
 //! Unary calls (cancel, approve, answer, create, selectModel) stay on the caller
 //! so no command channel is needed for them.
 //!
@@ -121,16 +122,10 @@ pub enum LiveEvent {
 #[derive(Clone, Debug)]
 pub enum LiveCmd {
     Follow(String),
-    Stop,
 }
 
 /// Start the live threads; they report through the supplied sender.
-pub fn spawn(
-    origin: &str,
-    cookie: &str,
-    commands: Receiver<LiveCmd>,
-    event_tx: Sender<LiveEvent>,
-) {
+pub fn spawn(origin: &str, cookie: &str, commands: Receiver<LiveCmd>, event_tx: Sender<LiveEvent>) {
     let events_origin = origin.to_string();
     let events_cookie = cookie.to_string();
     let events_out = event_tx.clone();
@@ -147,7 +142,10 @@ pub fn spawn(
 /// Read a waterfall item value from $events into the pending decision it
 /// carries. A waterfall this client does not answer yields None.
 pub fn parse_waterfall(value: &Value) -> Option<Pending> {
-    let name = value.get("event").and_then(Value::as_str).unwrap_or_default();
+    let name = value
+        .get("event")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let event_id = field(value, "eventId");
     let agent_id = field(value, "agentId");
     let request = value.get("request").cloned().unwrap_or(Value::Null);
@@ -205,7 +203,12 @@ pub fn parse_questions(event_id: &str, session_id: &str, request: &Value) -> Pen
         session_id: session_id.to_string(),
         question: first.map(|item| item.question.clone()).unwrap_or_default(),
         options: first
-            .map(|item| item.options.iter().map(|option| option.label.clone()).collect())
+            .map(|item| {
+                item.options
+                    .iter()
+                    .map(|option| option.label.clone())
+                    .collect()
+            })
             .unwrap_or_default(),
         multi: first.map(|item| item.multi_select).unwrap_or(false),
         questions,
@@ -292,8 +295,9 @@ fn run_events(origin: &str, cookie: &str, out: &Sender<LiveEvent>) {
             Ok(false) => down = true,
             Err(error) => {
                 if !down {
-                    let _ =
-                        out.send(LiveEvent::Note(format!("イベント接続が切れました: {error}")));
+                    let _ = out.send(LiveEvent::Note(format!(
+                        "イベント接続が切れました: {error}"
+                    )));
                 }
                 down = true;
             }
@@ -340,7 +344,11 @@ fn run_events_session(
             return Ok(ready);
         }
         let value = message.get("value").cloned().unwrap_or(Value::Null);
-        match value.get("type").and_then(Value::as_str).unwrap_or_default() {
+        match value
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+        {
             "ready" => {
                 ready = true;
                 if reconnecting {
@@ -358,7 +366,10 @@ fn run_events_session(
                     let _ = out.send(LiveEvent::Pending(pending));
                 }
                 None => {
-                    let name = value.get("event").and_then(Value::as_str).unwrap_or_default();
+                    let name = value
+                        .get("event")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
                     let _ = out.send(LiveEvent::Note(format!("未対応の要求: {name}")));
                 }
             },
@@ -380,12 +391,7 @@ fn run_events_session(
 }
 
 /// Follow the selected conversation, reconnecting whenever its mux drops.
-fn run_follow(
-    origin: &str,
-    cookie: &str,
-    commands: &Receiver<LiveCmd>,
-    out: &Sender<LiveEvent>,
-) {
+fn run_follow(origin: &str, cookie: &str, commands: &Receiver<LiveCmd>, out: &Sender<LiveEvent>) {
     let mut current: Option<String> = None;
     let mut following: Option<String> = None;
     let mut mux: Option<Mux> = None;
@@ -394,15 +400,8 @@ fn run_follow(
     loop {
         // Apply pending commands without blocking the socket read for long.
         while let Ok(command) = commands.try_recv() {
-            match command {
-                LiveCmd::Follow(session) => current = Some(session),
-                LiveCmd::Stop => {
-                    current = None;
-                    mux = None;
-                    stream.clear();
-                    following = None;
-                }
-            }
+            let LiveCmd::Follow(session) = command;
+            current = Some(session);
         }
         if current != following {
             // (re)open for the requested session
@@ -413,8 +412,9 @@ fn run_follow(
                         stream = new_stream;
                         following = Some(session);
                         if attempt > 0 {
-                            let _ =
-                                out.send(LiveEvent::Note("会話ストリームを再接続しました".to_string()));
+                            let _ = out.send(LiveEvent::Note(
+                                "会話ストリームを再接続しました".to_string(),
+                            ));
                         }
                         attempt = 0;
                         let _ = out.send(LiveEvent::Activity);
@@ -451,7 +451,10 @@ fn run_follow(
                 if kind == "error" {
                     let _ = out.send(LiveEvent::Note(format!(
                         "会話ストリーム: {}",
-                        message.get("error").map(|error| error.to_string()).unwrap_or_default()
+                        message
+                            .get("error")
+                            .map(|error| error.to_string())
+                            .unwrap_or_default()
                     )));
                     mux = None;
                     stream.clear();
@@ -468,7 +471,11 @@ fn run_follow(
                     continue;
                 }
                 let value = message.get("value").cloned().unwrap_or(Value::Null);
-                match value.get("type").and_then(Value::as_str).unwrap_or_default() {
+                match value
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                {
                     "assistant-stream" => {
                         let frame = value.get("frame").cloned().unwrap_or(Value::Null);
                         match frame.get("type").and_then(Value::as_str) {
@@ -674,9 +681,15 @@ mod tests {
         let second = &questions[1];
         assert_eq!(second.id, "q2");
         assert_eq!(second.header.as_deref(), Some("Scope"));
-        assert_eq!(second.detail.as_deref(), Some("Pick every feature in this release."));
+        assert_eq!(
+            second.detail.as_deref(),
+            Some("Pick every feature in this release.")
+        );
         assert!(second.multi_select);
-        assert_eq!(second.options[1].description.as_deref(), Some("Stripe checkout"));
+        assert_eq!(
+            second.options[1].description.as_deref(),
+            Some("Stripe checkout")
+        );
 
         // The single-line banner still gets the first question.
         assert_eq!(question, "Which database should I use?");
@@ -693,8 +706,9 @@ mod tests {
             ],
             "callId": "call-legacy"
         });
-        let Pending::Question { call_id, questions, .. } =
-            parse_questions("evt", "agent", &request)
+        let Pending::Question {
+            call_id, questions, ..
+        } = parse_questions("evt", "agent", &request)
         else {
             panic!("expected Pending::Question");
         };

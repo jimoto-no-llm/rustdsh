@@ -39,6 +39,18 @@ cargo run -- --stop-host       # stop the detached harness host
 
 RDSH_DESKTOP_DSH points at the harness launcher (defaults to dsh on PATH).
 
+## Development checks
+
+This crate is a separate workspace; run its checks from this directory:
+
+~~~sh
+cargo fmt --check
+cargo clippy --release --locked --all-targets -- -D warnings
+cargo test --release --locked
+~~~
+
+The root workspace's checks do not cover the native desktop crate.
+
 ## Prerequisites
 
 Linux uses the Wayland GPUI backend: a Vulkan driver, fontconfig and xkbcommon.
@@ -255,3 +267,6 @@ RDSH_DESKTOP_UPDATE_CHECK=0 in webui.env disables the background update check.
 - xattr is vendored: gpui_http_client pins xattr 0.2.3, which no longer compiles
   on current Linux toolchains. vendor/xattr implements the 0.2 API the
   dependency uses (see NOTICE.md).
+- proc-macro-error2 2.0.1 is vendored with a public `proc_macro` declaration to
+  fix Rust's future-incompatibility warning in GPUI's stacksafe-macro dependency.
+  See vendor/proc-macro-error2/NOTICE.md for provenance and the exact change.

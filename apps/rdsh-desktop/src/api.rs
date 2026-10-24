@@ -56,10 +56,6 @@ impl Api {
         })
     }
 
-    pub fn origin(&self) -> &str {
-        &self.origin
-    }
-
     /// The signed session cookie; the WebSocket mux authenticates with it.
     pub fn cookie(&self) -> &str {
         &self.cookie
@@ -107,7 +103,10 @@ impl Api {
         let error = result.get("error").cloned().unwrap_or(Value::Null);
         Err(anyhow!(
             "{endpoint} failed: {} {}",
-            error.get("code").and_then(Value::as_str).unwrap_or("unknown"),
+            error
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown"),
             error
                 .get("message")
                 .and_then(Value::as_str)

@@ -14,11 +14,17 @@ pub enum Block {
     /// An ATX heading (`#`..`######`); the level is clamped to 1..=6.
     Heading { level: u8, spans: Vec<Span> },
     /// A bullet (`-`, `*`, `+`) or numbered (`1.`, `1)`) list.
-    List { ordered: bool, items: Vec<Vec<Span>> },
+    List {
+        ordered: bool,
+        items: Vec<Vec<Span>>,
+    },
     /// A `>` blockquote, rendered with a left border.
     Blockquote(Vec<Block>),
     /// A fenced or indented code block with its optional language label.
-    CodeBlock { language: Option<String>, code: String },
+    Code {
+        language: Option<String>,
+        code: String,
+    },
     /// `---`, `***` or `___` on a line of its own.
     Rule,
 }
@@ -31,7 +37,10 @@ pub enum Span {
     Italic(Vec<Span>),
     Code(String),
     /// `[label](target)`; rendering shows the label in the accent colour.
-    Link { text: Vec<Span>, target: String },
+    Link {
+        text: Vec<Span>,
+        target: String,
+    },
 }
 
 /// Parse `text` into blocks. Never fails and never panics.
@@ -206,13 +215,13 @@ fn is_fence(line: &str, marker: u8) -> bool {
 }
 
 fn finish_fence(fence: Option<Fence>, code: String) -> Block {
-    Block::CodeBlock {
+    Block::Code {
         language: fence.and_then(|fence| fence.language),
         code: code.trim_end_matches('\n').to_string(),
     }
 }
 
-fn flush_paragraph<'a>(blocks: &mut Vec<Block>, paragraph: &mut Vec<&'a str>) {
+fn flush_paragraph(blocks: &mut Vec<Block>, paragraph: &mut Vec<&str>) {
     if paragraph.is_empty() {
         return;
     }
@@ -310,7 +319,9 @@ fn list_item(line: &str) -> Option<(bool, &str)> {
         return None;
     }
     let rest = &trimmed[digits..];
-    let content = rest.strip_prefix(". ").or_else(|| rest.strip_prefix(") "))?;
+    let content = rest
+        .strip_prefix(". ")
+        .or_else(|| rest.strip_prefix(") "))?;
     Some((true, content.trim()))
 }
 
@@ -365,7 +376,13 @@ fn parse_inline(text: &str) -> Vec<Span> {
                 if text.as_bytes().get(open) == Some(&b'[') {
                     if let Some((label, target, end)) = link(text, open) {
                         emit(&mut spans, &mut start, index);
-                        push_span(&mut spans, Span::Link { text: label, target });
+                        push_span(
+                            &mut spans,
+                            Span::Link {
+                                text: label,
+                                target,
+                            },
+                        );
                         index = end;
                         start = index;
                         continue;
@@ -560,7 +577,7 @@ mod tests {
             blocks,
             vec![
                 Block::Paragraph(vec![Span::Text("before".to_string())]),
-                Block::CodeBlock {
+                Block::Code {
                     language: Some("rust".to_string()),
                     code: "fn main() {}".to_string(),
                 },
@@ -576,7 +593,7 @@ mod tests {
             blocks,
             vec![
                 Block::Paragraph(vec![Span::Text("text".to_string())]),
-                Block::CodeBlock {
+                Block::Code {
                     language: None,
                     code: "let x = 1;".to_string(),
                 },
@@ -589,7 +606,7 @@ mod tests {
         let blocks = parse("```   \nplain\n```");
         assert_eq!(
             blocks,
-            vec![Block::CodeBlock {
+            vec![Block::Code {
                 language: None,
                 code: "plain".to_string(),
             }]
@@ -636,10 +653,7 @@ mod tests {
         let Block::Paragraph(spans) = &blocks[0] else {
             panic!("expected a paragraph, got {blocks:?}");
         };
-        assert_eq!(
-            span_text(spans),
-            "use cargo test, then bold, em and docs."
-        );
+        assert_eq!(span_text(spans), "use cargo test, then bold, em and docs.");
         assert!(spans
             .iter()
             .any(|span| matches!(span, Span::Code(code) if code == "cargo test")));

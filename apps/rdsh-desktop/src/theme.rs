@@ -325,9 +325,7 @@ pub fn radius_panel() -> Pixels {
 
 // Layout constants from the layout modules.
 pub const SIDEBAR_DEFAULT: f32 = 280.;
-pub const SIDEBAR_MIN: f32 = 264.;
-pub const SIDEBAR_MAX: f32 = 420.;
-pub const SIDEBAR_COLLAPSED: f32 = 56.;
+#[cfg(test)]
 pub const CENTER_MIN: f32 = 400.;
 pub const TOP_STRIP_HEIGHT: f32 = 52.;
 pub const LOGO_ROW_HEIGHT: f32 = 60.;
@@ -336,9 +334,6 @@ pub const LIST_ROW_HEIGHT: f32 = 36.;
 pub const PROJECT_ROW_HEIGHT: f32 = 34.;
 pub const SESSION_ROW_HEIGHT: f32 = 32.;
 pub const HEADER_MIN_HEIGHT: f32 = 76.;
-pub const CHAT_COLUMN_MIN: f32 = 680.;
-pub const CHAT_COLUMN_MAX: f32 = 920.;
-pub const CHAT_COLUMN_RATIO: f32 = 0.64;
 pub const COMPOSER_MIN_HEIGHT: f32 = 36.;
 
 // The window must stay wide enough for a full sidebar plus a usable center
@@ -468,10 +463,14 @@ mod tests {
 
     #[test]
     fn the_minimum_window_keeps_the_sidebar_and_center_usable() {
-        assert!(WINDOW_MIN_WIDTH >= SIDEBAR_DEFAULT + CENTER_MIN);
-        assert!(WINDOW_MIN_HEIGHT >= TOP_STRIP_HEIGHT + HEADER_MIN_HEIGHT + COMPOSER_MIN_HEIGHT);
-        // The minimum must never exceed the default bounds the window opens at.
-        assert!(WINDOW_MIN_WIDTH <= 1280.);
-        assert!(WINDOW_MIN_HEIGHT <= 860.);
+        const {
+            assert!(WINDOW_MIN_WIDTH >= SIDEBAR_DEFAULT + CENTER_MIN);
+            assert!(
+                WINDOW_MIN_HEIGHT >= TOP_STRIP_HEIGHT + HEADER_MIN_HEIGHT + COMPOSER_MIN_HEIGHT
+            );
+            // The minimum must never exceed the default bounds the window opens at.
+            assert!(WINDOW_MIN_WIDTH <= 1280.);
+            assert!(WINDOW_MIN_HEIGHT <= 860.);
+        }
     }
 }
