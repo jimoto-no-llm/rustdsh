@@ -40,6 +40,34 @@ class ActionPinningTest(unittest.TestCase):
             )
 
 
+class CdRetryTest(unittest.TestCase):
+    """A release that fails inside CD must be retryable without moving the tag."""
+
+    def test_cd_accepts_a_tag_input_for_a_manual_retry(self):
+        text = (WORKFLOWS / "cd.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", text)
+        self.assertRegex(text, r"\n      tag:\n(?:.*\n)*?        required: true")
+
+    def test_both_triggers_resolve_the_release_tag_the_same_way(self):
+        text = (WORKFLOWS / "cd.yml").read_text(encoding="utf-8")
+        # A tag push arrives with the tag in the ref; a manual run names it.
+        self.assertIn(
+            "  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}",
+            text,
+        )
+
+    def test_every_cd_checkout_builds_the_tagged_commit(self):
+        text = (WORKFLOWS / "cd.yml").read_text(encoding="utf-8")
+        checkouts = [
+            line for line in text.splitlines() if line.strip().startswith("- uses: actions/checkout@")
+        ]
+        self.assertTrue(checkouts)
+        self.assertEqual(
+            text.count("          ref: ${{ env.RELEASE_TAG }}"),
+            len(checkouts),
+            "a manual run must check out the tag, not the dispatched branch",
+        )
+
 class LatestGateTest(unittest.TestCase):
     def test_cd_never_marks_a_fresh_release_latest(self):
         text = (WORKFLOWS / "cd.yml").read_text(encoding="utf-8")
