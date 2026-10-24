@@ -5,6 +5,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- computeのtext・max_tokensの型不一致を明示的なエラーで返し、省略時の既定値と後続要求の処理を維持するようにしました。
+
 ## [0.12.0] - 2026-10-24
 
 ### Fixed
