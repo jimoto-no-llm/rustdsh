@@ -1,0 +1,27 @@
+{
+  "marker": "SEND_PIPELINE_abc123",
+  "session_id": "session-c6f5d95f-8942-4544-a93b-6f08d6f24838",
+  "persisted_turn": {
+    "turn": 1,
+    "seq": 4,
+    "prompt": "SEND_PIPELINE_abc123",
+    "response": ""
+  },
+  "session_stats": {
+    "turns": 1,
+    "steps": 1,
+    "llmMs": 0,
+    "toolMs": 0,
+    "ttftMs": 0,
+    "ttftSteps": 0,
+    "decodeMs": 0,
+    "decodeTokens": 0
+  },
+  "token_usage": {
+    "uncachedInputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0
+  },
+  "scope": "actual Enter key -> GPUI -> real DSH session/prompt -> persisted turnOutline; successful model response not verified"
+}

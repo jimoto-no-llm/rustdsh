@@ -6,6 +6,7 @@
 
 mod api;
 mod app;
+mod composer_input;
 mod cookies;
 mod editor;
 mod host;
