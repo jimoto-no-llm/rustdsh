@@ -5,8 +5,7 @@
       "expected": "abc123",
       "actual": "aabbcc112233",
       "passed": false,
-      "screenshot": "before/ascii.png",
-      "original_screenshot": "ascii/wayland-screenshot-2026-10-23_11-56-29.png"
+      "screenshot": "before/ascii.png"
     }
   ],
   "after": [
@@ -15,96 +14,89 @@
       "expected": "abc123",
       "actual": "abc123",
       "passed": true,
-      "screenshot": "after/ascii.png",
-      "original_screenshot": "ascii/wayland-screenshot-2026-10-23_11-56-36.png"
+      "screenshot": "after/ascii.png"
     },
     {
       "case": "repeated-characters",
       "expected": "bookkeeper 111 aaa",
       "actual": "bookkeeper 111 aaa",
       "passed": true,
-      "screenshot": "after/repeated-characters.png",
-      "original_screenshot": "repeated-characters/wayland-screenshot-2026-10-23_11-56-36.png"
+      "screenshot": "after/repeated-characters.png"
     },
     {
       "case": "shift-and-symbols",
       "expected": "ABC_xyz-+=!?123",
       "actual": "ABC_xyz-+=!?123",
       "passed": true,
-      "screenshot": "after/shift-and-symbols.png",
-      "original_screenshot": "shift-and-symbols/wayland-screenshot-2026-10-23_11-56-37.png"
+      "screenshot": "after/shift-and-symbols.png"
     },
     {
       "case": "insert-at-caret",
       "expected": "aXbc",
       "actual": "aXbc",
       "passed": true,
-      "screenshot": "after/insert-at-caret.png",
-      "original_screenshot": "insert-at-caret/wayland-screenshot-2026-10-23_11-56-37.png"
+      "screenshot": "after/insert-at-caret.png"
     },
     {
       "case": "backspace",
       "expected": "abc",
       "actual": "abc",
       "passed": true,
-      "screenshot": "after/backspace.png",
-      "original_screenshot": "backspace/wayland-screenshot-2026-10-23_11-56-38.png"
+      "screenshot": "after/backspace.png"
     },
     {
       "case": "delete",
       "expected": "acd",
       "actual": "acd",
       "passed": true,
-      "screenshot": "after/delete.png",
-      "original_screenshot": "delete/wayland-screenshot-2026-10-23_11-56-39.png"
+      "screenshot": "after/delete.png"
     },
     {
       "case": "replace-selection",
       "expected": "Z",
       "actual": "Z",
       "passed": true,
-      "screenshot": "after/replace-selection.png",
-      "original_screenshot": "replace-selection/wayland-screenshot-2026-10-23_11-56-39.png"
+      "screenshot": "after/replace-selection.png"
     },
     {
       "case": "cut-and-paste",
       "expected": "prefix:Copy-me-123",
       "actual": "prefix:Copy-me-123",
       "passed": true,
-      "screenshot": "after/cut-and-paste.png",
-      "original_screenshot": "cut-and-paste/wayland-screenshot-2026-10-23_11-56-40.png"
+      "screenshot": "after/cut-and-paste.png"
     },
     {
       "case": "newline",
       "expected": "line1\nline2",
       "actual": "line1\nline2",
       "passed": true,
-      "screenshot": "after/newline.png",
-      "original_screenshot": "newline/wayland-screenshot-2026-10-23_11-56-41.png"
+      "screenshot": "after/newline.png"
     },
     {
       "case": "unicode-paste",
       "expected": "日本語🙂 café\n2行目",
       "actual": "日本語🙂 café\n2行目",
       "passed": true,
-      "screenshot": "after/unicode-paste.png",
-      "original_screenshot": "unicode-paste/wayland-screenshot-2026-10-23_11-56-41.png"
+      "screenshot": "after/unicode-paste.png"
     },
     {
       "case": "unicode-backspace",
       "expected": "AB",
       "actual": "AB",
       "passed": true,
-      "screenshot": "after/unicode-backspace.png",
-      "original_screenshot": "unicode-backspace/wayland-screenshot-2026-10-23_11-56-42.png"
+      "screenshot": "after/unicode-backspace.png"
     },
     {
       "case": "paste-sanitization",
       "expected": "A\nB",
       "actual": "A\nB",
       "passed": true,
-      "screenshot": "after/paste-sanitization.png",
-      "original_screenshot": "paste-sanitization/wayland-screenshot-2026-10-23_11-56-42.png"
+      "screenshot": "after/paste-sanitization.png"
+    },
+    {
+      "case": "enter-to-real-host",
+      "marker": "SEND_PIPELINE_abc123",
+      "passed": true
     }
   ]
 }

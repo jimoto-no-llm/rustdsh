@@ -1,27 +1,126 @@
 {
-  "marker": "SEND_PIPELINE_abc123",
-  "session_id": "session-c6f5d95f-8942-4544-a93b-6f08d6f24838",
-  "persisted_turn": {
-    "turn": 1,
-    "seq": 4,
-    "prompt": "SEND_PIPELINE_abc123",
-    "response": ""
+  "sessionId": "session-77e7274e-4920-46de-a2c3-45f21296ac98",
+  "header": {
+    "version": 4,
+    "id": "session-77e7274e-4920-46de-a2c3-45f21296ac98",
+    "createdAt": 1792821073751,
+    "cwd": "/data/home",
+    "isSeeded": false,
+    "agentPreset": "standard"
   },
-  "session_stats": {
-    "turns": 1,
-    "steps": 1,
-    "llmMs": 0,
-    "toolMs": 0,
-    "ttftMs": 0,
-    "ttftSteps": 0,
-    "decodeMs": 0,
-    "decodeTokens": 0
+  "projections": {
+    "asOfSeq": 17,
+    "values": {
+      "title": "SEND_PIPELINE_abc123",
+      "goal": null,
+      "tokenUsage": {
+        "uncachedInputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0
+      },
+      "contextPressure": {
+        "contextWindow": 1000000
+      },
+      "contextBreakdown": {
+        "systemTokens": 1447,
+        "toolsTokens": 5157,
+        "messageTokens": 333
+      },
+      "inbox": {
+        "next-turn": [],
+        "next-step": []
+      },
+      "sessionStats": {
+        "turns": 1,
+        "steps": 1,
+        "llmMs": 0,
+        "toolMs": 0,
+        "ttftMs": 0,
+        "ttftSteps": 0,
+        "decodeMs": 0,
+        "decodeTokens": 0
+      },
+      "turnOutline": [
+        {
+          "turn": 1,
+          "seq": 4,
+          "prompt": "SEND_PIPELINE_abc123",
+          "response": ""
+        }
+      ],
+      "agentPreset": "standard",
+      "userQuestions": {
+        "active": [],
+        "settled": []
+      },
+      "subagentCatalog": [],
+      "subagentTiming": {
+        "settledMs": 0
+      },
+      "subagent": null,
+      "permissions": {
+        "currentValue": "workspace-write"
+      },
+      "todos": null,
+      "plan": {
+        "active": false,
+        "pending": false
+      },
+      "modelSelection": {
+        "lastUsed": {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high"
+        },
+        "next": {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high"
+        }
+      },
+      "sessionListMetadata": {
+        "blank": false,
+        "lastPromptAt": 1792821085443
+      },
+      "imageLimits": {
+        "maxImageBytes": 20971520,
+        "maxImagesPerMessage": 20,
+        "maxMessageImageBytes": 209715200,
+        "maxImagePixels": 64000000,
+        "maxImageDimension": 8192,
+        "mediaTypes": [
+          "image/png",
+          "image/jpeg",
+          "image/webp",
+          "image/gif"
+        ]
+      }
+    }
   },
-  "token_usage": {
-    "uncachedInputTokens": 0,
-    "outputTokens": 0,
-    "cacheReadTokens": 0,
-    "cacheWriteTokens": 0
-  },
-  "scope": "actual Enter key -> GPUI -> real DSH session/prompt -> persisted turnOutline; successful model response not verified"
+  "cursor": 17,
+  "kinds": [
+    "permission/preset",
+    "sandbox/mode",
+    "approval/policy",
+    "agent/inbox/spliced",
+    "turn/start",
+    "agent/inbox/spliced",
+    "step/start",
+    "system/message",
+    "user/message",
+    "user/message",
+    "user/message",
+    "request/header",
+    "request/context",
+    "session/title",
+    "session/title-llm-request",
+    "assistant/attempt",
+    "step/end",
+    "turn/end"
+  ],
+  "samples": [
+    "{\"type\":\"event\",\"event\":{\"type\":\"permission/preset\",\"seq\":0,\"time\":1792821073755,\"data\":{\"preset\":\"workspace-write\"}}}",
+    "{\"type\":\"event\",\"event\":{\"type\":\"sandbox/mode\",\"seq\":1,\"time\":1792821073757,\"data\":{\"mode\":\"workspace-write\"}}}"
+  ]
 }
