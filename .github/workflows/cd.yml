@@ -166,6 +166,22 @@ jobs:
           cd dist
           for file in *.deb *.rpm; do sha256sum "$file" > "$file.sha256"; done
           ls -l .
+      - name: Build the bundled plugins archive
+        # install.sh attaches the rdsh settings tab, the update banner and the
+        # rest of the bundled tier by running plugins/install.sh from a checkout.
+        # A curl install has no checkout, so the same tree ships as its own
+        # archive and install.sh fetches it from the release it just installed.
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tar --create --gzip --file dist/rdsh-plugins.tar.gz \
+            --exclude="node_modules" --exclude="*.bak*" --exclude=".git*" \
+            --owner=0 --group=0 --numeric-owner \
+            plugins
+          cd dist
+          sha256sum rdsh-plugins.tar.gz > rdsh-plugins.tar.gz.sha256
+          tar --list --gzip --file rdsh-plugins.tar.gz | head -5
+          ls -l rdsh-plugins.tar.gz
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-packages

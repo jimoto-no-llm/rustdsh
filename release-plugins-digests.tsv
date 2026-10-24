@@ -1,0 +1,5 @@
+# Trusted SHA-256 registry for the bundled plugins archive (install.sh).
+# A release whose archive is not pinned here installs the binary alone: the
+# rdsh settings tab and the update banner come from these plugins, so a
+# curl-installed profile has neither until an entry exists.
+# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.

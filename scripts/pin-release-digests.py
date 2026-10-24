@@ -31,6 +31,7 @@ from pathlib import Path
 REPO = "jimoto-no-llm/rustdsh"
 UNIX_REGISTRY = Path("release-digests.tsv")
 WINDOWS_REGISTRY = Path("release-digests-windows.tsv")
+PLUGIN_REGISTRY = Path("release-plugins-digests.tsv")
 UNIX_ASSETS = (
     "rdsh-linux-x64.tar.gz",
     "rdsh-linux-x64-musl.tar.gz",
@@ -38,9 +39,17 @@ UNIX_ASSETS = (
     "rdsh-macos-x64.tar.gz",
 )
 WINDOWS_ASSET = "rdsh-windows-x64.zip"
-ASSETS = UNIX_ASSETS + (WINDOWS_ASSET,)
+PLUGIN_ASSET = "rdsh-plugins.tar.gz"
+ASSETS = UNIX_ASSETS + (WINDOWS_ASSET, PLUGIN_ASSET)
 UNIX_HEADER = (
     "# Trusted SHA-256 registry for the exact release archives supported by install.sh.",
+    "# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.",
+)
+PLUGIN_HEADER = (
+    "# Trusted SHA-256 registry for the bundled plugins archive (install.sh).",
+    "# A release whose archive is not pinned here installs the binary alone: the",
+    "# rdsh settings tab and the update banner come from these plugins, so a",
+    "# curl-installed profile has neither until an entry exists.",
     "# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.",
 )
 WINDOWS_HEADER = (
@@ -51,6 +60,7 @@ WINDOWS_HEADER = (
 LEDGERS = (
     (UNIX_REGISTRY, UNIX_HEADER, UNIX_ASSETS),
     (WINDOWS_REGISTRY, WINDOWS_HEADER, (WINDOWS_ASSET,)),
+    (PLUGIN_REGISTRY, PLUGIN_HEADER, (PLUGIN_ASSET,)),
 )
 TAG_RE = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-(alpha|beta|rc)\.([0-9]+))?")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -216,6 +226,8 @@ def main(argv=None) -> int:
                         help=f"Unix ledger to update (default: {UNIX_REGISTRY})")
     parser.add_argument("--windows-registry", type=Path, default=WINDOWS_REGISTRY,
                         help=f"Windows ledger to update (default: {WINDOWS_REGISTRY})")
+    parser.add_argument("--plugins-registry", type=Path, default=PLUGIN_REGISTRY,
+                        help=f"bundled plugins ledger to update (default: {PLUGIN_REGISTRY})")
     parser.add_argument("--from-json", type=Path, help="offline asset list instead of gh api")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -223,7 +235,8 @@ def main(argv=None) -> int:
     parse_tag(args.tag, allow_prerelease=args.allow_prerelease)
     digests = load_assets_json(args.from_json) if args.from_json else fetch_asset_digests(args.tag)
     ledgers = ((args.registry, UNIX_HEADER, UNIX_ASSETS),
-               (args.windows_registry, WINDOWS_HEADER, (WINDOWS_ASSET,)))
+               (args.windows_registry, WINDOWS_HEADER, (WINDOWS_ASSET,)),
+               (args.plugins_registry, PLUGIN_HEADER, (PLUGIN_ASSET,)))
     updates = pin_all(args.tag, digests, ledgers, allow_prerelease=args.allow_prerelease)
     if args.dry_run:
         for path, updated, _assets in updates:

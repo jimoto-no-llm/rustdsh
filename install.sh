@@ -45,6 +45,7 @@ NO_RUSTUP=0
 FROM_RELEASE=0
 # Never make the digest registry follow RDSH_RELEASE_BASE or another environment value.
 RELEASE_DIGESTS_URL="https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv"
+PLUGIN_DIGESTS_URL="https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-plugins-digests.tsv"
 VER="latest"
 USE_MUSL="${RDSH_MUSL:-0}"
 DESKTOP=0
@@ -421,6 +422,111 @@ verify_installed_binary() {
   printf '%s\n' "$out" >&2
   return 1
 }
+validate_plugin_digest_manifest() {
+  # The bundled plugins archive has its own ledger: release-digests.tsv is
+  # restricted to the platform binaries, and an older installer refuses the
+  # whole file as soon as it names another asset. A header-only ledger is the
+  # state before the first release publishes the archive.
+  awk '
+    BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0; rows = 0 }
+    /^[ \t]*#/ || NF == 0 { next }
+    function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/ }
+    $1 == "latest" {
+      if (NF != 2 || !valid_version($2) || $2 ~ /-/ || latest_count++) bad = 1
+      latest = $2
+      next
+    }
+    {
+      if (NF != 3 || !valid_version($1) || $2 != "rdsh-plugins.tar.gz" ||
+          length($3) != 64 || $3 ~ /[^0-9a-fA-F]/) {
+        bad = 1
+        next
+      }
+      key = $1 SUBSEP $2
+      if (seen[key]++) bad = 1
+      versions[$1] = 1
+      rows++
+      if ($1 == latest) latest_assets++
+    }
+    END {
+      if (bad) exit 1
+      if (latest_count == 0 && rows == 0) exit 0
+      if (latest_count != 1 || !versions[latest] || latest_assets != 1) exit 1
+    }
+  ' "$1"
+}
+
+fetch_plugin_digests() {
+  # $1: destination. Same trust rule as the binary ledger: a remote release
+  # base never chooses the digests that verify its own artifacts.
+  local dest="$1" source="${RDSH_PLUGIN_DIGESTS:-}"
+  if [ -n "$source" ]; then
+    case "${RDSH_RELEASE_BASE:-}" in
+      file://*) ;;
+      *) echo "warning: ignoring RDSH_PLUGIN_DIGESTS (needs a file:// RDSH_RELEASE_BASE)" >&2; source="" ;;
+    esac
+  fi
+  case "$source" in
+    "") ;;
+    /*) ;;
+    *) echo "warning: ignoring RDSH_PLUGIN_DIGESTS=$source (needs an absolute path)" >&2; source="" ;;
+  esac
+  if [ -n "$source" ]; then
+    if [ ! -f "$source" ]; then echo "no local plugins digest registry at $source" >&2; return 1; fi
+    cp "$source" "$dest"
+    return
+  fi
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$dest" "$PLUGIN_DIGESTS_URL"
+}
+
+install_release_plugins() {
+  # Put the bundled plugin tree under PREFIX/share/rdsh and print its installer.
+  # The location is the one the launcher already probes, so the profile links
+  # to a stable path and 'rdsh plugins install' keeps working afterwards.
+  local work="$1" base="$2" manifest version expected url protocol entries
+  manifest="$work/release-plugins-digests.tsv"
+  fetch_plugin_digests "$manifest" || return 1
+  validate_plugin_digest_manifest "$manifest" || {
+    echo "trusted plugins digest registry is invalid" >&2
+    return 1
+  }
+  if [ "$VER" = "latest" ]; then
+    version="$(latest_release_version "$manifest")"
+  else
+    version="$(release_version "$VER")"
+  fi
+  case "$version" in
+    "" | *[!0-9A-Za-z.-]*) echo "invalid release version: $version" >&2; return 1 ;;
+  esac
+  if ! expected="$(expected_release_sha256 "$manifest" "$version" rdsh-plugins.tar.gz)"; then
+    echo "no pinned plugins archive for release $version" >&2
+    return 1
+  fi
+  url="$base/download/$version/rdsh-plugins.tar.gz"
+  echo "fetching release asset $version/rdsh-plugins.tar.gz" >&2
+  protocol='=https'
+  case "$base" in file://*) protocol='=file' ;; esac
+  curl --proto "$protocol" --proto-redir '=https' --tlsv1.2 -fsSL -o "$work/plugins.tar.gz" "$url" || return 1
+  verify_sha256 "$work/plugins.tar.gz" "$expected" || return 1
+  entries="$(tar -tzf "$work/plugins.tar.gz")" || { echo "could not list plugins archive" >&2; return 1; }
+  if ! printf '%s\n' "$entries" | awk '
+      /^plugins$/ { next }
+      /^plugins\// { if ($0 ~ /(^|\/)\.\.(\/|$)/) exit 1; next }
+      { exit 1 }
+    '; then
+    echo "plugins archive contains an unexpected path; refusing" >&2
+    return 1
+  fi
+  mkdir -p "$PREFIX/share/rdsh" || return 1
+  rm -rf "$PREFIX/share/rdsh/plugins" 2>/dev/null || true
+  tar -xzf "$work/plugins.tar.gz" -C "$PREFIX/share/rdsh" --no-same-owner --no-same-permissions plugins || return 1
+  if [ ! -f "$PREFIX/share/rdsh/plugins/install.sh" ]; then
+    echo "plugins archive has no plugins/install.sh" >&2
+    return 1
+  fi
+  echo "$PREFIX/share/rdsh/plugins/install.sh"
+}
+
 install_release_binary() {
   # Print a release binary that provably runs on this host, or exit non-zero.
   # Never installs a binary that failed to start: the glibc build falls back
@@ -747,12 +853,30 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 # layout, update banner) without asking: a missing update banner means people
 # never learn that a release exists. The starter extras stay opt-in. Skip with
 # RDSH_SKIP_PLUGINS=1.
-if [ -f "$REPO_ROOT/plugins/install.sh" ] && [ "${RDSH_SKIP_PLUGINS:-0}" != "1" ]; then
+#
+# A checkout install runs plugins/install.sh in place. A curl install has no
+# checkout, so the same tree is fetched from the release that was just
+# installed and unpacked into PREFIX/share/rdsh, the directory the launcher
+# already probes for bundled plugins.
+if [ -f "$REPO_ROOT/plugins/install.sh" ]; then
+  PLUGINS_SCRIPT="$REPO_ROOT/plugins/install.sh"
+elif [ "${RDSH_SKIP_PLUGINS:-0}" != "1" ] && [ "$MODE" != "restore" ]; then
+  PLUGIN_WORK="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-plugins)"
+  if PLUGINS_SCRIPT="$(install_release_plugins "$PLUGIN_WORK" "${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}")"; then
+    :
+  else
+    PLUGINS_SCRIPT=""
+    echo "note: could not fetch the bundled plugins archive; the settings tab and the update banner stay off" >&2
+    echo "next: clone the repository and run PROFILE=web ./plugins/install.sh" >&2
+  fi
+  rm -rf "$PLUGIN_WORK" 2>/dev/null || true
+fi
+if [ -n "${PLUGINS_SCRIPT:-}" ] && [ "${RDSH_SKIP_PLUGINS:-0}" != "1" ]; then
   echo "--- rdsh plugins (web profile) ---"
-  if PROFILE=web "$REPO_ROOT/plugins/install.sh" --recommended=none; then
+  if PROFILE=web "$PLUGINS_SCRIPT" --recommended=none; then
     echo "note: restart the web UI to load the update banner and the settings tab"
   else
-    echo "note: plugin attach failed; rerun PROFILE=web ./plugins/install.sh" >&2
+    echo "note: plugin attach failed; rerun PROFILE=web $PLUGINS_SCRIPT" >&2
   fi
 fi
 post_install_notes

@@ -150,7 +150,7 @@ ROADMAP の「one provider at a time」は、メンテナの分割案（1社ず�
 
 出典: [Go](https://opencode.ai/v2/docs/console/go/)、
 [Budgets（What counts）](https://opencode.ai/v2/docs/console/budgets/#what-counts)、
-[Budgets API](https://opencode.ai/v2/docs/console/api/budgets/)
+[Budgets API](https://opencode.ai/v2/docs/console/budgets/)
 
 ### プラン区分（Go / Go Plus）は必須入力
 
@@ -446,7 +446,8 @@ TMPDIR=/var/tmp rtk cargo test route_plan
 
 - [OpenCode Go](https://opencode.ai/v2/docs/console/go/)
 - [OpenCode Console Budgets（What counts）](https://opencode.ai/v2/docs/console/budgets/#what-counts)
-- [OpenCode Console Budgets API](https://opencode.ai/v2/docs/console/api/budgets/)
+- [OpenCode Console Budgets API](https://opencode.ai/v2/docs/console/budgets/)
+  （`/console/api/budgets/` は 2026-10-24 時点で 404。生きている Budgets ページに置換）
 - [Command Code Provider API](https://commandcode.ai/docs/provider)
 - [Command Code 料金](https://commandcode.ai/pricing)
 - [Ollama 料金](https://ollama.com/cloud)

@@ -193,12 +193,13 @@ must update that mapping and its tests:
 | Windows x86_64 | `rdsh-windows-x64.zip` |
 | Linux x86_64 (`.deb`) | `rdsh_<version>_amd64.deb` |
 | Linux x86_64 (`.rpm`) | `rdsh-<version>-1.x86_64.rpm` |
+| Bundled plugins | `rdsh-plugins.tar.gz` |
 
 Each archive has its own `.sha256` sidecar, but neither installer trusts it:
 both verify the archive against the reviewed digest ledgers described below.
 `install.sh` and `install.ps1` are added once, and the `packages` job adds
-one `.deb` and one `.rpm` with the same kind of sidecar, for **16 release
-assets** total. The packages are built from `packaging/nfpm.yaml` by a pinned
+one `.deb`, one `.rpm` and the bundled plugins archive with the same kind of
+sidecar, for **18 release assets** total. The packages are built from `packaging/nfpm.yaml` by a pinned
 nfpm (`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0`) on the same
 x86_64 glibc build as the Linux archive, and they stay out of both digest
 ledgers: `install.sh` and `install.ps1` read the archives only. Builds stage
@@ -217,21 +218,26 @@ rerun only failed jobs while the original staged artifacts remain available
 (seven days) rather than rebuilding the successful jobs. Concurrent
 runs for the same tag are serialized and never cancel an upload in progress.
 
-Release archives are pinned in two ledgers, both fetched from the fixed
+Release archives are pinned in three ledgers, all fetched from the fixed
 canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main` URL:
 
 | Ledger | Pins | Reader |
 | --- | --- | --- |
 | `release-digests.tsv` | the four Unix `.tar.gz` archives | `install.sh --from-release`, `sync-dsh.sh` |
 | `release-digests-windows.tsv` | `rdsh-windows-x64.zip` | `install.ps1 -FromRelease` |
+| `release-plugins-digests.tsv` | `rdsh-plugins.tar.gz` | `install.sh` after the binary lands |
 
 The split is a compatibility rule, not a preference: the published v0.3.3
 `install.sh` and every `sync-dsh.sh` copy in users' checkouts refuse
 `release-digests.tsv` as a whole as soon as one row names an asset outside the
 four Unix archives. Adding the Windows pin there breaks `--from-release` and the
 automatic updater for installs users already have, so that file stays Unix-only
-and the Windows pin lives in its own ledger. Neither installer trusts a checksum
-served by `RDSH_RELEASE_BASE`; the only override is the test-only
+and the Windows pin lives in its own ledger. The bundled plugins archive gets a
+third ledger for the same reason, and because `install.sh` attaches the rdsh
+settings tab and the update banner from it: without a pin a `curl` install has no
+checkout to attach from, so that ledger is what turns those plugins on for
+release-only installs. A header-only ledger means "no release ships it yet".
+Neither installer trusts a checksum served by `RDSH_RELEASE_BASE`; the only override is the test-only
 `RDSH_RELEASE_DIGESTS`, which a `file://` release base may use and a remote base
 never does (`install.ps1` gates it the same way). `install.ps1` refuses its
 whole ledger when `latest` does not pin the Windows archive, and the Unix
