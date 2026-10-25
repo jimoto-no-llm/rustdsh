@@ -243,5 +243,54 @@
     "passed": true,
     "seconds": 16.46,
     "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 20.68,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 91.04,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 31.69,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 22.54,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 43.13,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 29.62,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 17.16,
+    "timed_out": false
   }
 ]

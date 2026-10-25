@@ -60,6 +60,9 @@ def ensure_proxy() -> None:
 def harness_command(name: str, prompt: str) -> list[str]:
     if name == "dsh":
         return ["dsh", "--profile", "headless", "--patch", str(ROOT / "dsh-patch.yml"), prompt]
+    if name == "rdsh":
+        # rdsh passes this straight to dsh, adding its own slim environment.
+        return ["rdsh", "--profile", "headless", "--patch", str(ROOT / "dsh-patch.yml"), prompt]
     if name == "codex":
         return ["codex", "exec", "--skip-git-repo-check", prompt]
     if name == "opencode":
@@ -129,7 +132,7 @@ def run_one(harness: str, task: pathlib.Path, timeout: int) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--harness", action="append", choices=["dsh", "codex", "opencode", "claude", "gemini"], required=True)
+    parser.add_argument("--harness", action="append", choices=["dsh", "rdsh", "codex", "opencode", "claude", "gemini"], required=True)
     parser.add_argument("--task", action="append", help="task directory name; default all")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--out", type=pathlib.Path, default=ROOT / "results.json")
