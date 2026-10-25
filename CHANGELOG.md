@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows のアプリ起動は現在の既定ブラウザを使い、対応する Chromium 系ブラウザでは
+  専用ウィンドウとブラウザ別プロファイルを使用します。Dashboard インストーラーは
+  RDSH の公式アイコンを持つスタートメニュー項目を作成し、`-DesktopShortcut` で
+  デスクトップにも追加できます。
+
 ## [0.12.0] - 2026-10-24
 
 ### Fixed
