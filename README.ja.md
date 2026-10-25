@@ -18,7 +18,7 @@
 独立したコミュニティプロジェクトです。DeepSeek や DeepSeek Harness の公式ではありません。
 
 `rdsh` は、[DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) を高速かつ安全に利用するための Rust 製ランチャーです。
-日常的によく使う処理（トークン計算、検索、セッション管理など）をネイティブ化し、エージェントの会話やモデル実行は本家の `dsh` へそのまま透過的に委譲します。現在お使いの引数やオプションもそのまま動作します。
+日常的によく使う処理（トークン計算、検索、セッション管理など）をネイティブ化し、エージェントの会話やモデル実行は本家の `dsh` へそのまま委譲します。現在お使いの引数やオプションもそのまま動作します。
 
 ## AI エージェント向け
 
@@ -35,10 +35,10 @@
 
 ## rdsh を選ぶ理由
 
-- ⚡ **ミリ秒未満のプロセス起動**: `rdsh --version` は約0.9ms・最大RSS約2.9MBで起動します（本家 `dsh --version` は約88ms・約66MB）。これはプロセス起動のみの数値です。プロファイルを起動したエージェントセッション自体は本家 `dsh`（Node.js）がそのまま動作するため、対話時の起動時間やメモリ消費量は本家と同等です。詳細は[実測ベンチマーク](#実測ベンチマーク)を参照してください。
-- 🔄 **完全な互換性（Drop-in Replacement）**: `rdsh` 独自のサブコマンド以外は本家 `dsh` にそのまま渡すため、既存のスクリプトや使い慣れたオプションがそのまま動作します。
-- 🛠 **便利な高速ネイティブコマンド**: トークン見積り、並列コード検索、セッション一覧・圧縮、環境診断（`doctor`）などを Node.js なしで瞬時に実行できます。
-- 🛡 **安全設計**: 読み取り系コマンドは元ファイルを一切書き換えず、認証情報の無断外部送信も行いません。Linux 環境では、エージェントツールがアクセスできる対象を明示的に共有したファイルだけに限定できます。
+- **ミリ秒未満のプロセス起動**: `rdsh --version` は約0.9ms・最大RSS約2.9MBで起動します（本家 `dsh --version` は約88ms・約66MB）。これはプロセス起動のみの数値です。プロファイルを起動したエージェントセッション自体は本家 `dsh`（Node.js）がそのまま動作するため、対話時の起動時間やメモリ消費量は本家と同等です。詳細は[実測ベンチマーク](#実測ベンチマーク)を参照してください。
+- **完全な互換性（Drop-in Replacement）**: `rdsh` 独自のサブコマンド以外は本家 `dsh` にそのまま渡すため、既存のスクリプトや使い慣れたオプションがそのまま動作します。
+- **便利な高速ネイティブコマンド**: トークン見積り、並列コード検索、セッション一覧・圧縮、環境診断（`doctor`）などを Node.js なしで瞬時に実行できます。
+- **安全設計**: 読み取り系コマンドは元ファイルを一切書き換えず、認証情報の無断外部送信も行いません。Linux 環境では、エージェントツールがアクセスできる対象を明示的に共有したファイルだけに限定できます。
 
 このハイブリッド構成の設計思想は [docs/PHILOSOPHY.ja.md](docs/PHILOSOPHY.ja.md) にまとめています。
 
@@ -54,7 +54,7 @@
   - [エージェント実行の安全な隔離](#エージェント実行の安全な隔離)
   - [フック監視](#フック監視-rdsh-guard)
   - [コンテキスト注入](#コンテキスト注入rdsh-context)
-  - [依存グラフと変更影響](#依存グラフと変更影響rdsh-deps)
+  - [依存グラフと変更の影響](#依存グラフと変更の影響rdsh-deps)
 - [低スペック環境向け](#低スペック環境向け)
 - [Web UI とダッシュボード](#web-ui-とダッシュボード)
 - [Smart-DSH との併用](#smart-dsh-との併用)
@@ -68,20 +68,20 @@
 
 ## クイックスタート
 
-**Claude Code／Codex／Cursor／VS Code Copilot／OpenCode／Gemini CLI を利用中の方へ**：
+**Claude Code／Codex／Cursor／VS Code Copilot／OpenCode／Gemini CLI を利用中の方へ**
 現在お使いのエージェントを利用しながら、
 [MCP でダッシュボードを追加](docs/MCP-CLIENTS.md)できます。
 タスク・質問・構造化 UI の共有には Node.js 22 以上が必要です。DSH 本体と Rust の導入は任意です。
 
 ### 1. インストール（ビルド済みバイナリ）
 
-**Linux / macOS / WSL**:
+#### Linux / macOS / WSL
 
 ```sh
 curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
-**Windows (PowerShell)**:
+#### Windows (PowerShell)
 
 ```powershell
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
@@ -89,7 +89,7 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 & $f -FromRelease
 ```
 
-crates.io からもインストールできます（Rust 1.85 以上が必要です）：
+crates.io からもインストールできます（Rust 1.85 以上が必要です）。
 
 ```sh
 cargo install rdsh
@@ -147,7 +147,7 @@ Rust ツールチェーンや `install.sh` なしで `rdsh --version` が動き�
 
 ### ソースからのビルドと高度なオプション
 
-**Linux / macOS / WSL**:
+#### Linux / macOS / WSL
 
 ```sh
 git clone https://github.com/jimoto-no-llm/rustdsh.git
@@ -158,7 +158,7 @@ cd rustdsh
 ./install.sh --prefix=DIR    # インストール先を変更（既定: ~/.local/bin）
 ```
 
-**Windows (PowerShell)**:
+#### Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/jimoto-no-llm/rustdsh.git
@@ -177,33 +177,33 @@ cd rustdsh
 
 ### パッケージマネージャでの導入（Homebrew / Scoop / winget）
 
-macOS／Windows の上級者向けに、パッケージマネージャへ `rdsh` の管理を任せる導線も用意しています。[packaging/](packaging/README.md) のマニフェストは公開済みリリースのアーカイブと SHA-256 を固定しており、インストールコマンドと更新手順は [docs/PACKAGE-MANAGERS.md](docs/PACKAGE-MANAGERS.md) にまとめています。
+macOS／Windows の上級者向けに、パッケージマネージャで `rdsh` を管理する方法も用意しています。[packaging/](packaging/README.md) のマニフェストは公開済みリリースのアーカイブと SHA-256 を固定しており、インストールコマンドと更新手順は [docs/PACKAGE-MANAGERS.md](docs/PACKAGE-MANAGERS.md) にまとめています。
 
-**macOS（Homebrew）** — Apple Silicon／Intel のアーカイブを自動で選んでインストールします：
+**macOS（Homebrew）**: Apple Silicon／Intel のアーカイブを自動で選んでインストールします。
 
 ```sh
 brew install --formula ./packaging/homebrew/rdsh.rb
 ```
 
-**Windows（Scoop）**:
+#### Windows（Scoop）
 
 ```powershell
 scoop install https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/packaging/scoop/rdsh.json
 ```
 
-**Windows（winget）** — winget 1.6 以降は3つのマニフェストを直接読み込みます。`microsoft/winget-pkgs` への提出は手動のままです：
+**Windows（winget）**: winget 1.6 以降は3つのマニフェストを直接読み込みます。`microsoft/winget-pkgs` への提出は手動のままです。
 
 ```powershell
 winget install --manifest .\packaging\winget
 ```
 
-これらのチャネルは1リリースずつ固定されるため、新しいタグは `python3 scripts/update-packaging-manifests.py --version vX.Y.Z` を実行するまで反映されません。
+これらのチャネルではリリースを1つずつ固定するため、新しいタグは `python3 scripts/update-packaging-manifests.py --version vX.Y.Z` を実行するまで反映されません。
 
 ## 使い方
 
 ### `dsh` 互換での実行
 
-普段使っている `dsh` と同じ引数でそのまま動作します：
+普段使っている `dsh` と同じ引数でそのまま動作します。
 
 ```sh
 rdsh tui                          # dsh --profile tui と同等
@@ -215,7 +215,7 @@ rdsh --dry-run tui -- --resume id # 実行コマンドの内容だけを確認
 
 ### 高速ネイティブコマンド
 
-Node.js を起動せず、Rust ネイティブで高速に処理します：
+Node.js を起動せず、Rust ネイティブで高速に処理します。
 
 ```sh
 rdsh tokens ./README.md             # トークン数の即時見積り（英語:約4文字=1tok、日本語:1文字=1tok）
@@ -232,14 +232,14 @@ rdsh bench --n 5                    # rdsh と本家 dsh の起動速度比較
 ```
 
 Windows では親ジャンクションを安全に拒否する読み込み処理が用意できるまで、圧縮履歴を開きません。
-そのため、`sessions --tokens` の合計には一部の履歴が含まれず、正確な値にはなりません。
+そのため、`sessions --tokens` の合計には一部の履歴が含まれず、正確な値になりません。
 
 ### プラグインの補完（`rdsh plugins`）
 
 必須プラグインの一覧は `plugins/install.sh` にしか無く、このスクリプトを自動で
 呼ぶ経路もありません。そのためバイナリを更新しても
 `$DSH_HOME/profiles/<profile>/package.json` は書き換わらず、必須プラグインが
-欠けたまま気づけない状態でした。同じカタログをバイナリに同梱しているので、
+欠けていても気づけない状態でした。同じカタログをバイナリに同梱しているので、
 チェックアウト無しでも不足を確認して1コマンドで補完できます。
 
 ```sh
@@ -252,8 +252,8 @@ rdsh plugins install --no-bundled        # チェックアウト無しで上流�
 rdsh plugins install --plugins-dir <checkout>  # または RDSH_PLUGINS_DIR を設定
 ```
 
-追加はチェックアウト側のインストーラと同じ
-`dsh plugin --profile <name> add <spec>` 経由です（CLI は `RDSH_DSH_BIN` で
+追加にはチェックアウト側のインストーラと同じ
+`dsh plugin --profile <name> add <spec>` を使います（CLI は `RDSH_DSH_BIN` で
 差し替え可）。同梱プラグインはチェックアウトから解決し、見つからない場合は
 黙って省略せず報告します。`rdsh doctor` は必須ティアが不足している
 プロファイルごとに1行表示し、`--profile desktop` は
@@ -262,9 +262,9 @@ rdsh plugins install --plugins-dir <checkout>  # または RDSH_PLUGINS_DIR を�
 
 ### 選択した認証情報だけを共有する（rdsh auth）
 
-Codex、OpenCode、環境変数の認証情報を、秘密値を含めずに一覧表示します。
+Codex、OpenCode、環境変数の認証情報について、秘密値を含まない一覧を表示します。
 共有元と credential を選ぶまではコピーを行いません。取り込み先は DSH 本来の
-$DSH_HOME/.credentials.yamlです。選択は秘密値を含まない
+$DSH_HOME/.credentials.yamlです。選択内容は秘密値を含まない
 $DSH_HOME/rdsh-auth-sharing.jsonに保存します。
 
 ```sh
@@ -280,7 +280,7 @@ rdsh setup                                    # 選択済みの同期と初回�
 rdsh setup --web                              # 共有元・選択コマンド・個別キー保存
 ```
 
---select / --unselectは必要なものだけ個別に繰り返せます。選択すると
+--select / --unselectは必要なものだけを個別に繰り返し指定できます。選択すると
 boot、dump-config、plugin、dsh 名での委譲、setup の実行時にも、その共有元から
 同期します。--importはすぐに取り込みます。別CLIの未選択トークンが
 新しくても採用されません。DSH 側の新しい grant や既存の API-key 記録・ref、
@@ -300,7 +300,7 @@ openai-codex へ対応付けるため、選択名は opencode:openai-codex と�
 setup --yesだけでは全環境キーを保存しません。対話setupやWeb画面での
 個別の保存は引き続き可能です。
 
-**利用範囲と解除:** 保存した内容は、同じ DSH_HOME の全プロファイルで
+**利用範囲と解除:** 保存した内容は同じ DSH_HOME の全プロファイルで
 利用できます。選択を解除すると将来の rdsh による取り込みが停止しますが、保存済みのコピーや
 実行中のプロセスはそのまま残ります。コピーの利用を停止するには、DSH を停止したうえで
 認証ファイル内の該当する record/ref を削除してください。credential 自体を失効させるには、
@@ -313,7 +313,7 @@ DSH 自身の更新や環境変数の継承、OS sandbox を制御するもの�
 RDSH_AUTH_AUTOSYNC=1 を設定しても全取り込みの挙動に戻ることはありません。一覧と preview で
 確認のうえ、必要な共有元を選択してください。RDSH_AUTH_AUTOSYNC=0 では
 選択を残して自動同期だけを止めます。明示したauth --importは実行できます。
-破損している、または読み込めない選択ファイルが存在する場合は、同期を停止します。
+選択ファイルが破損しているか読み込めない場合は、同期を停止します。
 
 選択の変更と rdsh による認証情報の書き込みは共通の lock で直列化され、解除完了後に古い選択内容で
 取り込まれるのを防ぎます。writer の異常終了などによって lock が残った場合は、
@@ -332,7 +332,7 @@ Web 画面では保存を行う前に、保存先や利用範囲、ならびに�
 
 サーバー型の機能とプライバシーに関わるスイッチ（`discord` / `telemetry`）は
 有効化するまで動作しません。初期状態では高速でテレメトリを送らない dsh として動作します。
-設定画面（`rdsh setup --web` の追加機能欄）または CLI で有効化します：
+設定画面（`rdsh setup --web` の追加機能欄）または CLI で有効化します。
 
 ```sh
 rdsh settings set extras.enable serve,search-web
@@ -347,7 +347,7 @@ rdsh settings get extras.enable
 `rdsh serve` は dsh の Web GUI（:3080）と競合しません。`--port 0` で空きポートを利用できます。
 API とダッシュボードの詳細については [Web UI](#web-ui) を参照してください。
 
-dsh が同梱していない OpenAI 互換エンドポイント（HAI、Command Code、Sarashina、ローカル環境の llama.cpp / vLLM / LM Studio / Ollama など）は、プロファイルのルートとして追加できます：
+dsh に同梱されていない OpenAI 互換エンドポイント（HAI、Command Code、Sarashina、ローカル環境の llama.cpp / vLLM / LM Studio / Ollama など）は、プロファイルのルートとして追加できます。
 
 ```sh
 rdsh provider add hai --model deepseek-v4-flash              # 鍵は HAI_API_KEY か --key-stdin
@@ -367,8 +367,9 @@ DeepSeek Harness は「対象のプロバイダがどのモデルを扱えるか
 （例: Codex の `gpt-6.1-sol` が完全に欠落している、Kimi Code の `kimi-for-coding` が
 "K2.8 Preview" に昇格済みであるにもかかわらず古い表示名のまま残っている、など）。プロファイル側で `models:` を
 明示している場合は、その一覧が同梱カタログを上書きするため、この問題がより顕著になります。
-`rdsh models` はプロバイダ自身のカタログ（ローカルの Codex CLI、または Kimi Code の
-`/v1/models` からプロファイルの API キーを使って取得）を読み込み、プロファイルへ反映します：
+`rdsh models` は、ローカルの Codex CLI または Kimi Code の
+`/v1/models` からプロバイダ自身のカタログを取得し、プロファイルへ反映します。
+Kimi Code からの取得にはプロファイルの API キーを使います。
 
 ```sh
 rdsh models                              # 読み取り専用：不足IDと古い表示名を表示
@@ -377,32 +378,32 @@ rdsh models sync                         # 不足分を追記し、古い表示�
 rdsh models sync --profile web --dry-run # 書き込まずに確認
 ```
 
-削除は行いません。既存エントリの他の行はそのまま維持され、プロバイダの現行名をすでに含んでいる
+削除は行いません。既存エントリの他の行はそのまま維持し、プロバイダの現行名をすでに含んでいる
 表示名は書き換えません。構造を認識できないプロファイルについては、書き換えを行わずに処理を拒否します。
-変更の反映は次回の設定リロード時または再起動時となります。
+変更は次回の設定リロード時または再起動時に反映されます。
 
 ### エージェント実行の安全な隔離
 
-委譲されたエージェントツールは、既定では通常のファイル読み書きが可能です。`--share-file` で隔離されるのは **`rdsh_inspect` のみ**です。Linux（bubblewrap と prlimit が利用可能な環境）では、このツールから参照できる対象が明示的に共有したファイルのみに制限されます：
+委譲されたエージェントツールは、既定では通常のファイル読み書きが可能です。`--share-file` で隔離されるのは **`rdsh_inspect` のみ**です。Linux（bubblewrap と prlimit が利用可能な環境）では、このツールから参照できる対象が明示的に共有したファイルのみに制限されます。
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-`rdsh_inspect` からは共有ファイルが読み取り専用として参照でき、ネットワークアクセスも遮断されます。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制適用できます。
+`rdsh_inspect` からは共有ファイルを読み取り専用で参照でき、ネットワークアクセスも遮断されます。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制適用できます。
 
 `bash`・`read`・`write`・`run_code` などのその他の DSH ツールは隔離されず、**upstream DSH の権限と承認**に従います。起動時には `[rdsh security] rdsh_inspect is isolated; other DSH tools use upstream permissions` と表示されます。
 
 ### フック監視 (`rdsh guard`)
 
-DSH の `hooks.json` と連携し、危険なコマンド実行を瞬時に検知・遮断します：
+DSH の `hooks.json` と連携し、危険なコマンドの実行を瞬時に検知して遮断します。
 
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
 対応するファイル操作を構造的に判定する場合は、任意で policy file を指定できます。
-次の例では、既存のプロジェクトディレクトリ内における `Read` のみを分類上許可します。
+次の例では既存のプロジェクトディレクトリ内での `Read` のみを分類上許可します。
 
 ```json
 {
@@ -417,11 +418,11 @@ echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
 ```
 
-構造判定が対応しているのは、`Read`・`Write`・`Edit` のファイル path schema です。
+構造判定の対象は `Read`・`Write`・`Edit` のファイル path schema です。
 作業ディレクトリと対象 path を正規化し、tool および read/write の範囲を既存の root と照合したうえで、
 秘密情報を含まない理由とともに `allow`・`deny`・`unknown` を返します。JSON 内の `allow` は分類結果にすぎず、
 ホスト側の permission や approval を意味するものではありません。そのため `decision` は出力せず、最終的な権限判断はホスト側に委ねられます。
-未知の tool、shell command、破損した入力、未対応の引数に対しては fail closed として動作します。shell の構文解析や network 先の判定には対応していません。
+未知の tool、shell command、破損した入力、未対応の引数に対しては fail closed として動作します。shell の構文解析やネットワーク接続先の判定には対応していません。
 path の判定後にファイルシステムが変更される競合の可能性もあるため、この hook は OS sandbox として機能するものではありません。実際にアクセスを強制制限する場合は、実行 sandbox を使用してください。
 
 ```json
@@ -462,12 +463,12 @@ rdsh context forget mem_ab12cd34ef56
 ```
 
 `distill` はユーザーの発話のみを読み取り（zstd 圧縮セッションにも対応）、決定・制約・撤回を
-確定的なマーカーに基づいて抽出します。重複する古い項目は、推測による上書きではなく `superseded_by` によって無効化されます。
+確定的なマーカーに基づいて抽出します。重複する古い項目は推測による上書きではなく `superseded_by` によって無効化されます。
 `rdsh context build --require-stable` は、スナップショットの安定性が確認できない場合
-（構築中にファイルや git の状態が変化した、あるいは git の状態を読み取れない場合など）に exit 3 で終了し、
+（構築中にファイルや git の状態が変化したときや、git の状態を読み取れないときなど）に exit 3 で終了し、
 古いスナップショットや不確定なスナップショットが最新のものとして誤認されるのを防ぎます。
 
-### 依存グラフと変更影響（`rdsh deps`）
+### 依存グラフと変更の影響（`rdsh deps`）
 
 ```sh
 rdsh deps build                    # $DSH_HOME/rdsh-index に増分索引を作る
@@ -481,13 +482,13 @@ rdsh deps impact src/context.rs    # 直接・推移的な依存元と影響す�
 自動生成コードなどは `unknown` として明示され、未解決件数として報告されます（推測で補完することはありません）。
 インデックスが存在しない状態は「情報が存在しない」ことを意味し、「依存関係が存在しない」こととは異なります。
 
-インデックスが存在する場合、`rdsh context build` および `rdsh context inject` は、検索にヒットしたファイルの
-依存関係の周辺情報もあわせて取り込みます。これにより、コードの抜粋が実際に依存しているファイルとともに提供されます。
-Rust によるネイティブ処理のため、呼び出しごとのオーバーヘッドは約1msと非常に軽量です。
+インデックスが存在する場合、`rdsh context build` および `rdsh context inject` は検索にヒットしたファイルの
+依存関係の周辺情報もあわせて取り込みます。これにより、コードの抜粋と、そのコードが実際に依存しているファイルがあわせて提供されます。
+Rust によるネイティブ処理のため、呼び出しごとのオーバーヘッドは約1msと非常に小さいです。
 
 ## 低スペック環境向け
 
-既定のプロファイルは、`RDSH_DEFAULT_PROFILE`、rdsh 設定の `general.default_profile`、ローカルの `tui`、案内メッセージ付きエラーの優先順で決定されます。保存する既定値は `rdsh settings set general.default_profile web` で設定できます。なお、明示的に指定された `--profile <name>` が最優先されます。
+既定のプロファイルは `RDSH_DEFAULT_PROFILE`、rdsh 設定の `general.default_profile`、ローカルの `tui`、案内メッセージ付きエラーの優先順で決定されます。保存する既定値は `rdsh settings set general.default_profile web` で設定できます。なお、明示的に指定された `--profile <name>` が最優先されます。
 
 古いx86-64 CPU、古いLinuxディストリビューション、Node.jsを入れていない環境でも使えることを目指しています。
 
@@ -497,16 +498,16 @@ Rust によるネイティブ処理のため、呼び出しごとのオーバー
   `RDSH_NODE_COMPILE_CACHE=0`、`--passthrough`、`RDSH_PASSTHROUGH=1` を指定することで無効化できます。
   `RDSH_NODE_COMPILE_CACHE=<ディレクトリ>` を指定すると、既定の場所の代わりにその場所へキャッシュを置けます
   （`$HOME` が揮発する環境などで有効です）。
-- **幅広い CPU に対応**: ビルド済みの x86-64 バイナリは AVX や BMI を必要としません。静的リンクされた musl 版は、古い glibc 環境でも動作します。
+- **幅広い CPU に対応**: ビルド済みの x86-64 バイナリは AVX や BMI を必要としません。静的リンクされた musl 版は古い glibc 環境でも動作します。
 - **セッションのトークン見積り**: `sessions --tokens` は、展開後サイズが記録されている zstd フレームであればヘッダーから直接サイズを読み取ります。
   多くのストリーミングフレームでは `zstd -dc` による展開が必要です。処理結果は
   `~/.cache/rdsh/sessions-tokens.json` に保存され（`$XDG_CACHE_HOME` が優先されます）、
   `RDSH_TOKENS_CACHE=0` でキャッシュを無効化できます。サイズを読み取れない場合は `?` が付与されます。
-- **並列処理の制限**: 検索やセッション走査に使用するワーカーは最大8スレッドです。zstd CLI へのフォールバック時は 8〜32 プロセスを並列で使用します。
+- **並列処理の制限**: 検索やセッション走査に使用するワーカーのスレッド数は最大8です。zstd CLI へのフォールバック時は 8〜32 プロセスを並列で使用します。
 - **Node なしでも使えるネイティブコマンド**: `tokens`、`search`、`sessions` などのコマンドは単体で利用できます。会話機能を委譲するには
   `@deepseek-ai/dsh` を導入するか、`DSH_ORIG_BIN`（または `RDSH_ORIG_BIN`）を指定してください。
-- **低優先度での自動更新**: `sync-dsh.sh` は dsh と rdsh を更新し、リポジトリでレビュー済みの固定 digest 台帳に基づいて取得物を検証します。更新に失敗した場合は変更を元に戻します。
-  既定では固定 digest 台帳の `latest` が指す安定版を使用します。`RDSH_SYNC_FROM_SOURCE=1` を指定した場合は、
+- **低優先度での自動更新**: `sync-dsh.sh` は dsh と rdsh を更新し、リポジトリでレビュー済みの固定 digest の一覧に基づいて取得物を検証します。更新に失敗した場合は変更を元に戻します。
+  既定では固定 digest の一覧の `latest` が指す安定版を使用します。`RDSH_SYNC_FROM_SOURCE=1` を指定した場合は、
   `nice -n 19` および（利用可能であれば）`ionice -c3` の優先度で `main` ブランチからビルドを行います。
   systemd ユニットも同様に低優先度で実行されます。`ExecStart` のパスは各自の checkout 環境に合わせて設定してください。
 
@@ -516,7 +517,7 @@ Rust によるネイティブ処理のため、呼び出しごとのオーバー
 
 ### 内蔵 Web UI (`rdsh serve`)
 
-手元で状態確認やトークン見積もりを行える軽量な Web 画面です（既定ポート `:38080`、本家の `:3080` と競合しません）：
+手元で状態確認やトークン見積もりを行える軽量な Web 画面です（既定ポート `:38080`、本家の `:3080` と競合しません）。
 
 ```sh
 rdsh settings set extras.enable serve  # 機能を有効化
@@ -525,7 +526,7 @@ rdsh serve                             # 起動（ローカルホスト限定、
 
 ### 表示言語
 
-rdsh 自身が表示する CLI 診断と内蔵ローカル画面は、英語・簡体字中国語・日本語に対応します。1回だけ指定するには `--language`、保存するには `rdsh.json` を使います。既定の `auto` は最初の空でないロケール環境変数を使い、未設定・未対応なら英語になります。
+rdsh 自身が表示する CLI 診断と内蔵のローカル画面は、英語・簡体字中国語・日本語に対応します。1回だけ指定するには `--language`、保存するには `rdsh.json` を使います。既定の `auto` は最初の空でないロケール環境変数を使い、未設定・未対応なら英語になります。
 
 ```sh
 rdsh --language ja settings show
@@ -534,23 +535,23 @@ rdsh settings set general.language zh-CN
 
 優先順位は `--language`、`RDSH_LANG`、`general.language`、`LC_ALL`、`LC_MESSAGES`、`LANG` の順です。明示された `general.language` の値が不正な場合は、設定を書き換えずに処理を中断します。なお、委譲される `dsh` の引数、モデルの出力、JSON フィールド、ファイル内容、プロトコル識別子は翻訳されません。
 
-`worker-scope validate` と `worker-scope policy` のヘルプおよび CLI 診断も同様に3言語に対応しています。この独立した処理とそのヘルプは、無関係な設定ファイルの破損による影響を受けません。通常のコマンドやルートのヘルプでは設定エラーが報告されます。正規の JSON、ポリシーコード、渡されたパスの値は変更されません。
+`worker-scope validate` と `worker-scope policy` のヘルプおよび CLI 診断も同様に3言語に対応しています。この独立した処理とそのヘルプは、無関係な設定ファイルの破損による影響を受けません。通常のコマンドやルートのヘルプでは設定エラーが報告されます。正規形式の JSON、ポリシーコード、渡されたパスの値は変更されません。
 
 ### 拡張ダッシュボード (`rdsh-dashboard`)
 
-プロジェクト全体の稼働状況、質問・回答の確認、モバイル端末からの接続などを行える拡張ダッシュボードです（要 Node.js 22+）：
+プロジェクト全体の稼働状況や質問・回答の確認、モバイル端末からの接続などができる拡張ダッシュボードです（要 Node.js 22+）。
 
 ```sh
 rdsh-dashboard project --project <ディレクトリ>
 ```
 
-`project --include-project <ディレクトリ>` を指定すると、その起動時に明示されたプロジェクトのみを対象として、稼働・待機・要確認の各件数を横断表示します。詳細情報は各プロジェクト専用のダッシュボードに保持され、読み取りができない場合は前回の観測時刻と状態不明である旨を表示します。
+`project --include-project <ディレクトリ>` を指定すると、その起動時に指定されたプロジェクトのみを対象に、稼働・待機・要確認の各件数を横断表示します。詳細情報は各プロジェクト専用のダッシュボードに保持され、読み取れない場合は前回の観測時刻と、状態が不明である旨を表示します。
 
 ※ Windows ネイティブ環境ではタスクトレイに常駐し、タスクバーから手軽に開閉できます（ターミナルから起動したい場合は `--no-tray` を指定してください）。詳細は [dashboard/README.md](dashboard/README.md) を参照してください。外部エージェント CLI（cursor-agent、devin）を監視付きジョブとして実行することも可能です（[docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md)、英語）。
 
 ## デスクトップアプリ (Electron)
 
-DeepSeek Harness Desktop は、Web アプリケーション全体を内包した Electron シェルです。CLI と `$DSH_HOME` を共有しますが、**予約済みプロファイル**（`$DSH_HOME/profiles/desktop`）と同梱の独自コマンドランタイムを持つため、npm の `dsh` CLI ではプラグインを管理できません。`rdsh desktop` はこれらを自動検出し、プラグインの組み込みをアプリ自身のコマンドへ転送します。rdsh 側でプロファイルを起動したり直接書き換えたりすることはありません：
+DeepSeek Harness Desktop は、Web アプリケーション全体を内包した Electron シェルです。CLI と `$DSH_HOME` を共有しますが、**予約済みプロファイル**（`$DSH_HOME/profiles/desktop`）と同梱の独自コマンドランタイムを持つため、npm の `dsh` CLI ではプラグインを管理できません。`rdsh desktop` はこれらを自動検出し、プラグインの組み込みをアプリ自身のコマンドへ転送します。rdsh 側でプロファイルを起動したり直接書き換えたりすることはありません。
 
 ```sh
 rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
@@ -560,18 +561,18 @@ rdsh desktop install --plugins-dir . --no-sound --no-gitview --no-intelligent-ui
 rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
 ```
 
-プロファイルインストーラーや各種インストーラーからも同様に利用できます：
+プロファイルインストーラーや各種インストーラーからも同様に利用できます。
 
 ```sh
 PROFILE=desktop ./plugins/install.sh   # Essential＋既定の推奨プラグインを正しく転送して導入
 ./install.sh --desktop                 # インストール時に rdsh プラグインを組み込み
 ```
 
-※ プラグインを組み込む前にアプリを終了し、完了後に再起動してください。アプリ内の Plugins 画面からも、コマンドを使わずに同じパッケージをインストールできます。Electron ランタイム自体が置き換わることはなく、アプリ内の処理委譲はオプトインかつフェイルオープンな compute bridge に限定されます。詳細は [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) を参照してください。
+※ プラグインを組み込む前にアプリを終了し、完了後に再起動してください。アプリ内の Plugins 画面からもコマンドを使わずに同じパッケージをインストールできます。Electron ランタイム自体が置き換わることはなく、アプリ内の処理委譲はオプトインかつフェイルオープンな compute bridge に限定されます。詳細は [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) を参照してください。
 
 ## Smart-DSH との併用
 
-[Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（Web プロファイル向けプラグイン集）と問題なく共存できます：
+[Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（Web プロファイル向けプラグイン集）と問題なく共存できます。
 
 ```sh
 rdsh doctor                                    # dsh のバージョンと Smart-DSH バンドルを確認
@@ -599,9 +600,9 @@ rdsh 側でも本家の Node.js 版 `dsh` を `exec` するため、会話セッ
 メモリ消費量は本家と同等になります。
 
 本家 `dsh` と直接比較しているのは `--version` の行のみです。フック・`tokens`・
-`search` の各行は、同等の処理を Node.js で実装した参照実装との比較結果です（本家 `dsh` には
-`tokens` や `search` サブコマンドが存在しないため、本家との比較値は記載していません）。これらの数値は、
-`scripts/benchmark-node-vs-rust.py` を用いて Linux x86_64 実機上で測定された実測値です。
+`search` の各行は同等の処理を Node.js で実装した参照実装との比較結果です（本家 `dsh` には
+`tokens` や `search` サブコマンドが存在しないため、本家との比較値は記載していません）。これらの数値は
+`scripts/benchmark-node-vs-rust.py` を用いて Linux x86_64 実機で測定した値です。
 
 | 測定対象 | rdsh | 比較対象 | 差・倍率 |
 | --- | --- | --- | --- |
@@ -616,8 +617,8 @@ rdsh 側でも本家の Node.js 版 `dsh` を `exec` するため、会話セッ
 | 配布バイナリサイズ | **約1.8〜2.3 MB**（プラットフォーム別・単一バイナリ） | Nodeツリー 約508 MB | **超軽量** |
 
 `--version`・`sessions`・バイナリサイズの行は [docs/BENCHMARKS.md](docs/BENCHMARKS.md) に
-記録されている従来の数値であり、絶対値は実行環境のホストに依存します。フック・`tokens`・`search` の測定は
-Linux x86_64 環境、`n=15`、プロセス起動時間を含めた実測値であり、次のコマンドで再測定できます：
+記録されている従来の数値であり、絶対値は実行するホスト環境に依存します。フック・`tokens`・`search` の測定は
+Linux x86_64 環境、`n=15`、プロセス起動時間を含めた実測値であり、次のコマンドで再測定できます。
 
 ```sh
 cargo build --release
@@ -625,16 +626,16 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
   --mode all --n 15 --calls 200 --output /tmp/rdsh-node-vs-rust.json
 ```
 
-起動時間は `rdsh bench --n 5` で再現可能です。詳細な測定条件や測定生データについては、
+起動時間は `rdsh bench --n 5` で再現可能です。詳細な測定条件や測定の生データについては、
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md) を参照してください。
 
 ## 安全設計
 
-1. **本家挙動の透過性**: 会話ループやモデル推論は独自実装せず、すべて本家 `dsh` に委譲して互換性を担保します。
+1. **本家の動作を維持**: 会話ループやモデル推論は独自に実装せず、すべて本家 `dsh` に委譲して互換性を保ちます。
 2. **非破壊設計**: トークン計算、検索、ログ圧縮などの読み取り系コマンドは、既存のファイルを一切変更しません。
 3. **明示的な認証管理**: 他アプリの認証情報を無断で同期・送信せず、利用者が明示的に指定したものだけを取り込みます。
 4. **サンドボックス隔離**（オプトイン）: Linux 環境では、`--share-file` で共有したファイルだけを読み取り専用・ネットワークなしで `rdsh_inspect` に渡します。その他の DSH ツールは upstream の権限と承認に従います。
-5. **プライバシー既定**: セッション telemetry・Discord Rich Presence・更新確認は明示的に有効化するまで off。委譲する `dsh` には `DSH_TELEMETRY_DISABLED=1` を渡します。詳細は [docs/PRIVACY.md](docs/PRIVACY.md)。
+5. **プライバシーの既定設定**: セッション telemetry・Discord Rich Presence・更新確認は明示的に有効化するまで off です。委譲する `dsh` には `DSH_TELEMETRY_DISABLED=1` を渡します。詳細は [docs/PRIVACY.md](docs/PRIVACY.md)。
 
 ## よくある質問
 
@@ -648,7 +649,7 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
   本家 DSH の Web GUI（`:3080`）と `rdsh serve`（`:38080`）は既定ポートが異なります。空きポートを自動選択したい場合は `--port 0` を指定してください。
 
 - **Q. 既存のスクリプトは壊れませんか？**  
-  `rdsh` 固有のコマンド以外は、指定したすべての引数をそのまま本家 `dsh` に引き渡すため、既存のスクリプトや CI パイプラインはそのまま動作します。
+  `rdsh` 固有のコマンド以外は指定したすべての引数をそのまま本家 `dsh` に引き渡すため、既存のスクリプトや CI パイプラインはそのまま動作します。
 
 - **Q. プロファイルを指定しない `rdsh boot` が失敗する場合は？**
   `general.default_profile` または `RDSH_DEFAULT_PROFILE` を設定するか、`--profile <name>` を付けてください。
@@ -696,17 +697,17 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
 - 標準搭載の Web UI プラグイン（許諾済み、MIT）：[cwd514](https://github.com/cwd514) さんの [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（(c) 2026、効果音・デスクトップ通知）、[yugapor](https://github.com/yugapor) さんの [dsh-gitview](https://github.com/yugapor/dsh-gitview)（(c) 2026、差分・履歴・CI付き Git パネル）。どちらもインストール時に上流 GitHub から取得します（詳細は `plugins/recommended.md`）。
 
-rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）:
+rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）。
 
-- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）—
+- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）:
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
-- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）—
+- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）:
   推奨プラグイン `sound`（効果音とデスクトップ通知）。web/desktop では既定で導入し、
   `--recommended=none`／`SOUND=0`／`features.sound=false` でスキップできます
-- [dsh-gitview](https://github.com/yugapor/dsh-gitview)（yugapor）— 推奨プラグイン
+- [dsh-gitview](https://github.com/yugapor/dsh-gitview)（yugapor）: 推奨プラグイン
   `gitview`（サイドバー Git パネル）。web/desktop では既定で導入し、`--recommended=none`／
   `GITVIEW=0`／`features.gitview=false` でスキップできます
-- [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui)（cwd514、MIT、Copyright (c) 2026 cwd514）—
+- [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui)（cwd514、MIT、Copyright (c) 2026 cwd514）:
   推奨プラグイン `intelligent-ui`（宣言的な `render_ui` ツールによる表・グラフ・比較などの視覚回答）。
   web/desktop では既定で導入し、`INTELLIGENT_UI=0` または `--no-intelligent-ui` でスキップできます
 
@@ -714,14 +715,14 @@ rdsh が利用・改変・推薦している第三者製 DSH プラグインで�
 
 MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ライブラリにはそれぞれのライセンスが適用されます。固定しているバージョンと商標の表示は[サードパーティライセンス](THIRD_PARTY_LICENSES.md)にまとめています。
 
-## 保護付き起動の対応版
+## 保護付き起動に対応しているバージョン
 
-明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3` です。未知のバージョン、混在、改変されたランタイム、または別の依存先へ解決されたランタイムは実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
+明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3` です。未知のバージョン、バージョンの混在、改変されたランタイム、または別の依存先へ解決されたランタイムのいずれかに該当する場合は、実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
 
 ### 外部エージェントのジョブ
 
-`node dashboard/cli.mjs --language ja agents list` で表示言語を選択できます。外部エージェントのヘルプと CLI 診断は英語・簡体字中国語・日本語に対応しています。ジョブ状態、エラーコード、JSON キー、エージェント出力は原文を保持します。日本語のファイル名と指示文は UTF-8 の `--prompt-file` で渡せます。[コマンドと権限の制約](docs/AGENT-RUNNERS.md)を確認してください。実際のジョブ実行では外部サービスの料金が発生する場合があります。言語検証はローカルのテスト用実行ファイルで行います。
+`node dashboard/cli.mjs --language ja agents list` で表示言語を選択できます。外部エージェントのヘルプと CLI 診断は英語・簡体字中国語・日本語に対応しています。ジョブの状態、エラーコード、JSON キー、エージェント出力は原文を保持します。`--prompt-file` では、日本語のファイル名と指示文を UTF-8 で渡せます。[コマンドと権限の制約](docs/AGENT-RUNNERS.md)を確認してください。実際のジョブ実行では外部サービスの料金が発生する場合があります。言語検証はローカルのテスト用実行ファイルで行います。
 
-`budget-admission apply|validate|public --input-file <request-json>` も設定に依存しない純粋な JSON コマンドです。native と Dashboard のヘルプ・診断メッセージは3言語に対応し、予算コードと JSON 出力の内容は保持されます。プロバイダーの呼び出しや予算台帳への書き込みは行いません。[予算管理](docs/BUDGET-CONTROL.md)を参照してください。
+`budget-admission apply|validate|public --input-file <request-json>` も設定に依存しない純粋な JSON コマンドです。native と Dashboard のヘルプ・診断メッセージは3言語に対応し、予算コードと JSON 出力の内容は保持されます。プロバイダーを呼び出さず、予算の記録にも書き込みません。[予算管理](docs/BUDGET-CONTROL.md)を参照してください。
 
-`question-contracts apply|validate|public`、`answer-applications apply|validate|public|schema`、`instruction-queue validate|context|submit|resolve|control` も同様に `--input-file <request-json>` を受け取り、無関係な設定を読み込むことはありません。native と Dashboard のヘルプや固有の診断メッセージは3言語に対応し、エンジンのメッセージ、状態コード、正規 JSON は上流の値を保持します。任意の[応答ガード](plugins/rdsh-answer-guard/README.md)も通知要約と設定エラーの表示を3言語化し、モデルへの再出力指示は保持されます。
+`question-contracts apply|validate|public`、`answer-applications apply|validate|public|schema`、`instruction-queue validate|context|submit|resolve|control` も同様に `--input-file <request-json>` を受け取り、無関係な設定を読み込むことはありません。native と Dashboard のヘルプや固有の診断メッセージは3言語に対応し、エンジンのメッセージ、状態コード、正規形式の JSON は上流の値を保持します。任意の[応答ガード](plugins/rdsh-answer-guard/README.md)も通知要約と設定エラーの表示を3言語化し、モデルへの再出力指示は保持されます。
