@@ -218,6 +218,21 @@ rerun only failed jobs while the original staged artifacts remain available
 (seven days) rather than rebuilding the successful jobs. Concurrent
 runs for the same tag are serialized and never cancel an upload in progress.
 
+A tag push is not the only entry point. When a CD step itself is the thing that
+failed, the tag already exists and the run replays the workflow file from the tag,
+so fixing the step on `main` alone does not help. `workflow_dispatch` covers that:
+dispatch `cd` from `main` with the tag as its input.
+
+```sh
+gh workflow run cd.yml --ref main -f tag=vX.Y.Z
+```
+
+The manual run takes the workflow file from `main` and checks out the tag for
+everything it builds, so the published artefacts still come from the tagged
+commit. Validation is the same as a tag push: the tag must be annotated, must
+point at a commit on `main`, and its CI must be green. Prefer this over deleting
+and re-creating a tag, which is forbidden once the tag is published.
+
 Release archives are pinned in three ledgers, all fetched from the fixed
 canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main` URL:
 

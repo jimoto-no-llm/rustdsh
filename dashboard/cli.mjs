@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { openUrl } from "./browser.mjs";
 import { identity, stateHome } from "./state.mjs";
 import {
   applyProjectMove,
@@ -287,26 +288,6 @@ function delegatedArguments(omitCommand = false) {
     if (command) omitted.add(command.index);
   }
   return rawArguments.filter((_, index) => !omitted.has(index));
-}
-function openUrl(url) {
-  // Non-Windows shells can't hand a URL to a browser here; print it so
-  // `rdsh-dashboard open` still resolves to something usable.
-  if (process.platform !== "win32") {
-    console.log(url);
-    return;
-  }
-  // A bare name would be searched in the working directory first (CWE-427).
-  const rundll32 = path.join(
-    process.env.SystemRoot || "C:\\Windows",
-    "System32",
-    "rundll32.exe",
-  );
-  const child = spawn(rundll32, ["url.dll,FileProtocolHandler", url], {
-    windowsHide: true,
-    detached: true,
-    stdio: "ignore",
-  });
-  child.unref();
 }
 function portValue(value) {
   if (value === undefined) return undefined;
