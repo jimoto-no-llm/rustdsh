@@ -75,13 +75,13 @@
 
 ### 1. インストール（ビルド済みバイナリ）
 
-**Linux / macOS / WSL**
+#### Linux / macOS / WSL
 
 ```sh
 curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
-**Windows (PowerShell)**
+#### Windows (PowerShell)
 
 ```powershell
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
@@ -147,7 +147,7 @@ Rust ツールチェーンや `install.sh` なしで `rdsh --version` が動き�
 
 ### ソースからのビルドと高度なオプション
 
-**Linux / macOS / WSL**
+#### Linux / macOS / WSL
 
 ```sh
 git clone https://github.com/jimoto-no-llm/rustdsh.git
@@ -158,7 +158,7 @@ cd rustdsh
 ./install.sh --prefix=DIR    # インストール先を変更（既定: ~/.local/bin）
 ```
 
-**Windows (PowerShell)**
+#### Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/jimoto-no-llm/rustdsh.git
@@ -185,7 +185,7 @@ macOS／Windows の上級者向けに、パッケージマネージャで `rdsh`
 brew install --formula ./packaging/homebrew/rdsh.rb
 ```
 
-**Windows（Scoop）**
+#### Windows（Scoop）
 
 ```powershell
 scoop install https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/packaging/scoop/rdsh.json
