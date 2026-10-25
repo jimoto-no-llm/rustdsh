@@ -1029,7 +1029,7 @@ const NATIVE_FIRST: &[&str] = &[
 ];
 
 fn invoked_as_dsh() -> bool {
-    let argv0 = std::env::args().next().unwrap_or_default();
+    let argv0 = std::env::args_os().next().unwrap_or_default();
     std::path::Path::new(&argv0)
         .file_name()
         .and_then(|s| s.to_str())
@@ -1058,10 +1058,11 @@ fn main() {
     }));
 
     if invoked_as_dsh() {
-        let raw: Vec<String> = std::env::args().skip(1).collect();
+        let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
         let first_is_native = raw
             .first()
-            .is_some_and(|s| NATIVE_FIRST.contains(&s.as_str()));
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| NATIVE_FIRST.contains(&s));
         if !first_is_native {
             std::env::set_var("RDSH_SHARED_FILES", "[]");
             let scfg = rdsh_config::load();
@@ -2106,11 +2107,12 @@ fn localized_launcher_error(locale: locale::Locale, message: &str) -> String {
 }
 
 fn requested_locale() -> Result<locale::Locale, (locale::Locale, anyhow::Error)> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let explicit = args.iter().enumerate().find_map(|(index, arg)| {
+        let arg = arg.to_str()?;
         arg.strip_prefix("--language=").or_else(|| {
             (arg == "--language")
-                .then(|| args.get(index + 1).map(String::as_str))
+                .then(|| args.get(index + 1).and_then(|value| value.to_str()))
                 .flatten()
         })
     });
