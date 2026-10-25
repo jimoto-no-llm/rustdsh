@@ -19,6 +19,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `curl … | sh` で入れた同梱プラグインが、ランチャーの探す場所ではなく
+  `PREFIX/share/rdsh` に展開されていました。`rdsh plugins status` が見つけられず、
+  以後の `rdsh plugins install` も同梱 tree を解決できませんでした。ランチャーが
+  探索する `PREFIX/../share/rdsh`（FHS の bin と share の並び）へ展開するよう修正。
 - Windows の `install.ps1` でも、`-FromRelease` で入れた環境に同梱プラグイン（設定の
   **rdsh** タブ、更新バナーなど）が付くようにしました。従来は `-Desktop` 指定時だけ
   Desktop プロファイルへプラグインを入れており、Web プロファイルは空のままでした。
