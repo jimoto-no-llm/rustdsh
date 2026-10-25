@@ -216,7 +216,11 @@ test("native duplicate and undeclared task starts are refused before provider", 
       "concurrent",
       'return await parallel([() => agent("same", {rdshTaskId:"a"}), () => agent("same", {rdshTaskId:"a"})]);',
     );
-  assert.equal(result.dispatches.length, 1);
+  assert.equal(
+    result.dispatches.length,
+    1,
+    `expected one dispatch, got ${result.dispatches.length}: ${result.outcome.error ?? "no error"}`,
+  );
   assert.match(result.outcome.error, /task_already_claimed/);
   const unknown = await f.invoke(
     "match",

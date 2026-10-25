@@ -517,14 +517,18 @@ install_release_plugins() {
     echo "plugins archive contains an unexpected path; refusing" >&2
     return 1
   fi
-  mkdir -p "$PREFIX/share/rdsh" || return 1
-  rm -rf "$PREFIX/share/rdsh/plugins" 2>/dev/null || true
-  tar -xzf "$work/plugins.tar.gz" -C "$PREFIX/share/rdsh" --no-same-owner --no-same-permissions plugins || return 1
-  if [ ! -f "$PREFIX/share/rdsh/plugins/install.sh" ]; then
+  # The launcher probes <prefix>/../share/rdsh (FHS: bin next to share), so
+  # the tree belongs beside the prefix, not under it.
+  share_root="$PREFIX/../share/rdsh"
+  mkdir -p "$share_root" || return 1
+  share_root="$(cd "$share_root" && pwd)"
+  rm -rf "$share_root/plugins" 2>/dev/null || true
+  tar -xzf "$work/plugins.tar.gz" -C "$share_root" --no-same-owner --no-same-permissions plugins || return 1
+  if [ ! -f "$share_root/plugins/install.sh" ]; then
     echo "plugins archive has no plugins/install.sh" >&2
     return 1
   fi
-  echo "$PREFIX/share/rdsh/plugins/install.sh"
+  echo "$share_root/plugins/install.sh"
 }
 
 install_release_binary() {
