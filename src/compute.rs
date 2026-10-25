@@ -92,7 +92,16 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
         return Err(fail("bad_id", "id must be 1..=128 chars".to_string()));
     }
     let op = v.get("op").and_then(|x| x.as_str()).unwrap_or_default();
-    let text = v.get("text").and_then(|x| x.as_str()).unwrap_or_default();
+    let text = if matches!(op, "tokens.estimate" | "tokens.prune") {
+        match v.get("text") {
+            None => "",
+            Some(value) => value
+                .as_str()
+                .ok_or_else(|| fail("bad_text", "text must be a string".to_string()))?,
+        }
+    } else {
+        ""
+    };
     if text.len() > MAX_TEXT_BYTES {
         return Err(fail(
             "too_large",
@@ -112,13 +121,20 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
             }))
         }
         "tokens.prune" => {
-            let max = v.get("max_tokens").and_then(|x| x.as_u64()).unwrap_or(4000) as usize;
-            if !(MIN_TOKENS..=MAX_TOKENS).contains(&max) {
-                return Err(fail(
+            let bad_budget = || {
+                fail(
                     "bad_budget",
-                    format!("max_tokens must be {MIN_TOKENS}..={MAX_TOKENS}"),
-                ));
+                    format!("max_tokens must be an integer in {MIN_TOKENS}..={MAX_TOKENS}"),
+                )
+            };
+            let max = match v.get("max_tokens") {
+                None => 4000,
+                Some(value) => value.as_u64().ok_or_else(bad_budget)?,
+            };
+            if !(MIN_TOKENS as u64..=MAX_TOKENS as u64).contains(&max) {
+                return Err(bad_budget());
             }
+            let max = max as usize;
             let before = crate::tokens::estimate_tokens(text);
             let pruned = crate::tokens::prune_to_budget(text, max);
             let after = crate::tokens::estimate_tokens(&pruned);
