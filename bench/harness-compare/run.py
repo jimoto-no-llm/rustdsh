@@ -20,6 +20,9 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parent
 TASKS = ROOT / "tasks"
 
+MODEL = "deepseek-v4.1-flash"
+MODEL_SPEC = f"opencode-go/{MODEL}"
+
 PROMPT = (
     "You are in a small Python project. Make the test suite pass.\n"
     "Rules:\n"
@@ -35,6 +38,8 @@ def harness_command(name: str, prompt: str) -> list[str]:
         return ["dsh", "--profile", "headless", "--patch", str(ROOT / "dsh-patch.yml"), prompt]
     if name == "codex":
         return ["codex", "exec", "--skip-git-repo-check", prompt]
+    if name == "opencode":
+        return ["opencode", "run", "-m", MODEL_SPEC, prompt]
     raise SystemExit(f"unknown harness: {name}")
 
 
@@ -42,6 +47,13 @@ def harness_env(name: str) -> dict:
     env = dict(os.environ)
     if name == "codex":
         env["CODEX_HOME"] = str(ROOT / ".codex-home")
+    if name == "opencode":
+        # Keep the config outside the checkout: opencode resolves its project
+        # root from the config location and would otherwise edit the tasks here.
+        config = pathlib.Path(tempfile.gettempdir()) / "harness-compare-opencode.json"
+        if not config.exists():
+            shutil.copyfile(ROOT / "opencode.json", config)
+        env["OPENCODE_CONFIG"] = str(config)
     return env
 
 
@@ -77,7 +89,7 @@ def run_one(harness: str, task: pathlib.Path, timeout: int) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--harness", action="append", choices=["dsh", "codex"], required=True)
+    parser.add_argument("--harness", action="append", choices=["dsh", "codex", "opencode"], required=True)
     parser.add_argument("--task", action="append", help="task directory name; default all")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--out", type=pathlib.Path, default=ROOT / "results.json")

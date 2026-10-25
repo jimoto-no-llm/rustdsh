@@ -96,5 +96,54 @@
     "passed": true,
     "seconds": 20.21,
     "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "opencode",
+    "passed": false,
+    "seconds": 42.54,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 28.6,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 56.35,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 37.97,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 72.19,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 45.39,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 61.99,
+    "timed_out": false
   }
 ]
