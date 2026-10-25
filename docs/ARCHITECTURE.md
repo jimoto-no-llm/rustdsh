@@ -39,6 +39,11 @@ The dashboard keeps its synchronous JS ledger for stores, MCP schemas and budget
 admission; its pure cost-ledger CLI bridge invokes Rust through a private file.
 
 - Delegation is a verbatim `exec`: zero behavior change by construction.
+  The `dsh` alias keeps arguments as OS strings through delegation, including
+  non-UTF-8 bytes on Unix. Only recognized native command and profile names are
+  inspected as UTF-8; native CLI values still use Clap's argument validation.
+  The Linux [before/after output comparison](evidence/non-utf8-argv.json)
+  records exit status, stderr and the exact delegated argument bytes.
 - Optimizations must be output-identical (see `tests/regress.sh`).
 
 ## Worker-scope validation and policy
