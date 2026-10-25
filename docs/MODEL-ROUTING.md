@@ -240,6 +240,10 @@ Each profile is replaced atomically under the same lock protocol DSH uses, so a
 live config edit and this sync cannot interleave. The harness picks the new
 entries up on the next config reload or restart.
 
+A synced model starts with an empty `compat`, so on servers that reject the
+`developer` role — Kimi for Coding among them — pin the route-level switch once
+instead of per model; see [Kimi for Coding and the catalog gap](PROVIDERS.md#kimi-for-coding-and-the-catalog-gap).
+
 A live listing is fetched with `curl`, described by a config file on stdin so
 the API key never appears in the process list, and pinned to HTTPS so a redirect
 cannot downgrade it. The Codex source never refreshes a name: the CLI's
