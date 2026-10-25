@@ -39,6 +39,18 @@ cargo run -- --stop-host       # stop the detached harness host
 
 RDSH_DESKTOP_DSH points at the harness launcher (defaults to dsh on PATH).
 
+## Development checks
+
+This crate is a separate workspace; run its checks from this directory:
+
+~~~sh
+cargo fmt --check
+cargo clippy --release --locked --all-targets -- -D warnings
+cargo test --release --locked
+~~~
+
+The root workspace's checks do not cover the native desktop crate.
+
 ## Prerequisites
 
 Linux uses the Wayland GPUI backend: a Vulkan driver, fontconfig and xkbcommon.
@@ -102,6 +114,19 @@ The CI workflow desktop.yml builds and tests the crate on all three platforms.
 | Esc Esc (while running) | Stop the run |
 | Ctrl+K | Focus the composer |
 | Ctrl+N | New conversation |
+
+Printable text (including repeated letters and IME commits) enters the composer
+through GPUI's input handler. The key-down listener handles editing commands and
+shortcuts; it does not insert a second copy of printable keys.
+Idle Enter and Shift+Enter remain composer commands on Wayland; Enter during
+an active IME preedit remains owned by the input method.
+On Linux, `python3 tests/composer-wayland.py --binary /path/to/rdsh-desktop
+--output /path/to/evidence --verify-send` checks twelve editing flows through real OS events
+and reads the editor text back through the Wayland clipboard. It also checks
+that Enter stores the exact prompt in its isolated DSH session. See the script's
+help for the compositor and isolated-profile setup.
+Actual Linux before/after PNGs, the editing-flow GIF and clipboard observations
+are in [the composer evidence](../../docs/evidence/composer-input/README.md).
 
 The sidebar has a search filter (title and project path) and each project row
 folds, archives and restores. The timeline loads older history on demand and
@@ -255,3 +280,6 @@ RDSH_DESKTOP_UPDATE_CHECK=0 in webui.env disables the background update check.
 - xattr is vendored: gpui_http_client pins xattr 0.2.3, which no longer compiles
   on current Linux toolchains. vendor/xattr implements the 0.2 API the
   dependency uses (see NOTICE.md).
+- proc-macro-error2 2.0.1 is vendored with a public `proc_macro` declaration to
+  fix Rust's future-incompatibility warning in GPUI's stacksafe-macro dependency.
+  See vendor/proc-macro-error2/NOTICE.md for provenance and the exact change.

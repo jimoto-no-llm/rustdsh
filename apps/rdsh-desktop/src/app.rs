@@ -103,7 +103,7 @@ enum Update {
     Titles(Vec<(String, String)>),
     Ready(Box<Chat>),
     /// Newest published harness version, when it is ahead of the active one.
-    Update(String),
+    NewRelease(String),
     Failed(String),
 }
 
@@ -160,7 +160,11 @@ impl Chat {
             chat.sessions.len(),
             chat.startup_ms,
             chat.host_version(),
-            if chat.reused { "（ホスト再利用）" } else { "" }
+            if chat.reused {
+                "（ホスト再利用）"
+            } else {
+                ""
+            }
         );
         Ok(chat)
     }
@@ -213,7 +217,10 @@ impl Chat {
                         .to_string(),
                     updated: item.get("updatedAt").and_then(Value::as_i64).unwrap_or(0),
                     blank: item.get("blank").and_then(Value::as_bool).unwrap_or(false),
-                    running: item.get("running").and_then(Value::as_bool).unwrap_or(false),
+                    running: item
+                        .get("running")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
                     title: values
                         .get("title")
                         .and_then(Value::as_str)
@@ -227,7 +234,7 @@ impl Chat {
             })
             .collect();
         self.sessions
-            .sort_by(|left, right| right.updated.cmp(&left.updated));
+            .sort_by_key(|session| std::cmp::Reverse(session.updated));
         if self.selected.is_none() && !self.sessions.is_empty() {
             self.selected = Some(0);
         }
@@ -406,8 +413,10 @@ impl Chat {
             return Ok(());
         };
         let session_id = session.id.clone();
-        self.api
-            .unary("session/cancel", serde_json::json!({ "sessionId": session_id }))?;
+        self.api.unary(
+            "session/cancel",
+            serde_json::json!({ "sessionId": session_id }),
+        )?;
         Ok(())
     }
 
@@ -478,12 +487,12 @@ impl Chat {
         &self.host.version
     }
 
-    /// Path of the launcher, when one was resolved.
-    pub fn host_binary(&self) -> &std::path::Path {
-        &self.host.binary
-    }
-
-    pub fn switch_model(&mut self, session_id: &str, provider: &str, model: &str) -> anyhow::Result<()> {
+    pub fn switch_model(
+        &mut self,
+        session_id: &str,
+        provider: &str,
+        model: &str,
+    ) -> anyhow::Result<()> {
         self.api.unary(
             "session/selectModel",
             serde_json::json!({"request": {"sessionId": session_id, "provider": provider, "model": model}}),
@@ -493,15 +502,13 @@ impl Chat {
 
     /// Current projection values for one conversation.
     pub fn projections(&self, session_id: &str) -> anyhow::Result<Value> {
-        self.api.unary("session/projections", serde_json::json!({"sessionId": session_id}))
+        self.api.unary(
+            "session/projections",
+            serde_json::json!({"sessionId": session_id}),
+        )
     }
 
-    pub fn approve(
-        &self,
-        client_id: &str,
-        event_id: &str,
-        allow: bool,
-    ) -> anyhow::Result<()> {
+    pub fn approve(&self, client_id: &str, event_id: &str, allow: bool) -> anyhow::Result<()> {
         let value = if allow { "allowed-once" } else { "rejected" };
         self.api.unary(
             "$events/result",
@@ -548,11 +555,7 @@ impl Chat {
             .to_string())
     }
 
-    pub fn fill_titles(
-        &mut self,
-        limit: usize,
-        mut on_batch: impl FnMut(Vec<(String, String)>),
-    ) {
+    pub fn fill_titles(&mut self, limit: usize, mut on_batch: impl FnMut(Vec<(String, String)>)) {
         let pending: Vec<String> = self
             .sessions
             .iter()
@@ -564,7 +567,8 @@ impl Chat {
         for id in pending {
             if let Ok(title) = self.session_title(&id) {
                 if !title.is_empty() {
-                    if let Some(session) = self.sessions.iter_mut().find(|session| session.id == id) {
+                    if let Some(session) = self.sessions.iter_mut().find(|session| session.id == id)
+                    {
                         session.title = title.clone();
                     }
                     batch.push((id, title));
@@ -599,7 +603,6 @@ impl Chat {
         groups
     }
 }
-
 
 /// Read one conversation title over a short-lived socket. Free function so the
 /// title workers can run after the window already owns the connection.
@@ -712,10 +715,7 @@ fn records_to_messages(records: &[Value]) -> Vec<Message> {
     let mut messages = Vec::new();
     for record in records {
         let event = record.get("event").cloned().unwrap_or(Value::Null);
-        let kind = event
-            .get("type")
-            .and_then(Value::as_str)
-            .unwrap_or("event");
+        let kind = event.get("type").and_then(Value::as_str).unwrap_or("event");
         let data = event.get("data").cloned().unwrap_or(Value::Null);
         match kind {
             "user/message" => {
@@ -921,7 +921,11 @@ pub fn project_label(cwd: &str) -> String {
     }
     let name = cwd.trim_end_matches('/').rsplit('/').next().unwrap_or(cwd);
     if let Some((prefix, rest)) = name.split_once('-') {
-        if prefix.len() >= 8 && prefix.chars().all(|character| character.is_ascii_hexdigit()) {
+        if prefix.len() >= 8
+            && prefix
+                .chars()
+                .all(|character| character.is_ascii_hexdigit())
+        {
             return rest.to_string();
         }
     }
@@ -1248,13 +1252,18 @@ mod tests {
         assert_eq!(providers.len(), 3, "one section per provider");
         assert_eq!(providers[0].id, "deepseek-official");
         assert_eq!(providers[0].name, "DeepSeek");
-        assert_eq!(providers[1].name, "opencode-go", "missing name falls back to id");
-        assert_eq!(providers[1].models[0].name, "minimax-m3", "missing model name falls back to id");
+        assert_eq!(
+            providers[1].name, "opencode-go",
+            "missing name falls back to id"
+        );
+        assert_eq!(
+            providers[1].models[0].name, "minimax-m3",
+            "missing model name falls back to id"
+        );
         assert_eq!(providers[2].id, "commandcode-goat");
         assert_eq!(providers[2].name, "CommandCode Goat");
         assert_eq!(
-            providers[2].models[0].id,
-            "deepseek/deepseek-v4.1-flash",
+            providers[2].models[0].id, "deepseek/deepseek-v4.1-flash",
             "the commandcode-goat section is not truncated"
         );
         let total: usize = providers.iter().map(|provider| provider.models.len()).sum();
@@ -1264,10 +1273,18 @@ mod tests {
     #[test]
     fn ordering_puts_the_current_provider_first_and_keeps_the_rest_stable() {
         let providers = vec![
-            provider("deepseek-official", "DeepSeek", &["deepseek-flash", "deepseek-v4-pro"]),
+            provider(
+                "deepseek-official",
+                "DeepSeek",
+                &["deepseek-flash", "deepseek-v4-pro"],
+            ),
             provider("openai-codex", "Codex", &["gpt-5.5"]),
             provider("opencode-go", "opencode-go", &["minimax-m3"]),
-            provider("opencode-free", "opencode-free", &["opencode/glm-5.3-flash-free"]),
+            provider(
+                "opencode-free",
+                "opencode-free",
+                &["opencode/glm-5.3-flash-free"],
+            ),
             provider(
                 "commandcode-goat",
                 "CommandCode Goat",
@@ -1276,7 +1293,10 @@ mod tests {
         ];
 
         let ordered = order_providers(&providers, "commandcode-goat");
-        let ids: Vec<&str> = ordered.iter().map(|provider| provider.id.as_str()).collect();
+        let ids: Vec<&str> = ordered
+            .iter()
+            .map(|provider| provider.id.as_str())
+            .collect();
         assert_eq!(
             ids,
             [
@@ -1301,7 +1321,10 @@ mod tests {
             .collect();
         assert_eq!(
             untouched,
-            providers.iter().map(|provider| provider.id.clone()).collect::<Vec<_>>(),
+            providers
+                .iter()
+                .map(|provider| provider.id.clone())
+                .collect::<Vec<_>>(),
             "an unknown current provider leaves the catalog order alone"
         );
     }
@@ -1394,9 +1417,15 @@ mod tests {
         assert_eq!(tool_text_state("cargo test · done"), ToolState::Done);
         assert_eq!(tool_text_state("cargo test · 完了"), ToolState::Done);
         assert_eq!(tool_text_state("write · failed"), ToolState::Failed);
-        assert_eq!(tool_text_state("write · permission denied"), ToolState::Failed);
+        assert_eq!(
+            tool_text_state("write · permission denied"),
+            ToolState::Failed
+        );
         assert_eq!(tool_text_state("shell · エラー"), ToolState::Failed);
-        assert_eq!(tool_text_state("shell · status: DONE, errorCount: 0"), ToolState::Failed);
+        assert_eq!(
+            tool_text_state("shell · status: DONE, errorCount: 0"),
+            ToolState::Failed
+        );
     }
 
     #[test]
@@ -1424,7 +1453,11 @@ mod tests {
         assert_eq!(reasoning_preview("  a\n  b  "), "a b");
         let long = "x".repeat(200);
         let preview = reasoning_preview(&long);
-        assert_eq!(preview.chars().count(), 97, "96 characters plus the ellipsis");
+        assert_eq!(
+            preview.chars().count(),
+            97,
+            "96 characters plus the ellipsis"
+        );
         assert!(preview.ends_with('…'));
     }
 
@@ -1505,7 +1538,10 @@ mod tests {
         let first = Instant::now();
         assert!(!esc_cancels(None, first), "the first Esc only arms");
         assert!(esc_cancels(Some(first), first + Duration::from_millis(700)));
-        assert!(!esc_cancels(Some(first), first + Duration::from_millis(701)));
+        assert!(!esc_cancels(
+            Some(first),
+            first + Duration::from_millis(701)
+        ));
     }
 
     #[test]
@@ -1515,7 +1551,11 @@ mod tests {
             "a blank filter keeps every row"
         );
         assert!(session_matches("  ", "anything", "/srv/x"));
-        assert!(session_matches("RUST", "rustdsh の作業", "/home/me/Prog/rustdsh"));
+        assert!(session_matches(
+            "RUST",
+            "rustdsh の作業",
+            "/home/me/Prog/rustdsh"
+        ));
         assert!(session_matches(
             "prog/rustdsh",
             "設計レビュー",
@@ -1667,7 +1707,7 @@ impl DesktopApp {
 
         std::thread::spawn(move || {
             let progress = update_tx.clone();
-            let mut chat = match Chat::connect(move |step| {
+            let chat = match Chat::connect(move |step| {
                 let _ = progress.send(Update::Step(step.to_string()));
             }) {
                 Ok(chat) => chat,
@@ -1698,7 +1738,7 @@ impl DesktopApp {
                 // visible on the first frame instead of one registry round later.
                 if let Some(cached) = crate::host::cached_newest_published() {
                     if crate::host::compare_versions(&cached, &active_version).is_gt() {
-                        let _ = update_tx.send(Update::Update(cached));
+                        let _ = update_tx.send(Update::NewRelease(cached));
                     }
                 }
                 let updates = update_tx.clone();
@@ -1714,7 +1754,7 @@ impl DesktopApp {
                                 "update check: active {active_version}, newest {newest}, newer {newer}"
                             );
                             if newer {
-                                let _ = updates.send(Update::Update(newest));
+                                let _ = updates.send(Update::NewRelease(newest));
                             }
                         }
                         None => log::info!("update check: the registry did not answer"),
@@ -1787,8 +1827,8 @@ impl DesktopApp {
             model_scroll: ScrollHandle::new(),
             update: None,
             expanded: Rc::new(RefCell::new(HashSet::new())),
-            collapsed_projects: collapsed_projects,
-            archived_projects: archived_projects,
+            collapsed_projects,
+            archived_projects,
             show_archived: false,
             rename_target: None,
             rename_editor: Editor::new(),
@@ -1860,13 +1900,15 @@ impl DesktopApp {
             self.cancel_rename();
             return;
         }
-        match self.chat.as_ref() {
-            Some(chat) => match chat.rename_session(&target, &title) {
+        if let Some(chat) = self.chat.as_ref() {
+            match chat.rename_session(&target, &title) {
                 Ok(stored) => {
                     self.titles.insert(target.clone(), stored.clone());
                     if let Some(chat) = self.chat.as_mut() {
-                        if let Some(session) =
-                            chat.sessions.iter_mut().find(|session| session.id == target)
+                        if let Some(session) = chat
+                            .sessions
+                            .iter_mut()
+                            .find(|session| session.id == target)
                         {
                             session.title = stored.clone();
                         }
@@ -1874,8 +1916,7 @@ impl DesktopApp {
                     self.status = format!("名前を変更しました: {stored}");
                 }
                 Err(error) => self.status = format!("名前を変更できませんでした: {error}"),
-            },
-            None => {}
+            }
         }
         self.cancel_rename();
     }
@@ -1990,9 +2031,14 @@ impl DesktopApp {
                 Some(client_id) => chat.approve(&client_id, &event_id, allow),
                 None => Ok(()),
             },
-            (Pending::Question { call_id, session_id, .. }, Some(answers)) => {
-                chat.answer_question(&session_id, &call_id, &answers)
-            }
+            (
+                Pending::Question {
+                    call_id,
+                    session_id,
+                    ..
+                },
+                Some(answers),
+            ) => chat.answer_question(&session_id, &call_id, &answers),
             (Pending::Question { .. }, None) => Ok(()),
         };
         match result {
@@ -2027,7 +2073,7 @@ fn poll(
                         cx.notify();
                     });
                 }
-                Ok(Update::Update(newest)) => {
+                Ok(Update::NewRelease(newest)) => {
                     let _ = this.update(cx, |app, cx| {
                         app.update = Some(newest);
                         cx.notify();
@@ -2160,7 +2206,7 @@ fn poll(
 }
 
 impl Render for DesktopApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = self
             .chat
             .as_ref()
@@ -2821,9 +2867,8 @@ impl Render for DesktopApp {
                                         .child(name),
                                 )
                                 .when(!summary.is_empty(), |element| {
-                                    element.child(
-                                        div().text_color(theme::tertiary()).child(summary),
-                                    )
+                                    element
+                                        .child(div().text_color(theme::tertiary()).child(summary))
                                 }),
                         )
                         .into_any_element();
@@ -2865,8 +2910,7 @@ impl Render for DesktopApp {
                         ));
                         base.flex().flex_col().children(content).into_any_element()
                     } else {
-                        base
-                            .id(("reasoning", index))
+                        base.id(("reasoning", index))
                             .cursor_pointer()
                             .child(
                                 div()
@@ -3121,19 +3165,16 @@ impl Render for DesktopApp {
                 let mut buttons = div().flex().flex_row().gap(px(8.));
                 for (index, option) in options.into_iter().enumerate() {
                     let label = option.clone();
-                    buttons = buttons.child(action_button(
-                        ("answer", index),
-                        label,
-                        true,
-                        cx,
-                        {
-                            let question_id = question_id.clone();
-                            move |this, label: &str| {
-                                let label = label.to_string();
-                                this.answer_pending(true, Some(vec![(question_id.clone(), vec![label])]))
-                            }
-                        },
-                    ));
+                    buttons = buttons.child(action_button(("answer", index), label, true, cx, {
+                        let question_id = question_id.clone();
+                        move |this, label: &str| {
+                            let label = label.to_string();
+                            this.answer_pending(
+                                true,
+                                Some(vec![(question_id.clone(), vec![label])]),
+                            )
+                        }
+                    }));
                 }
                 div()
                     .mx(px(32.))
@@ -3202,7 +3243,9 @@ impl Render for DesktopApp {
                     let active = provider_id == current_provider && model_id == current_model;
                     list = list.child(
                         div()
-                            .id(SharedString::from(format!("model-{provider_id}/{model_id}")))
+                            .id(SharedString::from(format!(
+                                "model-{provider_id}/{model_id}"
+                            )))
                             .h(px(28.))
                             .px(px(10.))
                             .flex()
@@ -3217,9 +3260,7 @@ impl Render for DesktopApp {
                             } else {
                                 theme::label()
                             })
-                            .when(active, |element| {
-                                element.font_weight(FontWeight::SEMIBOLD)
-                            })
+                            .when(active, |element| element.font_weight(FontWeight::SEMIBOLD))
                             .on_click(cx.listener(move |this, _event, _window, cx| {
                                 let mut switched = false;
                                 if let Some(chat) = this.chat.as_mut() {
@@ -3297,7 +3338,7 @@ impl Render for DesktopApp {
                 // While an IME is composing, Enter commits the composition
                 // instead of sending a half-composed message, and the keys
                 // arrive with an empty key_char.
-                if keystroke.is_ime_in_progress() {
+                if crate::composer_input::ime_owns_key(keystroke, this.marked.is_some()) {
                     return;
                 }
                 let mut changed = false;
@@ -3371,28 +3412,16 @@ impl Render for DesktopApp {
                     "v" if command => {
                         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
                             if !text.is_empty() {
-                                let text = text.replace('\r', "").replace('\0', "");
+                                let text = text.replace(['\r', '\0'], "");
                                 this.editor.insert(&text);
                                 changed = true;
                             }
                         }
                     }
-                    _ => {
-                        // Printable input only: no command/alt chords, no
-                        // unmodified keys that produce no text (arrows,
-                        // function keys, dead keys, IME composition).
-                        let printable = keystroke
-                            .key_char
-                            .as_deref()
-                            .filter(|text| !text.is_empty())
-                            .filter(|text| !text.chars().any(char::is_control));
-                        if let Some(text) = printable {
-                            if !command && !modifiers.alt {
-                                this.editor.insert(text);
-                                changed = true;
-                            }
-                        }
-                    }
+                    // GPUI delivers printable keys through EntityInputHandler,
+                    // including ordinary ASCII and IME commits. Inserting here
+                    // as well would duplicate every printable keystroke.
+                    _ => {}
                 }
                 if changed || submitted {
                     this.composer_scroll.scroll_to_bottom();
@@ -3555,7 +3584,10 @@ fn inline_span(span: &Span, ctx: &mut Context<DesktopApp>, color: Rgba) -> AnyEl
             if color == theme::label() {
                 text.clone().into_any_element()
             } else {
-                div().text_color(color).child(text.clone()).into_any_element()
+                div()
+                    .text_color(color)
+                    .child(text.clone())
+                    .into_any_element()
             }
         }
         Span::Bold(inner) => div()
@@ -3613,7 +3645,10 @@ fn block_element(block: &Block, ctx: &mut Context<DesktopApp>, color: Rgba, last
     match block {
         Block::Paragraph(spans) => {
             let content: Vec<AnyElement> = render_inlines(spans, ctx, color);
-            let mut element = div().flex().flex_wrap().line_height(theme::body_line_height());
+            let mut element = div()
+                .flex()
+                .flex_wrap()
+                .line_height(theme::body_line_height());
             if !last {
                 element = element.mb(px(8.));
             }
@@ -3658,7 +3693,7 @@ fn block_element(block: &Block, ctx: &mut Context<DesktopApp>, color: Rgba, last
             }
             element.children(content)
         }
-        Block::CodeBlock { language, code } => {
+        Block::Code { language, code } => {
             let mut element = div()
                 .flex()
                 .flex_col()
@@ -3862,7 +3897,6 @@ fn action_button(
         .into_any_element()
 }
 
-
 // ---- IME / text input plumbing -------------------------------------------
 //
 // gpui delivers IME composition and committed text through an InputHandler that
@@ -3987,6 +4021,7 @@ impl EntityInputHandler for DesktopApp {
     ) {
         self.ime_replace(range, text);
         self.marked = None;
+        self.composer_scroll.scroll_to_bottom();
         log::info!("IME commit: {} chars", text.chars().count());
         cx.notify();
     }

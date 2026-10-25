@@ -54,3 +54,6 @@ strip = true
 # The vendored shim implements the 0.2 API the dependency actually uses.
 [patch.crates-io]
 xattr = { path = "vendor/xattr" }
+# stacksafe-macro (through GPUI) uses 2.0.1, whose private proc_macro re-export
+# triggers Rust's future-incompatibility lint. Keep the fix local and audited.
+proc-macro-error2 = { path = "vendor/proc-macro-error2" }

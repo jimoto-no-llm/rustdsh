@@ -32,10 +32,12 @@ impl Editor {
         &self.text
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.text.len()
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
@@ -66,7 +68,8 @@ impl Editor {
     }
 
     /// The text before the caret and the text after it, split at a character
-    /// boundary. Used for rendering the caret between two runs.
+    /// boundary, for inspecting caret movement in tests.
+    #[cfg(test)]
     pub fn split_at_caret(&self) -> (&str, &str) {
         (
             self.text.get(..self.caret).unwrap_or(&self.text),
@@ -100,6 +103,7 @@ impl Editor {
     }
 
     /// Drop the selection, keeping the caret where it is.
+    #[cfg(test)]
     pub fn collapse_selection(&mut self) {
         self.anchor = self.caret;
     }

@@ -29,11 +29,17 @@ implementation written against the observed protocol and theme values.
   uses system fonts; the bundled Montserrat webfont (SIL OFL-1.1) from
   packages/client/ui-theme is not shipped here.
 
-## Vendored dependency
+## Vendored dependencies
 
 vendor/xattr is a small, freshly written implementation of the xattr 0.2 API
 (MIT OR Apache-2.0), created because gpui pins xattr 0.2.3, which no longer
 compiles on current Linux toolchains. It contains no upstream code.
+
+vendor/proc-macro-error2 contains the published proc-macro-error2 2.0.1
+sources (MIT OR Apache-2.0), with a visibility fix for Rust's
+`pub_use_of_private_extern_crate` lint and rustfmt formatting.
+Its NOTICE.md records the archive checksum and exact change; the original
+LICENSE-MIT and LICENSE-APACHE are included alongside the source.
 
 ## Dependency licenses
 

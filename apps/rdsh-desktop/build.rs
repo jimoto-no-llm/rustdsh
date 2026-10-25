@@ -43,8 +43,16 @@ fn main() {
 }
 
 fn pkg_config_finds_dev_symlink() -> bool {
-    for dir in ["/usr/lib64", "/usr/lib", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib"] {
-        if std::path::Path::new(dir).join("libxkbcommon-x11.so").exists() {
+    for dir in [
+        "/usr/lib64",
+        "/usr/lib",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/lib",
+    ] {
+        if std::path::Path::new(dir)
+            .join("libxkbcommon-x11.so")
+            .exists()
+        {
             return true;
         }
     }

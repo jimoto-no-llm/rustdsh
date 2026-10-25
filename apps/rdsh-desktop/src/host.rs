@@ -19,13 +19,10 @@ use anyhow::{anyhow, Context, Result};
 const READY_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub struct Host {
-    pub url: String,
     pub origin: String,
     pub token: String,
     /// Pre-minted session cookie for an already running host.
     pub cookie: Option<String>,
-    /// Launcher this host was started from (empty when attached by accident).
-    pub binary: std::path::PathBuf,
     /// Version reported by that launcher.
     pub version: String,
     /// True when this launch reused a detached host instead of starting one.
@@ -73,18 +70,15 @@ impl Host {
                 }
                 continue;
             }
-            let (binary, version) = resolve_launcher()
-                .map(|(binary, version)| (binary, version))
+            let (_, version) = resolve_launcher()
                 .unwrap_or_else(|_| (std::path::PathBuf::new(), "unknown".to_string()));
             if rejected_cache {
                 log::info!("discarded a cached host that refused our cookie");
             }
             return Some(Self {
-                url: origin.clone(),
                 origin,
                 token: String::new(),
                 cookie: Some(format!("{name}={value}")),
-                binary,
                 version,
                 reused: true,
             });
@@ -132,11 +126,9 @@ impl Host {
             if let Some((url, origin, token)) = parse_ready(&seen) {
                 write_cache(&url, &origin, child.id(), &binary.to_string_lossy())?;
                 return Ok(Self {
-                    url,
                     origin,
                     token,
                     cookie: None,
-                    binary: binary.clone(),
                     version: version.clone(),
                     reused: false,
                 });
@@ -201,7 +193,6 @@ fn is_host_command(command: &str, binary: &str) -> bool {
 }
 
 struct Cached {
-    url: String,
     origin: String,
     pid: u32,
     /// The binary `spawn` started; a cache written before this field existed
@@ -221,10 +212,14 @@ fn read_cache() -> Option<Cached> {
     let path = cache_dir().ok()?.join("host.json");
     let text = fs::read_to_string(path).ok()?;
     let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    // Keep accepting the same cache schema without retaining the token URL.
+    value.get("url")?.as_str()?;
     Some(Cached {
-        url: value.get("url")?.as_str()?.to_string(),
         origin: value.get("origin")?.as_str()?.to_string(),
-        pid: value.get("pid").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32,
+        pid: value
+            .get("pid")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as u32,
         binary: value
             .get("binary")
             .and_then(serde_json::Value::as_str)
@@ -534,7 +529,10 @@ fn parse_ready(text: &str) -> Option<(String, String, String)> {
         let Some((base, query)) = url.split_once('?') else {
             continue;
         };
-        let Some(token) = query.split('&').find_map(|pair| pair.strip_prefix("token=")) else {
+        let Some(token) = query
+            .split('&')
+            .find_map(|pair| pair.strip_prefix("token="))
+        else {
             continue;
         };
         if token.is_empty() {
@@ -679,9 +677,7 @@ pub fn resolve_launcher() -> Result<(PathBuf, String)> {
             }
         }
     }
-    best.ok_or_else(|| {
-        anyhow!("dsh was not found; set RDSH_DESKTOP_DSH to the harness launcher")
-    })
+    best.ok_or_else(|| anyhow!("dsh was not found; set RDSH_DESKTOP_DSH to the harness launcher"))
 }
 
 #[cfg(test)]
@@ -696,10 +692,22 @@ mod tests {
         use super::compare_versions;
         use std::cmp::Ordering;
         assert_eq!(compare_versions("0.2.1", "0.2.1-rc.2"), Ordering::Greater);
-        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.1-alpha.2"), Ordering::Greater);
-        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.0-rc.2"), Ordering::Greater);
-        assert_eq!(compare_versions("0.2.1-alpha.10", "0.2.1-alpha.2"), Ordering::Greater);
-        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.1-rc.2"), Ordering::Equal);
+        assert_eq!(
+            compare_versions("0.2.1-rc.2", "0.2.1-alpha.2"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("0.2.1-rc.2", "0.2.0-rc.2"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("0.2.1-alpha.10", "0.2.1-alpha.2"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("0.2.1-rc.2", "0.2.1-rc.2"),
+            Ordering::Equal
+        );
         assert_eq!(compare_versions("0.2.0", "0.10.0"), Ordering::Less);
     }
 
@@ -759,7 +767,9 @@ mod tests {
 
     #[test]
     fn ignores_plugin_noise() {
-        assert!(parse_ready("{\"level\":\"fatal\",\"message\":\"Authentication required\"}").is_none());
+        assert!(
+            parse_ready("{\"level\":\"fatal\",\"message\":\"Authentication required\"}").is_none()
+        );
         assert!(parse_ready("http://example.com/?token=x").is_none());
     }
 
@@ -779,16 +789,25 @@ mod tests {
                 .as_nanos()
         ));
         create_owner_only_dir(&dir).unwrap();
-        assert_eq!(fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
 
         let log = dir.join("host.log");
         drop(open_owner_only_append(&log).unwrap());
-        assert_eq!(fs::metadata(&log).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&log).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
 
         // A log written by an earlier run with a looser umask is tightened.
         fs::set_permissions(&log, fs::Permissions::from_mode(0o644)).unwrap();
         drop(open_owner_only_append(&log).unwrap());
-        assert_eq!(fs::metadata(&log).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&log).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
 
         // The Web UI URL carries the same token, and a loose file from an
         // earlier run is tightened before the new value is written.
@@ -796,7 +815,10 @@ mod tests {
         fs::write(&url, "http://127.0.0.1:1/?token=old\n").unwrap();
         fs::set_permissions(&url, fs::Permissions::from_mode(0o644)).unwrap();
         write_owner_only(&url, b"http://127.0.0.1:1/?token=new\n").unwrap();
-        assert_eq!(fs::metadata(&url).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&url).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         assert_eq!(
             fs::read_to_string(&url).unwrap(),
             "http://127.0.0.1:1/?token=new\n"

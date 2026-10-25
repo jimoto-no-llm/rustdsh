@@ -7,6 +7,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- GPUIコンポーザで通常文字が二重入力される問題と、Waylandで通常Enter・Shift+EnterがIME変換中と誤判定される問題を修正しました。
+- GPUIデスクトップの既存書式・未使用コード・Clippy警告を整理し、依存proc-macro-error2の公開宣言を修正して将来のRustとの互換性警告を解消しました。
 - dsh互換の委譲で非UTF-8を含むPOSIX引数を保持し、nativeコマンドの不正引数でプロセスが異常終了する問題を修正しました。
 - computeのtext・max_tokensの型不一致を明示的なエラーで返し、省略時の既定値と後続要求の処理を維持するようにしました。
 - スマートフォン幅でrdsh設定本文が狭くなる問題を修正し、既存のモバイルレイアウトを適用しました。

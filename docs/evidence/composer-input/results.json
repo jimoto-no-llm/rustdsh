@@ -1,0 +1,102 @@
+{
+  "before": [
+    {
+      "case": "ascii",
+      "expected": "abc123",
+      "actual": "aabbcc112233",
+      "passed": false,
+      "screenshot": "before/ascii.png"
+    }
+  ],
+  "after": [
+    {
+      "case": "ascii",
+      "expected": "abc123",
+      "actual": "abc123",
+      "passed": true,
+      "screenshot": "after/ascii.png"
+    },
+    {
+      "case": "repeated-characters",
+      "expected": "bookkeeper 111 aaa",
+      "actual": "bookkeeper 111 aaa",
+      "passed": true,
+      "screenshot": "after/repeated-characters.png"
+    },
+    {
+      "case": "shift-and-symbols",
+      "expected": "ABC_xyz-+=!?123",
+      "actual": "ABC_xyz-+=!?123",
+      "passed": true,
+      "screenshot": "after/shift-and-symbols.png"
+    },
+    {
+      "case": "insert-at-caret",
+      "expected": "aXbc",
+      "actual": "aXbc",
+      "passed": true,
+      "screenshot": "after/insert-at-caret.png"
+    },
+    {
+      "case": "backspace",
+      "expected": "abc",
+      "actual": "abc",
+      "passed": true,
+      "screenshot": "after/backspace.png"
+    },
+    {
+      "case": "delete",
+      "expected": "acd",
+      "actual": "acd",
+      "passed": true,
+      "screenshot": "after/delete.png"
+    },
+    {
+      "case": "replace-selection",
+      "expected": "Z",
+      "actual": "Z",
+      "passed": true,
+      "screenshot": "after/replace-selection.png"
+    },
+    {
+      "case": "cut-and-paste",
+      "expected": "prefix:Copy-me-123",
+      "actual": "prefix:Copy-me-123",
+      "passed": true,
+      "screenshot": "after/cut-and-paste.png"
+    },
+    {
+      "case": "newline",
+      "expected": "line1\nline2",
+      "actual": "line1\nline2",
+      "passed": true,
+      "screenshot": "after/newline.png"
+    },
+    {
+      "case": "unicode-paste",
+      "expected": "日本語🙂 café\n2行目",
+      "actual": "日本語🙂 café\n2行目",
+      "passed": true,
+      "screenshot": "after/unicode-paste.png"
+    },
+    {
+      "case": "unicode-backspace",
+      "expected": "AB",
+      "actual": "AB",
+      "passed": true,
+      "screenshot": "after/unicode-backspace.png"
+    },
+    {
+      "case": "paste-sanitization",
+      "expected": "A\nB",
+      "actual": "A\nB",
+      "passed": true,
+      "screenshot": "after/paste-sanitization.png"
+    },
+    {
+      "case": "enter-to-real-host",
+      "marker": "SEND_PIPELINE_abc123",
+      "passed": true
+    }
+  ]
+}

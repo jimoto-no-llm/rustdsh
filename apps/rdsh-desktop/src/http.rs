@@ -66,7 +66,8 @@ fn send(
     let authority = origin
         .strip_prefix("http://")
         .ok_or_else(|| anyhow!("only loopback http origins are supported: {origin}"))?;
-    let mut stream = TcpStream::connect(authority).with_context(|| format!("connect to {authority}"))?;
+    let mut stream =
+        TcpStream::connect(authority).with_context(|| format!("connect to {authority}"))?;
     stream.set_read_timeout(Some(IO_TIMEOUT))?;
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
 
@@ -131,7 +132,9 @@ fn read_line(reader: &mut impl BufRead) -> Result<String> {
     if read == 0 {
         return Err(anyhow!("connection closed while reading the response"));
     }
-    Ok(line.trim_end_matches([char::from(13), char::from(10)]).to_string())
+    Ok(line
+        .trim_end_matches([char::from(13), char::from(10)])
+        .to_string())
 }
 
 fn read_exact(reader: &mut impl Read, length: usize) -> Result<String> {
