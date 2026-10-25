@@ -7,6 +7,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- GPUIコンポーザで通常文字が二重入力される問題と、Waylandで通常Enter・Shift+EnterがIME変換中と誤判定される問題を修正しました。
 - GPUIデスクトップの既存書式・未使用コード・Clippy警告を整理し、依存proc-macro-error2の公開宣言を修正して将来のRustとの互換性警告を解消しました。
 - Windows のアプリ起動は現在の既定ブラウザを使い、対応する Chromium 系ブラウザでは
   専用ウィンドウと普段のブラウザプロファイルを使用し、Google などのログイン状態を

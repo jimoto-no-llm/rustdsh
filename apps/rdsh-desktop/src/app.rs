@@ -3338,7 +3338,7 @@ impl Render for DesktopApp {
                 // While an IME is composing, Enter commits the composition
                 // instead of sending a half-composed message, and the keys
                 // arrive with an empty key_char.
-                if keystroke.is_ime_in_progress() {
+                if crate::composer_input::ime_owns_key(keystroke, this.marked.is_some()) {
                     return;
                 }
                 let mut changed = false;
@@ -3418,22 +3418,10 @@ impl Render for DesktopApp {
                             }
                         }
                     }
-                    _ => {
-                        // Printable input only: no command/alt chords, no
-                        // unmodified keys that produce no text (arrows,
-                        // function keys, dead keys, IME composition).
-                        let printable = keystroke
-                            .key_char
-                            .as_deref()
-                            .filter(|text| !text.is_empty())
-                            .filter(|text| !text.chars().any(char::is_control));
-                        if let Some(text) = printable {
-                            if !command && !modifiers.alt {
-                                this.editor.insert(text);
-                                changed = true;
-                            }
-                        }
-                    }
+                    // GPUI delivers printable keys through EntityInputHandler,
+                    // including ordinary ASCII and IME commits. Inserting here
+                    // as well would duplicate every printable keystroke.
+                    _ => {}
                 }
                 if changed || submitted {
                     this.composer_scroll.scroll_to_bottom();
@@ -4033,6 +4021,7 @@ impl EntityInputHandler for DesktopApp {
     ) {
         self.ime_replace(range, text);
         self.marked = None;
+        self.composer_scroll.scroll_to_bottom();
         log::info!("IME commit: {} chars", text.chars().count());
         cx.notify();
     }

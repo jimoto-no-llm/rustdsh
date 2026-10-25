@@ -115,6 +115,19 @@ The CI workflow desktop.yml builds and tests the crate on all three platforms.
 | Ctrl+K | Focus the composer |
 | Ctrl+N | New conversation |
 
+Printable text (including repeated letters and IME commits) enters the composer
+through GPUI's input handler. The key-down listener handles editing commands and
+shortcuts; it does not insert a second copy of printable keys.
+Idle Enter and Shift+Enter remain composer commands on Wayland; Enter during
+an active IME preedit remains owned by the input method.
+On Linux, `python3 tests/composer-wayland.py --binary /path/to/rdsh-desktop
+--output /path/to/evidence --verify-send` checks twelve editing flows through real OS events
+and reads the editor text back through the Wayland clipboard. It also checks
+that Enter stores the exact prompt in its isolated DSH session. See the script's
+help for the compositor and isolated-profile setup.
+Actual Linux before/after PNGs, the editing-flow GIF and clipboard observations
+are in [the composer evidence](../../docs/evidence/composer-input/README.md).
+
 The sidebar has a search filter (title and project path) and each project row
 folds, archives and restores. The timeline loads older history on demand and
 keeps at most 400 messages in memory.

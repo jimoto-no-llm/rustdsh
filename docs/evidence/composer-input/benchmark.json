@@ -1,0 +1,19 @@
+{
+  "scope": "100 physical ASCII key events at 1ms injected delay; OS input plus clipboard; software Vulkan in VM; before inserts 200 chars, after 100; no speedup claim",
+  "results": {
+    "before": {
+      "samples": 8,
+      "median_ms": 169.227,
+      "min_ms": 152.24,
+      "max_ms": 187.716,
+      "all_values_matched": true
+    },
+    "after": {
+      "samples": 8,
+      "median_ms": 180.853,
+      "min_ms": 166.433,
+      "max_ms": 198.273,
+      "all_values_matched": true
+    }
+  }
+}
