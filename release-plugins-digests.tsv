@@ -3,3 +3,5 @@
 # rdsh settings tab and the update banner come from these plugins, so a
 # curl-installed profile has neither until an entry exists.
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
+latest v0.12.0
+v0.12.0 rdsh-plugins.tar.gz acad6aeaa7914419ecdc3b7b5d24385ca16bd71ca0c1b784415eb6b47c787778
