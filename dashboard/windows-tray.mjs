@@ -31,7 +31,7 @@ function isPowershellCandidate(candidate) {
 }
 
 // spawn() with a bare name tries the working directory before PATH (CWE-427).
-function powershellPath() {
+export function powershellPath() {
   for (const directory of (process.env.PATH || "").split(path.delimiter)) {
     if (!path.isAbsolute(directory)) continue;
     const candidate = path.join(directory, "pwsh.exe");

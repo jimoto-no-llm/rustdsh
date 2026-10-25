@@ -155,7 +155,8 @@ Requires Node.js 22+, and PowerShell 7 for Windows launchers. Tailscale is optio
 for local use and must be installed and signed in for phone access.
 
 ```powershell
-# From the repository root; installs dependencies and a launcher in ~/.local/bin.
+# Installs dependencies, a launcher in ~/.local/bin and a branded Start menu link.
+# Add -DesktopShortcut for the same RustDSH icon on the desktop.
 pwsh -NoProfile -ExecutionPolicy Bypass -File ./dashboard/install-windows.ps1
 
 # A project-specific dashboard. The default port is stable for each project path.
@@ -245,11 +246,16 @@ the owned server may still start. Use `open` or `stop` with that same project to
 inspect or stop it before starting another instance.
 The helper runs this checkout's PowerShell script with process-local execution
 policy; machine/user policy is not changed and enforced Group Policy still applies.
-Opening a browser passes its authenticated URL to the Windows URL handler, as the
-existing `open` command does. Other processes with the same OS-user access can
-observe that short-lived command line; the tray helper itself receives no URL/key.
-PowerShell 7 is resolved from PATH and the URL handler from the Windows system
-directory; an executable placed in the project or working directory is never used.
+Opening a browser follows the current Windows HTTP/HTTPS default. Supported
+Chromium browsers use an app window with the existing browser profile and its
+website sign-ins; other handlers use normal Windows URL activation. The last-used
+profile is selected when its metadata is available; `RDSH_BROWSER_PROFILE_DIRECTORY`
+can pin a specific profile folder. The browser helper receives its authenticated URL
+over stdin, though the browser's own launch command can still be observed by other
+processes with the same OS-user access. The tray helper itself receives no URL/key.
+PowerShell 7 is resolved from absolute PATH entries and browser executables from
+Windows' association API; working-directory executables are never searched.
+See [Windows browser and shortcut details](../docs/WINDOWS-BROWSER.md).
 Re-run the installer after upgrading to refresh an older launcher.
 Installation uses the lockfile's native prebuilts without package lifecycle
 scripts and verifies that Koffi loads before writing the launchers. An unavailable
