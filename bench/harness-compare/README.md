@@ -1,24 +1,34 @@
 # Harness comparison benchmark
 
-Runs the same coding tasks through more than one harness, with the same model
-and the same prompt, and grades the result with the task tests. It measures
+Runs the same coding tasks through several harnesses, with the same model and
+the same prompt, and grades the result with the task tests. It measures
 pass/fail and wall time only: not output style, not cost.
+
+Five harnesses are wired up: DSH (through rdsh), Codex CLI, opencode,
+Claude Code and Gemini CLI. The last two only speak their vendor API, so
+`proxy.py` translates Anthropic Messages and Gemini generateContent into the
+OpenAI chat endpoint under test.
 
 ## What it needs
 
 - `dsh` on PATH (the DSH headless profile)
 - `codex` on PATH (Codex CLI)
-- `OPENCODE_GO_API_KEY`, used by both harnesses through the same endpoint
+- `opencode`, `claude` and `gemini` on PATH for those harnesses
+- `OPENCODE_GO_API_KEY`, used by every harness through the same endpoint
 
 `dsh-patch.yml` points the headless profile at `opencode-go` with the model
-under test; `.codex-home/config.toml` does the same for Codex. Both are
-generated state, so `.codex-home/` stays out of git.
+under test; `.codex-home/config.toml` does the same for Codex, and
+`opencode.json` for opencode. `run.py` starts `proxy.py` on demand for Claude
+Code and Gemini CLI. `.codex-home/` is generated state and stays out of git.
+
+The endpoint routes by session and rejects the HTTP/1.1 fingerprint urllib
+presents, so `proxy.py` sends `x-opencode-session` and shells out to curl.
 
 ## Run it
 
 ```sh
 export OPENCODE_GO_API_KEY=...
-python3 run.py --harness dsh --harness codex --out results.json
+python3 run.py --harness dsh --harness codex --harness claude --harness gemini --out results.json
 ```
 
 `--task <name>` limits the run to one task, `--timeout` changes the per-task
@@ -40,6 +50,10 @@ gets one prompt: make the tests pass, only edit `solution.py`. Seven tasks:
 | --- | ---: | ---: | ---: |
 | DSH via rdsh | 7 / 7 | 24.6 s | 229.6 s |
 | Codex CLI | 7 / 7 | 28.0 s | 200.6 s |
+| Claude Code | 6 / 7 | 36.5 s | 514.1 s |
+| Gemini CLI | 6 / 7 | 18.2 s | 411.3 s |
+| opencode | 6 / 7 | 45.4 s | 345.0 s |
 
-Seven small tasks do not separate two harnesses driving the same model. That
-is the honest reading, and it is why the site does not claim a quality win.
+Two harnesses passed all seven; three missed one each, so the harness does
+change the outcome even with the same model. Seven single runs prove no
+statistic, and the site does not claim a quality win.

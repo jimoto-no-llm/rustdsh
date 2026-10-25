@@ -22,6 +22,10 @@ TASKS = ROOT / "tasks"
 
 MODEL = "deepseek-v4.1-flash"
 MODEL_SPEC = f"opencode-go/{MODEL}"
+# Claude Code and Gemini CLI only speak their vendor API, so both go
+# through proxy.py, which translates them to the endpoint under test.
+PROXY_PORT = 8907
+PROXY_URL = f"http://127.0.0.1:{PROXY_PORT}"
 
 PROMPT = (
     "You are in a small Python project. Make the test suite pass.\n"
@@ -33,6 +37,26 @@ PROMPT = (
 )
 
 
+def ensure_proxy() -> None:
+    """Start proxy.py once, on demand."""
+    import socket
+
+    def listening() -> bool:
+        with socket.socket() as probe:
+            return probe.connect_ex(("127.0.0.1", PROXY_PORT)) == 0
+
+    if listening():
+        return
+    subprocess.Popen([sys.executable, str(ROOT / "proxy.py"), str(PROXY_PORT)],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    for _ in range(50):
+        time.sleep(0.2)
+        if listening():
+            return
+    raise SystemExit("proxy did not start")
+
+
 def harness_command(name: str, prompt: str) -> list[str]:
     if name == "dsh":
         return ["dsh", "--profile", "headless", "--patch", str(ROOT / "dsh-patch.yml"), prompt]
@@ -40,11 +64,27 @@ def harness_command(name: str, prompt: str) -> list[str]:
         return ["codex", "exec", "--skip-git-repo-check", prompt]
     if name == "opencode":
         return ["opencode", "run", "-m", MODEL_SPEC, prompt]
+    if name == "claude":
+        return ["claude", "-p", prompt, "--model", MODEL,
+                "--dangerously-skip-permissions", "--output-format", "text"]
+    if name == "gemini":
+        return ["gemini", "-p", prompt, "-m", MODEL, "--yolo"]
     raise SystemExit(f"unknown harness: {name}")
 
 
 def harness_env(name: str) -> dict:
     env = dict(os.environ)
+    if name in ("claude", "gemini"):
+        ensure_proxy()
+    if name == "claude":
+        env["ANTHROPIC_BASE_URL"] = PROXY_URL
+        env["ANTHROPIC_AUTH_TOKEN"] = "proxy"
+        env["ANTHROPIC_API_KEY"] = "proxy"
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+    if name == "gemini":
+        env["GOOGLE_GEMINI_BASE_URL"] = PROXY_URL
+        env["GEMINI_API_KEY"] = "proxy"
+        env["GEMINI_CLI_TRUST_WORKSPACE"] = "true"
     if name == "codex":
         env["CODEX_HOME"] = str(ROOT / ".codex-home")
     if name == "opencode":
@@ -89,7 +129,7 @@ def run_one(harness: str, task: pathlib.Path, timeout: int) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--harness", action="append", choices=["dsh", "codex", "opencode"], required=True)
+    parser.add_argument("--harness", action="append", choices=["dsh", "codex", "opencode", "claude", "gemini"], required=True)
     parser.add_argument("--task", action="append", help="task directory name; default all")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--out", type=pathlib.Path, default=ROOT / "results.json")

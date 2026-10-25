@@ -145,5 +145,103 @@
     "passed": true,
     "seconds": 61.99,
     "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 23.24,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "claude",
+    "passed": false,
+    "seconds": 300.12,
+    "timed_out": true
+  },
+  {
+    "task": "lru-cache",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 47.25,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 47.04,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 36.53,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 34.41,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 25.47,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 19.72,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "gemini",
+    "passed": false,
+    "seconds": 300.01,
+    "timed_out": true
+  },
+  {
+    "task": "lru-cache",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.18,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.17,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 20.75,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.05,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 16.46,
+    "timed_out": false
   }
 ]
