@@ -7,6 +7,7 @@ cheapest gate before CI reaches GitHub.
 
 import pathlib
 import re
+import yaml
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -69,6 +70,7 @@ class CdRetryTest(unittest.TestCase):
         )
 
 
+
 class BundledPluginsLocationTest(unittest.TestCase):
     """The installer and the launcher must agree on where the plugin tree lives."""
 
@@ -85,6 +87,29 @@ class BundledPluginsLocationTest(unittest.TestCase):
             launcher,
             "the launcher probes <exe dir>/../share/rdsh",
         )
+
+
+class WorkflowShapeTest(unittest.TestCase):
+    """GitHub refuses a workflow when a key it expects to be a mapping is empty."""
+
+    def test_every_env_block_is_a_mapping(self):
+        # `env:` with no children parses as YAML null and is allowed by yaml.safe_load,
+        # but GitHub rejects the whole workflow: 'Unexpected value' with no run at all.
+        for path in sorted(WORKFLOWS.glob("*.yml")):
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+            def walk(node, where):
+                if isinstance(node, dict):
+                    for key, value in node.items():
+                        if key == "env" and not isinstance(value, dict):
+                            self.fail(f"{path.name}: {where}/env is {value!r}, not a mapping")
+                        walk(value, f"{where}/{key}")
+                elif isinstance(node, list):
+                    for index, value in enumerate(node):
+                        walk(value, f"{where}[{index}]")
+
+            walk(document, "")
+
 
 class LatestGateTest(unittest.TestCase):
     def test_cd_never_marks_a_fresh_release_latest(self):

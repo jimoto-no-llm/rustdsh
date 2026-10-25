@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "opencode-go": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenCode Go",
+      "options": {
+        "baseURL": "https://opencode.ai/inference/go/v1",
+        "apiKey": "{env:OPENCODE_GO_API_KEY}"
+      },
+      "models": {
+        "deepseek-v4.1-flash": {
+          "name": "deepseek-v4.1-flash"
+        }
+      }
+    }
+  },
+  "model": "opencode-go/deepseek-v4.1-flash"
+}

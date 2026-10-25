@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$BinDirectory = (Join-Path $env:USERPROFILE '.local\bin'))
+param([string]$BinDirectory = (Join-Path $env:USERPROFILE '.local\bin'), [switch]$DesktopShortcut)
 $ErrorActionPreference = 'Stop'
 $taskNode = (Get-Command node.exe -ErrorAction Stop).Source
 $taskPwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
@@ -54,4 +54,5 @@ Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.ps1') -Value $
 # cmd.exe resolves a bare command name in the working directory first; pin the captured path.
 $taskCmdPwsh = '"' + $taskPwsh.Replace('%', '%%') + '"'
 Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.cmd') -Value '@echo off', "$taskCmdPwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0rdsh-dashboard.ps1`" %*" -Encoding oem
+& (Join-Path $PSScriptRoot 'install-windows-shortcut.ps1') -Launcher (Join-Path $BinDirectory 'rdsh-dashboard.ps1') -DesktopShortcut:$DesktopShortcut
 Write-Host "Installed rdsh-dashboard in $BinDirectory. Add that directory to PATH if needed."
