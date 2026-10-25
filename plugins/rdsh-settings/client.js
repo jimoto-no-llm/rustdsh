@@ -1289,6 +1289,7 @@ window.__ModuleLoader__.load({
       return h(
         "div",
         {
+          className: "rdsh-settings",
           "aria-label": copy("advanced"),
           style: {
             display: "flex",
