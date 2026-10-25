@@ -7,6 +7,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- computeのtext・max_tokensの型不一致を明示的なエラーで返し、省略時の既定値と後続要求の処理を維持するようにしました。
 - スマートフォン幅でrdsh設定本文が狭くなる問題を修正し、既存のモバイルレイアウトを適用しました。
 - Windows のアプリ起動は現在の既定ブラウザを使い、対応する Chromium 系ブラウザでは
   専用ウィンドウと普段のブラウザプロファイルを使用し、Google などのログイン状態を
