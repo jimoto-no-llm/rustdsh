@@ -18,6 +18,19 @@ An independent community project; not an official DeepSeek or DeepSeek Harness p
 `rdsh` is a fast, safe launcher for [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness).
 It ports frequently used CLI operations (token calculation, code search, session management) to native Rust, while delegating conversation workflows and model execution transparently to upstream `dsh`. All existing arguments and options continue to work as-is.
 
+## For AI agents
+
+Paste this before you ask an agent to work on this repository.
+
+```text
+You are working on rdsh, a Rust launcher for dsh (DeepSeek Harness).
+- Native subcommands run in Rust. Every other argument is passed to upstream dsh unchanged.
+- A booted profile still runs Node.js, so conversations start and cost memory like upstream. Do not claim rdsh makes them faster or lighter.
+- Read AGENTS.md before editing. Do not touch credentials, published release assets or published tags.
+- Verify with: cargo fmt --check, cargo clippy -- -D warnings, cargo test.
+- Report only commands you actually ran, with their exit codes.
+```
+
 ## Why rdsh?
 
 - ⚡ **Sub-millisecond process launch**: `rdsh --version` starts in ~0.90 ms with ~2.9 MB peak RSS, versus ~88 ms and ~66 MB for Node.js-based `dsh --version`. This is process launch only: a booted agent profile still runs upstream Node.js, so conversation startup and session memory match upstream. See [Benchmarks](#benchmarks).

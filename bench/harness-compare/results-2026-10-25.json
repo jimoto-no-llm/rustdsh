@@ -1,0 +1,296 @@
+[
+  {
+    "task": "dedupe-rows",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 28.21,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 74.7,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 14.76,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 40.54,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 24.58,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 26.24,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 28.01,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 31.57,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 22.8,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 31.62,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 23.86,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 22.92,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 40.14,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 20.21,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "opencode",
+    "passed": false,
+    "seconds": 42.54,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 28.6,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 56.35,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 37.97,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 72.19,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 45.39,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "opencode",
+    "passed": true,
+    "seconds": 61.99,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 23.24,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "claude",
+    "passed": false,
+    "seconds": 300.12,
+    "timed_out": true
+  },
+  {
+    "task": "lru-cache",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 47.25,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 47.04,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 36.53,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 34.41,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "claude",
+    "passed": true,
+    "seconds": 25.47,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 19.72,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "gemini",
+    "passed": false,
+    "seconds": 300.01,
+    "timed_out": true
+  },
+  {
+    "task": "lru-cache",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.18,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.17,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 20.75,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 18.05,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "gemini",
+    "passed": true,
+    "seconds": 16.46,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 20.68,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 91.04,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 31.69,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 22.54,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 43.13,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 29.62,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "rdsh",
+    "passed": true,
+    "seconds": 17.16,
+    "timed_out": false
+  }
+]
