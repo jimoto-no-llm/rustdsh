@@ -247,8 +247,10 @@ inspect or stop it before starting another instance.
 The helper runs this checkout's PowerShell script with process-local execution
 policy; machine/user policy is not changed and enforced Group Policy still applies.
 Opening a browser follows the current Windows HTTP/HTTPS default. Supported
-Chromium browsers use an app window and separate profiles; other handlers use
-normal Windows URL activation. The browser helper receives its authenticated URL
+Chromium browsers use an app window with the existing browser profile and its
+website sign-ins; other handlers use normal Windows URL activation. The last-used
+profile is selected when its metadata is available; `RDSH_BROWSER_PROFILE_DIRECTORY`
+can pin a specific profile folder. The browser helper receives its authenticated URL
 over stdin, though the browser's own launch command can still be observed by other
 processes with the same OS-user access. The tray helper itself receives no URL/key.
 PowerShell 7 is resolved from absolute PATH entries and browser executables from

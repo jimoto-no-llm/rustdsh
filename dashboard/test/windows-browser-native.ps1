@@ -7,26 +7,44 @@ $taskRoot = Join-Path ([IO.Path]::GetTempPath()) ('rdsh browser 日本語 & ' + 
 New-Item -ItemType Directory -Path $taskRoot | Out-Null
 try {
     $taskUrl = [uri]'http://127.0.0.1:38081/?value=%27%20%26%20%24%60#key=fixture-only'
-    $taskProfiles = @{}
     foreach ($taskBrowserName in @('chrome.exe', 'msedge.exe', 'brave.exe', 'vivaldi.exe', 'chromium.exe')) {
         $taskExecutable = Join-Path $taskRoot $taskBrowserName
         New-Item -ItemType File -Path $taskExecutable | Out-Null
         $taskStart = New-RdshBrowserStartInfo -Url $taskUrl -StateDirectory $taskRoot -BrowserExecutable $taskExecutable
         Assert-Rdsh ($taskStart.FileName -eq $taskExecutable -and -not $taskStart.UseShellExecute) 'Selected default browser was not used'
         Assert-Rdsh ($taskStart.ArgumentList[0] -eq ('--app=' + $taskUrl.AbsoluteUri)) 'URL did not remain a single literal argument'
-        $taskProfileArgument = $taskStart.ArgumentList[1]
-        Assert-Rdsh ($taskProfileArgument.StartsWith('--user-data-dir=' + $taskRoot)) 'Browser profile escaped the app state'
-        Assert-Rdsh ($taskStart.ArgumentList.Contains('--no-first-run')) 'App first-run suppression missing'
-        $taskProfiles[$taskBrowserName] = $taskProfileArgument
-        $taskAgain = New-RdshBrowserStartInfo -Url $taskUrl -StateDirectory $taskRoot -BrowserExecutable $taskExecutable
-        Assert-Rdsh ($taskAgain.ArgumentList[1] -eq $taskProfileArgument) 'Same browser did not reuse its profile'
+        Assert-Rdsh (@($taskStart.ArgumentList | Where-Object { $_ -match '^--(?:user-data-dir|incognito|guest|profile-directory)' }).Count -eq 0) 'Default launch replaced the existing browser context'
+        $taskPinned = New-RdshBrowserStartInfo -Url $taskUrl -StateDirectory $taskRoot -BrowserExecutable $taskExecutable -ProfileDirectory 'Profile 4 & 日本語'
+        Assert-Rdsh ($taskPinned.ArgumentList.Contains('--profile-directory=Profile 4 & 日本語')) 'Explicit profile was not preserved as one argument'
     }
-    Assert-Rdsh (@($taskProfiles.Values | Select-Object -Unique).Count -eq 5) 'Different browser executables share a profile'
-    $taskOtherChrome = Join-Path $taskRoot 'other\chrome.exe'
-    New-Item -ItemType Directory -Path (Split-Path $taskOtherChrome) | Out-Null
-    New-Item -ItemType File -Path $taskOtherChrome | Out-Null
-    $taskOther = New-RdshBrowserStartInfo -Url $taskUrl -StateDirectory $taskRoot -BrowserExecutable $taskOtherChrome
-    Assert-Rdsh ($taskOther.ArgumentList[1] -ne $taskProfiles['chrome.exe']) 'Different installations share a profile'
+    Assert-Rdsh (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'browser-profiles'))) 'App created isolated browser state'
+    foreach ($taskProduct in @(
+        @{Exe='chrome.exe'; Root='Google\Chrome'}, @{Exe='msedge.exe'; Root='Microsoft\Edge'},
+        @{Exe='brave.exe'; Root='BraveSoftware\Brave-Browser'}, @{Exe='vivaldi.exe'; Root='Vivaldi'},
+        @{Exe='chromium.exe'; Root='Chromium'},
+        @{Exe='C:\Program Files\Google\Chrome Beta\Application\chrome.exe'; Root='Google\Chrome Beta'},
+        @{Exe='C:\Program Files\Microsoft\Edge Dev\Application\msedge.exe'; Root='Microsoft\Edge Dev'}
+    )) {
+        $taskDataRoot = Join-Path $taskRoot ($taskProduct.Root + '\User Data')
+        New-Item -ItemType Directory -Path (Join-Path $taskDataRoot 'Profile 4 & 日本語') -Force | Out-Null
+        $taskLocalState = Join-Path $taskDataRoot 'Local State'
+        Set-Content -LiteralPath $taskLocalState -Value '{"profile":{"last_used":"Profile 4 & 日本語"}}' -Encoding utf8NoBOM
+        $taskChosen = Get-RdshBrowserProfileDirectory -BrowserExecutable $taskProduct.Exe -LocalAppDataDirectory $taskRoot
+        Assert-Rdsh ($taskChosen -eq 'Profile 4 & 日本語') 'Last-used signed-in profile was not selected'
+        New-Item -ItemType Directory -Path (Join-Path $taskDataRoot 'Profile 1') -Force | Out-Null
+        Set-Content -LiteralPath $taskLocalState -Value '{"profile":{"last_used":"Profile 1"}}'
+        Assert-Rdsh ((Get-RdshBrowserProfileDirectory $taskProduct.Exe $taskRoot) -eq 'Profile 1') 'Profile selection was cached across launches'
+        foreach ($taskMetadata in @('not json', '{"profile":{"last_used":"missing"}}', '{"profile":{"last_used":"../outside"}}', '{}')) {
+            Set-Content -LiteralPath $taskLocalState -Value $taskMetadata
+            Assert-Rdsh ($null -eq (Get-RdshBrowserProfileDirectory $taskProduct.Exe $taskRoot)) 'Invalid metadata forced a new or external profile'
+        }
+    }
+    Assert-Rdsh ($null -eq (Get-RdshBrowserProfileDirectory 'firefox.exe' $taskRoot)) 'Unknown browser used Chromium metadata'
+    foreach ($taskInvalidProfile in @('.', '..', '../outside', 'C:\other', '--profile=foo/bar', 'Profile 4" --guest', "Profile`n4")) {
+        $taskRejected = $false
+        try { $null = New-RdshBrowserStartInfo -Url $taskUrl -StateDirectory $taskRoot -ProfileDirectory $taskInvalidProfile } catch { $taskRejected = $true }
+        Assert-Rdsh $taskRejected 'Profile path was not limited to one folder name'
+    }
     $taskFirefox = Join-Path $taskRoot 'firefox.exe'
     New-Item -ItemType File -Path $taskFirefox | Out-Null
     foreach ($taskExecutable in @($null, '', 'chrome.exe', $taskFirefox, (Join-Path $taskRoot 'missing\msedge.exe'))) {
@@ -52,20 +70,19 @@ try {
     $taskDesktop = Join-Path $taskRoot 'Desktop'
     $taskLinks = & (Join-Path $PSScriptRoot '../install-windows-shortcut.ps1') -Launcher $taskLauncher -LauncherArguments @() -StartMenuDirectory $taskMenu -DesktopDirectory $taskDesktop -DesktopShortcut
     Assert-Rdsh ($taskLinks.Count -eq 2) 'Shortcut installer did not create both links'
-    $taskShell = New-Object -ComObject WScript.Shell
+    . (Join-Path $PSScriptRoot '../windows-shortcut.ps1')
     $taskExpectedIcon = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../assets/icon.ico')).Path
     foreach ($taskLink in $taskLinks) {
-        $taskShortcut = $taskShell.CreateShortcut($taskLink)
+        $taskShortcut = [Rdsh.WindowsShortcut]::Read($taskLink)
         Assert-Rdsh ($taskShortcut.IconLocation -eq ($taskExpectedIcon + ',0')) 'Shortcut still uses a browser icon'
         Assert-Rdsh ($taskShortcut.Arguments.EndsWith('"' + $taskLauncher + '"')) 'Launcher path was not preserved'
         Assert-Rdsh ($taskShortcut.TargetPath -eq (Get-Command pwsh.exe).Source) 'Shortcut did not pin PowerShell'
         Assert-Rdsh ($taskShortcut.WorkingDirectory -eq $taskRoot) 'Shortcut working directory is incorrect'
     }
     # Re-running the installer refreshes an existing browser-branded shortcut.
-    $taskShortcut.IconLocation = (Get-Command pwsh.exe).Source + ',0'
-    $taskShortcut.Save()
+    [Rdsh.WindowsShortcut]::Save($taskLink, $taskShortcut.TargetPath, $taskShortcut.Arguments, $taskRoot, (Get-Command pwsh.exe).Source)
     $null = & (Join-Path $PSScriptRoot '../install-windows-shortcut.ps1') -Launcher $taskLauncher -LauncherArguments @() -StartMenuDirectory $taskMenu -DesktopDirectory $taskDesktop -DesktopShortcut
-    Assert-Rdsh ($taskShell.CreateShortcut($taskLink).IconLocation -eq ($taskExpectedIcon + ',0')) 'Shortcut icon repair was not applied'
+    Assert-Rdsh ([Rdsh.WindowsShortcut]::Read($taskLink).IconLocation -eq ($taskExpectedIcon + ',0')) 'Shortcut icon repair was not applied'
     Write-Output 'Windows default-browser routing and RDSH shortcuts verified'
 } finally {
     # Only this test's newly-created absolute temporary directory is removed.

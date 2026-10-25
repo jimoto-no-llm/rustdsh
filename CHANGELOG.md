@@ -8,9 +8,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 ### Fixed
 
 - Windows のアプリ起動は現在の既定ブラウザを使い、対応する Chromium 系ブラウザでは
-  専用ウィンドウとブラウザ別プロファイルを使用します。Dashboard インストーラーは
+  専用ウィンドウと普段のブラウザプロファイルを使用し、Google などのログイン状態を
+  引き継ぎます。最後に使ったプロファイルを選び、`RDSH_BROWSER_PROFILE_DIRECTORY` で
+  固定もできます。Dashboard インストーラーは
   RDSH の公式アイコンを持つスタートメニュー項目を作成し、`-DesktopShortcut` で
-  デスクトップにも追加できます。
+  デスクトップにも追加できます。ショートカットは Unicode API で保存するため、
+  日本語を含む保存先でもシステムの ANSI コードページに依存しません。
 
 ## [0.12.0] - 2026-10-24
 

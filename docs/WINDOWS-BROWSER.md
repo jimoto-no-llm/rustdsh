@@ -4,10 +4,25 @@ Windows Dashboard `--open`, `rdsh-dashboard open` and the notification area's
 Open action read the current Windows default for the URL's HTTP or HTTPS
 protocol on every launch. They never require Edge or change the system default.
 
-Chrome, Edge, Brave, Vivaldi and Chromium open an app window. Each executable
-gets its own profile under the Dashboard state directory's `browser-profiles/`;
-existing Edge profiles and normal browser profiles are left intact. Other
-browsers, missing executables and Store handlers use Windows' normal URL
+Chrome, Edge, Brave, Vivaldi and Chromium open an app window using their normal
+browser profiles. The launcher does not pass `--user-data-dir` or create an
+isolated RDSH browser profile, so existing Google and other website sign-ins
+remain available when opening links from the app. The browser manages those
+sessions; RDSH does not copy cookies or credentials.
+
+For standard installations, the launcher reads `profile.last_used` from the
+browser's `Local State` and selects that existing profile. Missing, unreadable or
+unsupported profile metadata leaves selection to the browser itself. To keep
+using a specific profile, set the `RDSH_BROWSER_PROFILE_DIRECTORY` environment
+variable for the launcher to its folder name, such as `Default` or `Profile 4`.
+This is the profile directory shown in `chrome://version`, not a Google email
+address. With several Google accounts signed into that profile, Google still
+controls which account a particular site uses and may show its account chooser.
+
+Old RDSH-only `browser-profiles/` directories are left in place but no longer
+used. Already-open app windows keep their old profile until closed; relaunch
+RustDSH to use the normal browser profile. Other browsers, missing executables
+and Store handlers use Windows' normal URL
 activation. Those browsers control whether the page opens in a tab or a window.
 The page's favicon supplies its in-browser icon; taskbar branding is controlled
 by the selected browser and is not changed by the launcher.
