@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rdsh — DeepSeek Harness の高速ランチャー</title>
-<meta name="description" content="rdsh は DeepSeek Harness (dsh) を高速に起動する Rust 製ランチャー。起動 0.90 ms、ピークメモリ 2.9 MB、単一バイナリ 1.97 MB。">
+<meta name="description" content="rdsh は DeepSeek Harness (dsh) を高速に起動する Rust 製ランチャー。起動時間 0.90 ms、ピークメモリ 2.9 MB、単一バイナリ 1.97 MB。">
 <meta name="author" content="jimoto-no-llm">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#f7f7f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:title" content="rdsh — DeepSeek Harness の高速ランチャー">
-<meta property="og:description" content="起動 0.90 ms、ピークメモリ 2.9 MB。dsh の引数はそのまま通る Rust 製ランチャー。">
+<meta property="og:description" content="起動時間 0.90 ms、ピークメモリ 2.9 MB。dsh の引数をそのまま渡す Rust 製ランチャー。">
 <meta property="og:image" content="../assets/dashboard-dark.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://github.com/jimoto-no-llm/rustdsh">
@@ -97,7 +97,7 @@
         <h1 id="readme-h">rdsh</h1>
         <p class="lede">
           <a href="https://github.com/deepseek-ai/deepseek-harness" rel="noopener">DeepSeek Harness</a>
-          のランチャー。よく使うコマンドを Rust で実装し、会話とモデル実行は上流の dsh に渡す。引数はそのまま通る。
+          のランチャー。よく使うコマンドを Rust で実装し、会話とモデル実行は上流の dsh に委譲する。引数はそのまま dsh に渡す。
         </p>
         <div class="chips">
           <span class="chip">単一バイナリ</span>
@@ -134,21 +134,21 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
             <tr><td>動作確認</td><td><code>rdsh --version &amp;&amp; rdsh doctor</code></td></tr>
             <tr><td>TUI で開始</td><td><code>rdsh tui</code></td></tr>
             <tr><td>Web プロファイル</td><td><code>rdsh --profile web</code></td></tr>
-            <tr><td>dsh と置き換え</td><td><code>./install.sh --as-dsh</code></td></tr>
+            <tr><td>dsh を置き換える</td><td><code>./install.sh --as-dsh</code></td></tr>
             <tr><td>元に戻す</td><td><code>./install.sh --restore</code></td></tr>
           </tbody>
         </table>
 
         <div class="callout">
           <p class="callout-title">注意</p>
-          <p><code>--as-dsh</code> は <code>dsh</code> コマンドを rdsh に差し替える。元のコマンドは <code>dsh-orig</code> として残り、<code>--restore</code> で戻せる。</p>
+          <p><code>--as-dsh</code> は <code>dsh</code> コマンドを rdsh に差し替える。元のコマンドは <code>dsh-orig</code> として残り、<code>--restore</code> で元に戻せる。</p>
         </div>
 
         <h2>構成</h2>
         <table class="table">
           <tbody>
             <tr><th scope="row">言語</th><td>Rust。単一バイナリで動作する</td></tr>
-            <tr><th scope="row">上流</th><td>dsh の引数とサブコマンドをそのまま転送する</td></tr>
+            <tr><th scope="row">上流</th><td>dsh の引数とサブコマンドをそのまま渡す</td></tr>
             <tr><th scope="row">対象外</th><td>会話ループとモデル実行は上流が担当する</td></tr>
             <tr><th scope="row">計測値</th><td><a href="#bench" data-jump="bench">BENCHMARKS.md</a></td></tr>
             <tr><th scope="row">安全設計</th><td><a href="#safety" data-jump="safety">SAFETY.md</a></td></tr>
@@ -168,7 +168,7 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
           <tbody>
             <tr><th scope="row"><code>--version</code> 起動</th><td><span class="bar" style="--v:1%"></span><b>0.90 ms</b></td><td>88 ms</td><td class="ratio">98×</td></tr>
             <tr><th scope="row">ピークメモリ</th><td><span class="bar" style="--v:4%"></span><b>2.9 MB</b></td><td>66 MB</td><td class="ratio">1/23</td></tr>
-            <tr><th scope="row">フック相当メモリ</th><td><span class="bar" style="--v:6%"></span><b>2.7 MB</b></td><td>45 MB</td><td class="ratio">1/16</td></tr>
+            <tr><th scope="row">フック相当のメモリ使用量</th><td><span class="bar" style="--v:6%"></span><b>2.7 MB</b></td><td>45 MB</td><td class="ratio">1/16</td></tr>
             <tr><th scope="row">コード検索</th><td><span class="bar" style="--v:41%"></span><b>17 ms</b></td><td>41 ms</td><td class="ratio">2.4×</td></tr>
             <tr><th scope="row">トークン見積もり</th><td><span class="bar" style="--v:34%"></span><b>12 ms</b></td><td>35 ms</td><td class="ratio">2.9×</td></tr>
             <tr><th scope="row">セッション一覧</th><td><span class="bar" style="--v:25%"></span><b>0.41 s</b></td><td>1.65 s</td><td class="ratio">4.0×</td></tr>
@@ -183,7 +183,7 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 
         <h2>読み方</h2>
         <ul class="list">
-          <li>起動時間は 5 回の中央値。ウォームキャッシュ。</li>
+          <li>起動時間はウォームキャッシュ時に 5 回測定した中央値。</li>
           <li>メモリは起動直後のピーク RSS。</li>
           <li>検索・トークン・セッションは同じ入力で比較している。</li>
           <li>配布物のサイズは単一バイナリ。上流は Node.js のツリー全体。</li>
@@ -192,7 +192,7 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 
       <article id="doc-commands" class="doc" aria-labelledby="commands-h" hidden>
         <h1 id="commands-h">COMMANDS.md</h1>
-        <p class="lede">Node.js を起動せずに終わるコマンド。引数は dsh と同じ。</p>
+        <p class="lede">Node.js を起動せずに実行できるコマンド。引数は dsh と同じ。</p>
 
         <div class="filterbar">
           <label class="sr" for="cmd-filter">コマンドを絞り込む</label>
@@ -214,8 +214,8 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
             <tr><td><code>desktop</code></td><td>Desktop アプリの検出とプラグイン接続。</td><td>状態</td></tr>
             <tr><td><code>bench</code></td><td>rdsh と dsh の起動比較。</td><td>表</td></tr>
             <tr><td><code>features</code></td><td>機能スイッチと既定値。</td><td>一覧</td></tr>
-            <tr><td><code>auth</code></td><td>認証状態の確認と取り込み。</td><td>状態</td></tr>
-            <tr><td><code>guard</code></td><td>フックとして動き、危険なコマンドを止める。</td><td>判定</td></tr>
+            <tr><td><code>auth</code></td><td>認証状態の確認と認証情報の取り込み。</td><td>状態</td></tr>
+            <tr><td><code>guard</code></td><td>フックとして動作し、危険なコマンドを止める。</td><td>判定</td></tr>
             <tr><td><code>context</code></td><td>ターン文脈の組み立て・注入・記憶。</td><td>JSON</td></tr>
             <tr><td><code>deps</code></td><td>依存グラフと変更の影響範囲。</td><td>グラフ</td></tr>
             <tr><td><code>serve</code></td><td>ローカル専用の状態ページ。</td><td>HTTP</td></tr>
@@ -241,14 +241,14 @@ rdsh features</code></pre>
 
       <article id="doc-safety" class="doc" aria-labelledby="safety-h" hidden>
         <h1 id="safety-h">SAFETY.md</h1>
-        <p class="lede">既定で壊さないことを優先する。危険な操作は明示的に有効化する。</p>
+        <p class="lede">既定では破壊的な変更を行わないことを優先する。危険な操作は明示的に有効化する。</p>
 
         <h2>設計原則</h2>
         <ol class="steps">
-          <li><b>上流への忠実さ</b><span>会話ループとエージェント処理は再実装せず、dsh にそのまま委譲する。</span></li>
+          <li><b>上流の実装をそのまま利用</b><span>会話ループとエージェント処理は再実装せず、dsh にそのまま委譲する。</span></li>
           <li><b>非破壊</b><span>tokens・search・sessions・compact といった読み取り系は元ファイルを変更しない。</span></li>
-          <li><b>認証は明示</b><span>認証情報を外部へ送らず、自動同期もしない。取り込むのは承認済みの項目だけ。</span></li>
-          <li><b>ツール隔離（任意）</b><span>Linux では <code>--share-file</code> が共有したファイルだけを読み取り専用・ネットワーク無しで見せる。</span></li>
+          <li><b>認証情報は明示的に指定</b><span>認証情報を外部へ送らず、自動同期もしない。取り込むのは承認済みの項目だけ。</span></li>
+          <li><b>ツール隔離（任意）</b><span>Linux では、<code>--share-file</code> で共有したファイルだけを、読み取り専用かつネットワークなしの環境で参照できるようにする。</span></li>
           <li><b>既定値の明示</b><span>更新確認は既定で有効。<code>serve</code>・<code>search-web</code>・<code>context_engine</code>・<code>agent_tool_sandbox</code> は任意で有効化する。</span></li>
         </ol>
 
@@ -272,7 +272,7 @@ rdsh features</code></pre>
             <tr><td><code>serve</code></td><td>無効</td><td>ローカル状態ページ</td></tr>
             <tr><td><code>search-web</code></td><td>無効</td><td>SearXNG 経由の検索</td></tr>
             <tr><td><code>context_engine</code></td><td>無効</td><td>ターン文脈の組み立て</td></tr>
-            <tr><td><code>agent_tool_sandbox</code></td><td>無効</td><td>共有ファイルだけを見せる実行</td></tr>
+            <tr><td><code>agent_tool_sandbox</code></td><td>無効</td><td>共有ファイルだけを参照できる実行環境</td></tr>
           </tbody>
         </table>
         <p class="table-note"><code>rdsh features on &lt;id&gt;</code> で有効化、<code>rdsh features</code> で一覧。</p>
@@ -280,10 +280,10 @@ rdsh features</code></pre>
 
       <article id="doc-web" class="doc" aria-labelledby="web-h" hidden>
         <h1 id="web-h">WEB.md</h1>
-        <p class="lede">Web UI、ダッシュボード、Desktop アプリの接続。いずれもローカルで動く。</p>
+        <p class="lede">Web UI、ダッシュボード、Desktop アプリとの連携。いずれもローカルで動作する。</p>
 
         <h2>軽量な状態ページ</h2>
-        <p class="body-text">localhost だけで動く小さな画面（既定 <code>:38080</code>。DSH の <code>:3080</code> とは衝突しない）。起動時に一度きりのトークンで保護される。</p>
+        <p class="body-text">localhost だけで動作する小さなページ（既定 <code>:38080</code>。DSH の <code>:3080</code> とは衝突しない）。リクエストには一度きりのトークンが必要になる。</p>
         <div class="codeblock">
           <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="serve">コピー</button></div>
           <pre data-code-panel="serve"><code>rdsh settings set extras.enable serve
@@ -291,14 +291,14 @@ rdsh serve</code></pre>
         </div>
 
         <h2>ダッシュボード</h2>
-        <p class="body-text">プロジェクト指標と人間への確認を扱う任意の Node.js ダッシュボード（Node.js 22 以降）。Windows ではタスクトレイに常駐する。</p>
+        <p class="body-text">プロジェクトの指標表示とユーザーへの確認に使うオプションの Node.js ダッシュボード（Node.js 22 以降）。Windows ではタスクトレイに常駐する。</p>
         <div class="codeblock">
           <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="dash">コピー</button></div>
           <pre data-code-panel="dash"><code>rdsh-dashboard project --project &lt;directory&gt;</code></pre>
         </div>
 
         <h2>Desktop アプリ</h2>
-        <p class="body-text">DeepSeek Harness Desktop は Web アプリを包んだ Electron 製。CLI とは別のプロファイルを持つため、rdsh は検出と転送だけを行い、プロファイルを書き換えない。</p>
+        <p class="body-text">DeepSeek Harness Desktop は Web アプリを包んだ Electron 製のアプリ。CLI とは別のプロファイルを持つため、rdsh はアプリの検出とプラグイン接続だけを行い、プロファイルを書き換えない。</p>
         <div class="codeblock">
           <div class="codeblock-head"><span class="codeblock-lang">sh</span><button type="button" class="copy" data-copy="desktop">コピー</button></div>
           <pre data-code-panel="desktop"><code>rdsh desktop status
@@ -314,11 +314,11 @@ rdsh desktop verify</code></pre>
 
       <nav class="docnav" id="docnav" aria-label="ドキュメント移動">
         <button type="button" class="docnav-btn" id="docnav-prev">
-          <span class="docnav-dir">前</span>
+          <span class="docnav-dir">前へ</span>
           <span class="docnav-name"></span>
         </button>
         <button type="button" class="docnav-btn docnav-next" id="docnav-next">
-          <span class="docnav-dir">次</span>
+          <span class="docnav-dir">次へ</span>
           <span class="docnav-name"></span>
         </button>
       </nav>
