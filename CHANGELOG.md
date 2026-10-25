@@ -8,6 +8,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 ### Fixed
 
 - computeのtext・max_tokensの型不一致を明示的なエラーで返し、省略時の既定値と後続要求の処理を維持するようにしました。
+- スマートフォン幅でrdsh設定本文が狭くなる問題を修正し、既存のモバイルレイアウトを適用しました。
 - Windows のアプリ起動は現在の既定ブラウザを使い、対応する Chromium 系ブラウザでは
   専用ウィンドウと普段のブラウザプロファイルを使用し、Google などのログイン状態を
   引き継ぎます。最後に使ったプロファイルを選び、`RDSH_BROWSER_PROFILE_DIRECTORY` で
@@ -20,6 +21,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `curl … | sh` で入れた同梱プラグインが、ランチャーの探す場所ではなく
+  `PREFIX/share/rdsh` に展開されていました。`rdsh plugins status` が見つけられず、
+  以後の `rdsh plugins install` も同梱 tree を解決できませんでした。ランチャーが
+  探索する `PREFIX/../share/rdsh`（FHS の bin と share の並び）へ展開するよう修正。
 - Windows の `install.ps1` でも、`-FromRelease` で入れた環境に同梱プラグイン（設定の
   **rdsh** タブ、更新バナーなど）が付くようにしました。従来は `-Desktop` 指定時だけ
   Desktop プロファイルへプラグインを入れており、Web プロファイルは空のままでした。

@@ -5,9 +5,9 @@ name: conflicts
 on:
   push:
     branches: [main]
-  pull_request_target:
-    # edited: re-check when the base branch is changed (title/body edits are skipped below).
-    types: [opened, reopened, synchronize, edited]
+  schedule:
+    # A conflict only appears when main moves, but a weekly sweep catches the rest.
+    - cron: '0 3 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +17,6 @@ permissions:
 
 jobs:
   label:
-    if: github.event.action != 'edited' || github.event.changes.base != null
     concurrency:
       group: rdsh-conflicts-notification
       cancel-in-progress: false
