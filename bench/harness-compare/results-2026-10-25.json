@@ -1,0 +1,100 @@
+[
+  {
+    "task": "dedupe-rows",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 28.21,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 74.7,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 14.76,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 40.54,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 24.58,
+    "timed_out": false
+  },
+  {
+    "task": "dedupe-rows",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 26.24,
+    "timed_out": false
+  },
+  {
+    "task": "fix-binary-search",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 28.01,
+    "timed_out": false
+  },
+  {
+    "task": "merge-intervals",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 31.57,
+    "timed_out": false
+  },
+  {
+    "task": "parse-duration",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 22.8,
+    "timed_out": false
+  },
+  {
+    "task": "top-k-words",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 31.62,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 23.86,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "dsh",
+    "passed": true,
+    "seconds": 22.92,
+    "timed_out": false
+  },
+  {
+    "task": "lru-cache",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 40.14,
+    "timed_out": false
+  },
+  {
+    "task": "token-bucket",
+    "harness": "codex",
+    "passed": true,
+    "seconds": 20.21,
+    "timed_out": false
+  }
+]
