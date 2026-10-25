@@ -42,6 +42,12 @@ gets one prompt: make the tests pass, only edit `solution.py`. Seven tasks:
 `parse-duration`, `merge-intervals`, `top-k-words`, `fix-binary-search`,
 `dedupe-rows`, `lru-cache`, `token-bucket`.
 
+## Icons and licensing
+
+The site chart marks each harness with its logo. See [ICONS.md](ICONS.md) for the
+sources, the CC0 1.0 status of the icon set, and the trademark position: the marks
+belong to their owners and identify what was compared, nothing more.
+
 ## Result on 2026-10-25
 
 `results-2026-10-25.json`, model `deepseek-v4.1-flash`, Fedora 44 x86_64:
