@@ -25,7 +25,7 @@ try{
  child=spawn(original,['--profile','web','--host','127.0.0.1','--port','0','--no-open'],{env,cwd:root,stdio:['ignore','pipe','pipe'],detached:process.platform!=='win32'});
  const url=await new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(new Error('DSH Web readiness deadline exceeded')),30000);const read=b=>{text+=b;const m=text.match(/dsh web: (\S+)/);if(m){clearTimeout(timer);resolve(m[1]);}};child.stdout.on('data',read);child.stderr.on('data',read);child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('exit',()=>{clearTimeout(timer);if(!text.match(/dsh web: (\S+)/))reject(new Error('DSH exited before readiness'));});});
  browser=await chromium.launch({headless:true,...(process.env.RDSH_CHROME_PATH?{executablePath:process.env.RDSH_CHROME_PATH}:{})});
- const context=await browser.newContext({viewport:report.viewports[0],locale:'en-US'});page=await context.newPage();
+ const context=await browser.newContext({viewport:report.viewports[0],locale:'en-US',...(process.env.RDSH_E2E_RECORD_VIDEO==='1'?{recordVideo:{dir:output}}:{})});page=await context.newPage();
  page.on('pageerror',e=>report.page_errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.console_errors.push(m.text());});page.on('response',r=>{if(r.url().includes('/rdsh-settings'))report.settings_requests.push({method:r.request().method(),status:r.status()});});
  await page.goto(url);await page.getByRole('button',{name:'Settings',exact:true}).waitFor();
  // Do not supply a provider credential: dismiss only fixture onboarding.
@@ -35,7 +35,9 @@ try{
  if(await notice.isVisible())await notice.click();
  await later.waitFor({timeout:15000});await later.click();
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'rdsh',exact:true}).click();
- const section=page.locator('.rdsh-settings');const goal=section.getByPlaceholder('例: dsh互換性を維持する');await goal.waitFor();
+ const section=page.locator('.rdsh-settings');
+ await section.getByRole('button',{name:'すべて開く',exact:true}).click();
+ const goal=section.getByPlaceholder('例: dsh互換性を維持する');await goal.waitFor();
  await section.getByRole('status').filter({hasText:'接続状態: OFF'}).waitFor();
  await section.getByText('独自のDiscordアプリを使う',{exact:true}).click();
  await section.getByPlaceholder('Discord アプリケーションID').fill('123456789012345678');
@@ -49,7 +51,7 @@ try{
  assert.equal(await section.getByRole('button',{name:'Discord設定を保存',exact:true}).isDisabled(),true);
  await section.getByRole('figure',{name:'Discord表示プレビュー'}).getByText('Discord settings E2E',{exact:true}).waitFor();
  assert.equal(await section.getByRole('figure',{name:'Discord表示プレビュー'}).getByText('Discord settings E2E',{exact:true}).count(),1);
- await section.getByText('ポート',{exact:true}).locator('..').locator('input').fill('');
+ await section.getByRole('spinbutton',{name:'ポート',exact:true}).fill('');
  await section.getByRole('button',{name:'保存する',exact:true}).click();await section.locator('.rdsh-msg').filter({hasText:'保存しました'}).waitFor();
  const saved=JSON.parse(await readFile(settings,'utf8'));assert.deepEqual(saved.discord,{enabled:false,application_id:'123456789012345678',details:'Discord settings E2E',show_agent_status:false,show_elapsed:false,show_image:true,status_display:'details',large_image:'',large_text:'',button_label:'',button_url:''});assert.equal(saved.context.goal,'Genuine DSH plugin E2E');assert.equal(saved.serve.port,38080);assert.deepEqual(saved.extras.enable,['serve']);
  await section.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
@@ -75,10 +77,14 @@ try{
  await writeFile(settings,'{broken');await section.getByRole('button',{name:'再読み込み',exact:true}).click();await page.getByRole('alert').filter({hasText:'設定ファイルを読み込めません'}).waitFor();assert.equal(await page.getByRole('button',{name:'保存する',exact:true}).count(),0);
  await page.screenshot({path:path.join(output,'harness-settings-error.png')});
  await writeFile(settings,JSON.stringify(saved));await page.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
- await page.setViewportSize(report.viewports[1]);await page.screenshot({path:path.join(output,'harness-settings-mobile.png')});
+ await page.setViewportSize(report.viewports[1]);
+ await page.getByText('Unable to create default workspace. Use Choose workspace to select a folder.',{exact:true}).waitFor({state:'hidden'});
+ await page.screenshot({path:path.join(output,'harness-settings-mobile.png')});
  report.mobile_content_width=await section.evaluate(e=>e.getBoundingClientRect().width);
  assert.ok(report.mobile_content_width>=280,'rdsh content should remain usable at 390px');
  report.mobile_overflow=await section.evaluate(e=>e.scrollWidth>e.clientWidth+1);assert.equal(report.mobile_overflow,false);
+ report.mobile_navigation_direction=await section.evaluate(e=>getComputedStyle(e.closest('[data-shortcut-modal=settings]')).flexDirection);
+ assert.equal(report.mobile_navigation_direction,'column','settings navigation should sit above the content on a phone');
  report.mobile_readability='PASS: navigation above content, no horizontal overflow';
  report.mobile_accepted=true;
  assert.deepEqual(report.page_errors,[]);assert.ok(report.console_errors.every(m=>m.includes('400 (Bad Request)')));
