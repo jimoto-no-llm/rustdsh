@@ -82,7 +82,7 @@ Recommended plugins (optional; choose with --recommended)
   subagents*      rdsh-subagent-optimizer     bounded exploration subagents
   sound*          github:cwd514/dsh-sound-notifications   effect sounds and desktop notifications
   gitview*        github:yugapor/dsh-gitview  Web sidebar Git panel
-  intelligent-ui* github:cwd514/dsh-intelligent-ui   interactive visual answers (render_ui)
+  intelligent-ui* dsh-intelligent-ui          interactive visual answers (render_ui)
   compute         rdsh-compute                compute bridge
   easy-work       rdsh-easy-work              guided workflow entry points
   ui-comfort      rdsh-ui-comfort             deliberate Enter in the Web chat
@@ -190,14 +190,14 @@ select_recommended_individually() {
   if prompt_yes_no "rdsh-subagent-route (pick the model and effort for new child agents)" "$rec_subagent_route"; then rec_subagent_route=1; else rec_subagent_route=0; fi
   if prompt_yes_no "github:cwd514/dsh-sound-notifications" "$rec_sound"; then rec_sound=1; else rec_sound=0; fi
   if prompt_yes_no "github:yugapor/dsh-gitview" "$rec_gitview"; then rec_gitview=1; else rec_gitview=0; fi
-  if prompt_yes_no "github:cwd514/dsh-intelligent-ui" "$rec_intelligent_ui"; then rec_intelligent_ui=1; else rec_intelligent_ui=0; fi
+  if prompt_yes_no "dsh-intelligent-ui (visual answers)" "$rec_intelligent_ui"; then rec_intelligent_ui=1; else rec_intelligent_ui=0; fi
 }
 
 prompt_recommended() {
   printf '\nRecommended plugins (optional):\n' >&2
   printf '  rdsh-translation, rdsh-compute, rdsh-easy-work, rdsh-subagent-optimizer,\n' >&2
   printf '  rdsh-ui-comfort, github:cwd514/dsh-sound-notifications, github:yugapor/dsh-gitview,\n' >&2
-  printf '  github:cwd514/dsh-intelligent-ui\n' >&2
+  printf '  dsh-intelligent-ui\n' >&2
   printf 'Install recommended plugins? [Y/n/a=all/s=select individually] ' >&2
   IFS= read -r _answer || _answer=""
   case "$_answer" in
@@ -302,6 +302,7 @@ if [ "$rec_easy_work" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rd
 if [ "$rec_subagents" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-subagent-optimizer"; fi
 if [ "$rec_ui_comfort" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-ui-comfort"; fi
 if [ "$rec_subagent_route" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-subagent-route"; fi
+if [ "$rec_intelligent_ui" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED dsh-intelligent-ui"; fi
 
 # The Desktop profile is owned by the Electron application. The npm dsh CLI
 # refuses to manage it, so every package goes through the Desktop-installed
@@ -317,7 +318,7 @@ if [ "$PROFILE" = "desktop" ]; then
     for p in $RECOMMENDED_BUNDLED; do echo "  [recommended] $REPO_ROOT/plugins/$p" >&2; done
     if [ "$rec_sound" = "1" ]; then echo "  [recommended] github:cwd514/dsh-sound-notifications" >&2; fi
     if [ "$rec_gitview" = "1" ]; then echo "  [recommended] github:yugapor/dsh-gitview" >&2; fi
-    if [ "$rec_intelligent_ui" = "1" ]; then echo "  [recommended] github:cwd514/dsh-intelligent-ui" >&2; fi
+  
     exit 1
   fi
   set -- --no-bundled
@@ -326,7 +327,7 @@ if [ "$PROFILE" = "desktop" ]; then
   for p in $RECOMMENDED_BUNDLED; do set -- "$@" --package "$REPO_ROOT/plugins/$p"; done
   if [ "$rec_sound" = "1" ]; then set -- "$@" --package github:cwd514/dsh-sound-notifications; fi
   if [ "$rec_gitview" = "1" ]; then set -- "$@" --package github:yugapor/dsh-gitview; fi
-  if [ "$rec_intelligent_ui" = "1" ]; then set -- "$@" --package github:cwd514/dsh-intelligent-ui; fi
+
   if [ "$DRY_RUN" = "1" ]; then
     printf '%s ' "$RDSH" desktop install "$@"
     printf '\n'
@@ -363,9 +364,6 @@ if [ "$rec_sound" = "1" ]; then
 fi
 if [ "$rec_gitview" = "1" ]; then
   run_add github:yugapor/dsh-gitview "recommended third-party git panel"
-fi
-if [ "$rec_intelligent_ui" = "1" ]; then
-  run_add github:cwd514/dsh-intelligent-ui "recommended third-party visual answers"
 fi
 echo "done: $ok ok, $fail failed (profile: $PROFILE)"
 [ "$fail" -eq 0 ]

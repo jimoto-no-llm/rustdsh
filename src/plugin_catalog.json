@@ -131,9 +131,10 @@
     },
     {
       "id": "intelligent-ui",
-      "package": "github:cwd514/dsh-intelligent-ui",
+      "package": "dsh-intelligent-ui",
       "starter": true,
-      "why": "interactive visual answers (render_ui)"
+      "why": "interactive visual answers (render_ui), bundled",
+      "bundled": true
     }
   ]
 }

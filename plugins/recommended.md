@@ -131,7 +131,7 @@ check its duplicate-ID behavior before migrating existing profiles.
 | `ui-comfort` | `rdsh-ui-comfort` | off | Deliberate Enter in the DSH Web chat: the composer sends on a second Enter within 1.5 s instead of the first, and the goal editor keeps Enter from committing the edit; both toggle live in the **rdsh 入力** settings section through `localStorage`. |
 | `sound` | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | web, desktop | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. |
 | `gitview` | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | web, desktop | Git panel in the Web sidebar: working-tree changes, staging and commits, unified/side-by-side diffs, commit graph, branches, blame, reflog, and CI status. |
-| `intelligent-ui` | `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | web, desktop | ChatGPT-style visual answers: the model calls the declarative `render_ui` tool and the plugin draws the view (tables, charts, comparisons, timelines, inputs, calculators; 15 block types, nesting up to 6 levels). A browser client plugin, so `PROFILE=web` is the intended target; skip it with `INTELLIGENT_UI=0`. |
+| `intelligent-ui` | `dsh-intelligent-ui` (bundled; MIT, (c) 2026 cwd514) | web, desktop | ChatGPT-style visual answers: the model calls the declarative `render_ui` tool and the plugin draws the view (tables, charts, comparisons, timelines, inputs, calculators; 15 block types, nesting up to 6 levels). A browser client plugin, so `PROFILE=web` is the intended target; skip it with `INTELLIGENT_UI=0`. |
 
 Notes:
 
@@ -146,8 +146,9 @@ Notes:
   intended target. Desktop notifications additionally need a secure context
   (`127.0.0.1`/`localhost`/`https`) and the browser's notification
   permission; otherwise only the sounds play (see the upstream README).
-- `intelligent-ui` is a third-party Web client plugin fetched from upstream
-  at install time. It is part of the web/desktop starter set; skip it with
+- `intelligent-ui` is a third-party Web client plugin, vendored into
+  `plugins/dsh-intelligent-ui` and shipped in the release archive. It is part of
+  the web/desktop starter set; skip it with
   `INTELLIGENT_UI=0` or `rdsh desktop install --no-intelligent-ui`. It has no
   `features.*` veto in `rdsh.json`.
 - `subagent-route` is off by default. It writes the `agentOptions` block of the
