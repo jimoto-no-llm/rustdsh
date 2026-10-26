@@ -5,12 +5,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-26
+
 ### Added
 
 - 視覚回答プラグイン（dsh-intelligent-ui、cwd514、MIT）を `plugins/dsh-intelligent-ui` に同梱しました。
   `plugins/install.sh` と `rdsh desktop install` は GitHub から取得せず同梱版を入れ、web/desktop で既定で有効になります。
 - `rdsh desktop install` でも、`features.feedback` が明示的にオンでなければメッセージのフィードバック面を
   無効化する同梱プラグインを入れるようにしました（CLI インストーラと同じ既定）。
+- `rdsh features on feedback` で、既に入っているフィードバック無効化プラグインを外すようにしました。
 
 ### Fixed
 
