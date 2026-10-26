@@ -1,0 +1,64 @@
+{
+  "name": "dsh-intelligent-ui",
+  "version": "0.3.2",
+  "private": true,
+  "description": "ChatGPT の Intelligent UI 相当。モデルが文章ではなく対話的なビジュアル回答を選べるようにするプラグイン",
+  "license": "MIT",
+  "author": "cwd514",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cwd514/dsh-intelligent-ui.git"
+  },
+  "homepage": "https://github.com/cwd514/dsh-intelligent-ui#readme",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "bundle",
+    "plugin",
+    "toolview",
+    "intelligent-ui",
+    "visualization",
+    "chart",
+    "interactive"
+  ],
+  "type": "module",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "catalog.md",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "test/*.mjs"
+  ],
+  "scripts": {
+    "check": "node --check index.js && node --check client.js && node --check test/smoke.mjs",
+    "test": "node test/smoke.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-tool"
+      ]
+    }
+  },
+  "meta": {
+    "title": "Intelligent UI",
+    "description": "モデルが文章の代わりに対話的なビジュアル回答（グラフ・表・比較・手順・入力欄つきの小さな道具）を返せるようにします。render_ui ツールとその描画ビューを追加します。"
+  }
+}

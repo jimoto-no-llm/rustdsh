@@ -57,6 +57,8 @@ pub const STARTER_PLUGINS: &[&str] = &[
 pub const SOUND_SPEC: &str = "github:cwd514/dsh-sound-notifications";
 pub const GITVIEW_SPEC: &str = "github:yugapor/dsh-gitview";
 pub const INTELLIGENT_UI_SPEC: &str = "github:cwd514/dsh-intelligent-ui";
+/// Directory name of the bundled copy of that plugin, shipped in `plugins/`.
+pub const INTELLIGENT_UI_PLUGIN: &str = "dsh-intelligent-ui";
 /// Default third-party specs attached alongside the bundled plugins.
 pub const DEFAULT_THIRD_PARTY: &[&str] = &[SOUND_SPEC, GITVIEW_SPEC, INTELLIGENT_UI_SPEC];
 /// Product name used by the macOS bundle and the Windows install directory.
@@ -834,12 +836,14 @@ struct Target {
     spec: String,
 }
 
+#[allow(clippy::too_many_arguments)] // the flags are orthogonal and all come from the CLI
 fn desktop_targets(
     plugins_dir: Option<&str>,
     packages: &[String],
     no_bundled: bool,
     compute: bool,
     skipped_third_party: &[&str],
+    feedback_off: bool,
     env: &OsEnv,
     locale: crate::locale::Locale,
 ) -> Result<(Vec<Target>, Option<PathBuf>)> {
@@ -861,6 +865,21 @@ fn desktop_targets(
                 spec,
             });
         }
+        // The DSH feedback surface is off by default, like the CLI installer:
+        // attach the patch bundle unless `features.feedback` is explicitly on.
+        if feedback_off {
+            for name in ["rdsh-no-feedback", "rdsh-no-feedback-client"] {
+                if plugins_root.join(name).join("package.json").is_file() {
+                    let spec = plugins_root.join(name).display().to_string();
+                    #[cfg(windows)]
+                    let spec = spec.replace('\\', "/");
+                    targets.push(Target {
+                        label: name.to_string(),
+                        spec,
+                    });
+                }
+            }
+        }
         root = Some(plugins_root);
         for spec in DEFAULT_THIRD_PARTY {
             if skipped_third_party.contains(spec) {
@@ -872,6 +891,21 @@ fn desktop_targets(
                 .next()
                 .unwrap_or(spec)
                 .to_string();
+            // The visual-answers plugin ships in the checkout. Attach that copy
+            // instead of fetching it, so an install works offline and the
+            // dependency key stays `dsh-intelligent-ui` for upgrades.
+            if *spec == INTELLIGENT_UI_SPEC {
+                if let Some(root) = &root {
+                    let bundled = root.join(INTELLIGENT_UI_PLUGIN);
+                    if bundled.join("package.json").is_file() {
+                        targets.push(Target {
+                            label,
+                            spec: bundled.display().to_string(),
+                        });
+                        continue;
+                    }
+                }
+            }
             targets.push(Target {
                 label,
                 spec: spec.to_string(),
@@ -967,12 +1001,15 @@ pub fn cmd_install(options: InstallOptions, locale: crate::locale::Locale) -> Re
     .into_iter()
     .filter_map(|(skip, spec)| skip.then_some(spec))
     .collect();
+    let feedback_off =
+        !crate::rdsh_config::feature_enabled(&crate::rdsh_config::load(), "feedback");
     let (targets, plugins_root) = desktop_targets(
         plugins_dir.as_deref(),
         &packages,
         no_bundled,
         compute,
         &skipped,
+        feedback_off,
         &env,
         locale,
     )?;
@@ -1601,6 +1638,7 @@ mod tests {
             false,
             false,
             &[],
+            true,
             &env,
             crate::locale::Locale::English,
         )
@@ -1612,6 +1650,70 @@ mod tests {
             .find(|target| target.label == "rdsh-settings")
             .expect("bundled rdsh-settings target");
         assert!(Path::new(&settings.spec).is_absolute(), "{}", settings.spec);
+    }
+
+    #[test]
+    fn desktop_targets_prefer_bundled_copies_and_attach_the_feedback_bundle() {
+        let root = temp_root("targets-bundled");
+        let env = base_env(&root);
+        let checkout = root.join("rustdsh");
+        for name in [
+            "rdsh-settings",
+            "dsh-intelligent-ui",
+            "rdsh-no-feedback",
+            "rdsh-no-feedback-client",
+        ] {
+            let dir = checkout.join("plugins").join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("package.json"), format!("{{\"name\":\"{name}\"}}")).unwrap();
+        }
+
+        let (targets, _) = desktop_targets(
+            Some(checkout.to_str().unwrap()),
+            &[],
+            false,
+            false,
+            &[SOUND_SPEC, GITVIEW_SPEC],
+            true,
+            &env,
+            crate::locale::Locale::English,
+        )
+        .unwrap();
+        let labels: Vec<&str> = targets.iter().map(|t| t.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "rdsh-settings",
+                "rdsh-no-feedback",
+                "rdsh-no-feedback-client",
+                "dsh-intelligent-ui",
+            ]
+        );
+        // The visual-answers plugin comes from the checkout, not GitHub.
+        let ui = targets
+            .iter()
+            .find(|t| t.label == "dsh-intelligent-ui")
+            .unwrap();
+        assert_eq!(
+            Path::new(&ui.spec),
+            checkout.join("plugins").join("dsh-intelligent-ui")
+        );
+
+        // With the feedback switch on, the patch bundle stays out.
+        let (targets, _) = desktop_targets(
+            Some(checkout.to_str().unwrap()),
+            &[],
+            false,
+            false,
+            &[SOUND_SPEC, GITVIEW_SPEC],
+            false,
+            &env,
+            crate::locale::Locale::English,
+        )
+        .unwrap();
+        let labels: Vec<&str> = targets.iter().map(|t| t.label.as_str()).collect();
+        assert_eq!(labels, vec!["rdsh-settings", "dsh-intelligent-ui"]);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
@@ -1632,6 +1734,7 @@ mod tests {
             false,
             false,
             &[],
+            true,
             &env,
             crate::locale::Locale::English,
         )
@@ -1653,6 +1756,7 @@ mod tests {
             false,
             false,
             &[SOUND_SPEC, GITVIEW_SPEC, INTELLIGENT_UI_SPEC],
+            true,
             &env,
             crate::locale::Locale::English,
         )
@@ -1670,6 +1774,7 @@ mod tests {
             true,
             false,
             &[],
+            true,
             &env,
             crate::locale::Locale::English,
         )
@@ -1684,6 +1789,7 @@ mod tests {
             true,
             false,
             &[],
+            true,
             &env,
             crate::locale::Locale::English,
         )
