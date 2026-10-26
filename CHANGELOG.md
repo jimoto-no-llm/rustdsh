@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-26
+
 ### Fixed
 
 - GPUIコンポーザで通常文字が二重入力される問題と、Waylandで通常Enter・Shift+EnterがIME変換中と誤判定される問題を修正しました。
