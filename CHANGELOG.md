@@ -3,6 +3,8 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
 ### Added
 
 - 視覚回答プラグイン（dsh-intelligent-ui、cwd514、MIT）を `plugins/dsh-intelligent-ui` に同梱しました。

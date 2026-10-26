@@ -398,8 +398,11 @@ test('the plugin installer defaults browser packages only for web and desktop', 
     const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {
       cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: profile, DRY_RUN: '1', SOUND: '', GITVIEW: '', INTELLIGENT_UI: '', RDSH_BIN: bin },
     });
-    for (const name of ['dsh-sound-notifications', 'dsh-gitview', 'dsh-intelligent-ui'])
+    for (const name of ['dsh-sound-notifications', 'dsh-gitview'])
       assert.equal(stdout.includes('github:' + (name === 'dsh-gitview' ? 'yugapor/' : 'cwd514/') + name), ['web', 'desktop'].includes(profile), profile || 'default');
+    // The visual-answers plugin ships in the checkout, so it is a path spec now.
+    assert.equal(stdout.includes('plugins/dsh-intelligent-ui'), ['web', 'desktop'].includes(profile), profile || 'default');
+    assert.ok(!stdout.includes('github:cwd514/dsh-intelligent-ui'), 'the plugin no longer comes from GitHub');
   }
   const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {
     cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: 'tui', DRY_RUN: '1', SOUND: '1', GITVIEW: '1' },
