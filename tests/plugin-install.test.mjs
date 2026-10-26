@@ -161,7 +161,7 @@ test('--recommended=list prints the catalog, essential tier first, and installs 
   assert.ok(stdout.indexOf('Essential plugins') < stdout.indexOf('Recommended plugins'));
   assert.match(stdout, /@deepseek-ai\/dsh-tool-present/);
   assert.match(stdout, /github:cwd514\/dsh-sound-notifications/);
-  assert.match(stdout, /intelligent-ui\*\s+github:cwd514\/dsh-intelligent-ui/); // starter marker
+  assert.match(stdout, /intelligent-ui\*\s+dsh-intelligent-ui/); // starter marker, bundled
   assert.match(stdout, /ui-comfort\s+rdsh-ui-comfort/); // not in the starter set
   assert.match(stdout, /ui-comfort\s+rdsh-ui-comfort/);
   assert.doesNotMatch(stdout, /dsh plugin --profile/);

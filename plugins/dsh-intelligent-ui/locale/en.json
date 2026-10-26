@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Intelligent UI",
+    "description": "Lets the model answer with an interactive view — charts, tables, comparisons, procedures, and small tools with inputs — instead of prose. Adds the render_ui tool and its view."
+  }
+}

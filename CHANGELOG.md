@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- 視覚回答プラグイン（dsh-intelligent-ui、cwd514、MIT）を `plugins/dsh-intelligent-ui` に同梱しました。
+  `plugins/install.sh` と `rdsh desktop install` は GitHub から取得せず同梱版を入れ、web/desktop で既定で有効になります。
+- `rdsh desktop install` でも、`features.feedback` が明示的にオンでなければメッセージのフィードバック面を
+  無効化する同梱プラグインを入れるようにしました（CLI インストーラと同じ既定）。
+
 ### Fixed
 
 - GPUIコンポーザで通常文字が二重入力される問題と、Waylandで通常Enter・Shift+EnterがIME変換中と誤判定される問題を修正しました。

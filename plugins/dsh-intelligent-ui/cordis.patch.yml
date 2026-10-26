@@ -1,0 +1,23 @@
+# ChatGPT の Intelligent UI 相当の「対話的なビジュアル回答」を有効化します。
+# Host 側が render_ui ツールと要素カタログの skill を登録し、
+# client.js がそのツール結果を会話ストリーム内にウィジェットとして描画します。
+#
+# 設定はすべて省略可能です（既定値で動作します）。
+- insert:
+    - id: intelligent-ui
+      name: "dsh-intelligent-ui"
+      config:
+        # ツールと skill を登録するか。false にすると完全に無効化します。
+        enabled: true
+        # モデルが自発的にビジュアル回答を使う頻度。
+        #   auto      : モデルが判断する（既定。追加のプロンプトは 0 トークン）
+        #   encourage : 比較・データ・手順・計算ではビジュアル提示を優先させる
+        #   off       : ユーザーが明示的に求めたときだけ使わせる
+        posture: auto
+        # spec の上限。超えるとモデルに修正可能なエラーを返します。
+        # maxBlocks: 40
+        # maxNodes: 240
+        # プロンプト節の挿入位置（posture が auto 以外のときだけ節を作ります）。
+        # promptOrder: 3200
+        # 追加の方針文。posture の文に追記されます。
+        # extraGuidance: ''

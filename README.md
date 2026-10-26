@@ -844,8 +844,9 @@ authors):
   sidebar Git panel
 - [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui) by cwd514
   (MIT, (c) 2026 cwd514) — visual answers in the DSH Web chat via the
-  declarative `render_ui` tool; on by default for web/desktop (`INTELLIGENT_UI=0`
-  or `--no-intelligent-ui` skips it)
+  declarative `render_ui` tool; vendored as
+  [`plugins/dsh-intelligent-ui`](plugins/dsh-intelligent-ui/README.md) and on by
+  default for web/desktop (`INTELLIGENT_UI=0` or `--no-intelligent-ui` skips it)
 
 ## License
 

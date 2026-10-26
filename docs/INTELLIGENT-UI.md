@@ -3,7 +3,7 @@
 エージェントが会話の途中で構造化UIを提示し、人間の選択・入力が**同じセッションへ戻る**ための
 プロトコルです。見本の展示にとどまらず、提示・更新・操作・返送・認可の分離までを実装しています。
 
-> 名前の似た第三者プラグイン [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui)（cwd514、MIT、Copyright (c) 2026 cwd514）は**別物**です。本書の `rdsh-ui/1` は rustdsh 自身の実装（dashboard の `dashboard_present_ui` と `plugins/rdsh-agent-ui`）で、上流は DSH ホストに宣言的な `render_ui` ツールと React 描画を足す独立した Web プラグインです（推奨一覧のオプトインとして `plugins/recommended.md` に登録）。
+> 名前の似た第三者プラグイン [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui)（cwd514、MIT、Copyright (c) 2026 cwd514）は**別物**です。本書の `rdsh-ui/1` は rustdsh 自身の実装（dashboard の `dashboard_present_ui` と `plugins/rdsh-agent-ui`）で、上流は DSH ホストに宣言的な `render_ui` ツールと React 描画を足す独立した Web プラグインです（rdsh は上流を `plugins/dsh-intelligent-ui` に同梱し、web/desktop で既定で入れる）。
 > どちらもターン末尾スロット（`conversation.chat.turnTail`）へ描くため、併用する場合は表示順を確認してください。
 
 ## 5つの機構

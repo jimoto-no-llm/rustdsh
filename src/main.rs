@@ -686,7 +686,7 @@ enum DesktopAction {
         /// Skip the default Git panel (github:yugapor/dsh-gitview)
         #[arg(long = "no-gitview")]
         no_gitview: bool,
-        /// Skip the default visual answers (github:cwd514/dsh-intelligent-ui)
+        /// Skip the bundled visual answers plugin (dsh-intelligent-ui)
         #[arg(long = "no-intelligent-ui")]
         no_intelligent_ui: bool,
         /// Extra package spec to add (name, git URL, or path; repeatable)
