@@ -964,6 +964,66 @@ pub fn essential_gaps(
     gaps
 }
 
+/// Profiles whose manifest carries the bundled feedback patch.
+pub fn profiles_with_feedback_patch(env: &OsEnv) -> Vec<String> {
+    const BUNDLES: [&str; 2] = ["rdsh-no-feedback", "rdsh-no-feedback-client"];
+    let Ok(entries) = std::fs::read_dir(env.dsh_home.join("profiles")) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+    dirs.sort();
+    dirs.into_iter()
+        .filter_map(|dir| {
+            let state = desktop::read_profile(&dir);
+            if !state.initialized || !BUNDLES.iter().any(|name| state.installed(name)) {
+                return None;
+            }
+            dir.file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
+        .collect()
+}
+
+/// Detach the bundled feedback patch from every initialized profile.
+///
+/// `rdsh features on feedback` only flips the switch, and the switch selects the
+/// bundle at provisioning time. An install that already carries the patch keeps
+/// the DSH surface hidden until the package is removed, so the toggle removes it
+/// here.
+pub fn detach_feedback_bundles(env: &OsEnv, locale: Locale) -> Result<Vec<(String, bool)>> {
+    const BUNDLES: [&str; 2] = ["rdsh-no-feedback", "rdsh-no-feedback-client"];
+    let _ = locale;
+    let dsh = dsh_bin()?;
+    let mut results = Vec::new();
+    for profile in profiles_with_feedback_patch(env) {
+        let state = desktop::read_profile(&env.dsh_home.join("profiles").join(&profile));
+        let attached: Vec<&str> = BUNDLES
+            .iter()
+            .copied()
+            .filter(|name| state.installed(name))
+            .collect();
+        if attached.is_empty() {
+            continue;
+        }
+        let mut args = vec![
+            "plugin".to_string(),
+            "--profile".to_string(),
+            profile.clone(),
+            "remove".to_string(),
+        ];
+        args.extend(attached.iter().map(|name| name.to_string()));
+        let ok = match Command::new(&dsh).args(&args).output() {
+            Ok(output) => output.status.success(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                bail!("could not run '{dsh}'; install the dsh CLI or set RDSH_DSH_BIN")
+            }
+            Err(error) => return Err(error).with_context(|| format!("failed to run {dsh}")),
+        };
+        results.push((profile, ok));
+    }
+    Ok(results)
+}
+
 /// One doctor line per profile whose essential tier is incomplete.
 pub fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
     let Ok(catalog) = Catalog::load() else {

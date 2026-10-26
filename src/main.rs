@@ -3129,6 +3129,38 @@ fn features_toggle(id: &str, on: bool, locale: locale::Locale) -> anyhow::Result
         if on { "true" } else { "false" },
         def.summary
     );
+    // Turning the switch back on must also bring the surface back: the patch is
+    // a package, and the switch alone does not uninstall it.
+    if id == "feedback" && on {
+        let env = desktop::OsEnv::from_process();
+        match plugins::detach_feedback_bundles(&env, locale) {
+            Ok(done) => {
+                for (profile, ok) in done {
+                    println!(
+                        "features.feedback: {} {profile}",
+                        if ok {
+                            match locale {
+                                locale::Locale::English => "removed the feedback patch from",
+                                locale::Locale::Chinese => "已从以下配置移除反馈补丁：",
+                                locale::Locale::Japanese => "フィードバック無効化を外しました:",
+                            }
+                        } else {
+                            match locale {
+                                locale::Locale::English => {
+                                    "could not remove the feedback patch from"
+                                }
+                                locale::Locale::Chinese => "无法从以下配置移除反馈补丁：",
+                                locale::Locale::Japanese => {
+                                    "フィードバック無効化を外せませんでした:"
+                                }
+                            }
+                        }
+                    );
+                }
+            }
+            Err(error) => eprintln!("features.feedback: {error}"),
+        }
+    }
     Ok(())
 }
 
