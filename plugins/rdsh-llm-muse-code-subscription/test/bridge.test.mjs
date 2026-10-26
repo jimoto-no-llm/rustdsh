@@ -527,7 +527,8 @@ test("the supported Harness base adapter retains its released image metadata API
   const release = createRequire(import.meta.url)("@deepseek-ai/dsh-llm/package.json").version;
   if (release === "0.2.1-alpha.1") assert.equal(typeof adapter.imageRequestTarget, "undefined");
   else {
-    assert.equal(release, "0.2.1-alpha.3");
+    // alpha.3 and every later release keep the image metadata API.
+    assert.match(release, /^0\.2\.1-(alpha\.3|alpha\.4|alpha\.5|rc\.\d+)$/);
     assert.deepEqual(
       adapter.imageRequestTarget("muse-code", "metadata-only", { width: 121, height: 83, bytes: 321 }),
       { width: 121, height: 83, maxBytes: 321 },
