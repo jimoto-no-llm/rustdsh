@@ -33,7 +33,7 @@
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2 || 0.2.1-alpha.3 || 0.2.1-rc.3 || 0.2.1-rc.4"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "3.18.5-alpha.2"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.2",
