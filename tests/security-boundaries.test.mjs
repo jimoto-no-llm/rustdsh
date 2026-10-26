@@ -23,6 +23,7 @@ function auditedRuntimeEnvironment() {
     alpha1: process.env.RDSH_AUDITED_RUNTIME_ALPHA1,
     alpha3: process.env.RDSH_AUDITED_RUNTIME_ALPHA3,
     rc3: process.env.RDSH_AUDITED_RUNTIME_RC3,
+    rc4: process.env.RDSH_AUDITED_RUNTIME_RC4,
   };
 }
 
@@ -53,6 +54,7 @@ test('audited preload accepts registered versions and the legacy unset rc2 adapt
     [runtimes.alpha1, 'dsh-tools-0.2.1-alpha.1'],
     [runtimes.alpha3, 'dsh-tools-0.2.1-alpha.3'],
     [runtimes.rc3, 'dsh-tools-0.2.1-rc.3'],
+    [runtimes.rc4, 'dsh-tools-0.2.1-rc.4'],
   ].filter(([runtime]) => runtime);
   if (pairs.length === 0) {
     t.skip('official audited runtime paths are supplied by the Linux security matrix');

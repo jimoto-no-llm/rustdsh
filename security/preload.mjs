@@ -11,6 +11,7 @@ const adapters = Object.freeze({
   'dsh-tools-0.2.1-alpha.1': '2e9b6a72ba6b917197965c08eb894d4e8d01dc6f81e0e1c9870a5ae8514687a7',
   'dsh-tools-0.2.1-alpha.3': '614e4f50fff440f3f80cbe047148f7ad0ef2807ca27379e57f7e4f57925642cf',
   'dsh-tools-0.2.1-rc.3': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
+  'dsh-tools-0.2.1-rc.4': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
 });
 const language = (() => {
   const value = (process.env.RDSH_SECURITY_LANG || process.env.RDSH_LANG || 'en').toLowerCase();

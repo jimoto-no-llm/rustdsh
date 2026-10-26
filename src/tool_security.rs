@@ -24,7 +24,7 @@ struct AuditedAdapter {
     bin_sha256: &'static str,
 }
 
-const AUDITED_ADAPTERS: [AuditedAdapter; 4] = [
+const AUDITED_ADAPTERS: [AuditedAdapter; 5] = [
     AuditedAdapter {
         id: "dsh-tools-0.2.0-rc.2",
         dsh_version: "0.2.0-rc.2",
@@ -48,6 +48,14 @@ const AUDITED_ADAPTERS: [AuditedAdapter; 4] = [
         dsh_version: "0.2.1-rc.3",
         tools_version: "0.2.1-rc.3",
         // bin.js is byte-identical to 0.2.1-alpha.3; dsh-tools moved on.
+        bin_sha256: "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+    },
+    AuditedAdapter {
+        id: "dsh-tools-0.2.1-rc.4",
+        dsh_version: "0.2.1-rc.4",
+        tools_version: "0.2.1-rc.4",
+        // rc.4 re-released the same entry files: lib/bin.js and dsh-tools'
+        // lib/index.js are byte-identical to 0.2.1-rc.3.
         bin_sha256: "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
     },
 ];
@@ -574,6 +582,11 @@ mod tests {
                 "RDSH_AUDITED_DSH_RC3",
                 "dsh-tools-0.2.1-rc.3",
                 "RDSH_AUDITED_RUNTIME_RC3",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC4",
+                "dsh-tools-0.2.1-rc.4",
+                "RDSH_AUDITED_RUNTIME_RC4",
             ),
         ];
         // One release per run is enough: a machine normally carries a single

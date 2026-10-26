@@ -9,5 +9,5 @@
   "engines": { "node": ">=22" },
   "scripts": { "test": "node --test test/*.test.mjs" },
   "dependencies": { "@muse-code/sdk": "1.4.8" },
-  "peerDependencies": { "@deepseek-ai/dsh-llm": "0.2.1-alpha.1 || 0.2.1-alpha.3 || 0.2.1-rc.3" }
+  "peerDependencies": { "@deepseek-ai/dsh-llm": "0.2.1-alpha.1 || 0.2.1-alpha.3 || 0.2.1-rc.3 || 0.2.1-rc.4" }
 }

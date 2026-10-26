@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- DSH **0.2.1-rc.4** に対応しました。厳格なツール境界（`features.agent_tool_sandbox` / `RDSH_SECURITY=1`）の
+  監査済みアダプターに `dsh-tools-0.2.1-rc.4` を追加し、`rdsh-mcp-exposure` と
+  `rdsh-llm-muse-code-subscription` の peer 範囲にも rc.4 を入れました。
+  rc.4 の `lib/bin.js` と dsh-tools の `lib/index.js` は rc.3 と同一のため、ダイジェストは同じ値です。
+
 ## [0.12.1] - 2026-10-26
 
 ### Added
