@@ -16,9 +16,9 @@
     "capture:sharp": "RDSH_VIDEO_CAPTURE_DIR=../public/sharp RDSH_VIDEO_DPR=6 node scripts/capture.mjs"
   },
   "dependencies": {
-    "@react-three/fiber": "9.8.1",
+    "@react-three/fiber": "9.8.2",
     "@remotion/cli": "4.0.538",
-    "@remotion/three": "4.0.535",
+    "@remotion/three": "4.0.538",
     "@remotion/transitions": "4.0.538",
     "@types/three": "0.186.0",
     "react": "19.3.0",
