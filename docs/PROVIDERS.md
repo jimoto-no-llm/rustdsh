@@ -466,6 +466,28 @@ under the provider block by hand (rdsh does not guess them):
 `--replace` rewrites the whole block, so re-add a hand-written `compat:`
 afterwards (the `sarashina` preset writes its own).
 
+#### Kimi for Coding and the catalog gap
+
+Kimi for Coding (`https://api.kimi.com/coding`) is a concrete rejecting server:
+it answers OpenAI Chat Completions with `400 role 'developer' is not allowed`.
+The trap is that pi-ai's compatibility auto-detection only knows the servers it
+classifies, and `api.kimi.com` is not on its non-standard list, so detection
+assumes `supportsDeveloperRole: true`. Models from pi-ai's bundled catalog
+(e.g. `kimi-for-coding`) carry `supportsDeveloperRole: false` and keep working,
+but a model the profile declares itself — added by hand or by `rdsh models
+sync`, which is how `k3.1-pro` arrives — starts with an empty `compat` and
+inherits the wrong auto-detection. A reasoning model then sends the system
+prompt as `role: "developer"` and every request fails.
+
+Set the switch at the route level so models synced later inherit it:
+
+```yaml
+      kimi-coding:
+        # ...generated keys...
+        compat:
+          supportsDeveloperRole: false
+```
+
 ## Not covered
 
 Starting or managing the servers, network discovery (mDNS), choosing
