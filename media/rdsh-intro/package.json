@@ -23,7 +23,7 @@
     "@types/three": "0.186.0",
     "react": "19.3.0",
     "react-dom": "19.3.1",
-    "remotion": "4.0.535",
+    "remotion": "4.0.538",
     "three": "0.186.1"
   },
   "devDependencies": {
