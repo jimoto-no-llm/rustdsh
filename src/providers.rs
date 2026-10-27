@@ -2797,7 +2797,7 @@ fn curl_send(
 
 /// Ollama の /api/show が返す、推論の制御方法。
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Thinking {
+pub(crate) enum Thinking {
     /// モデル定義の段階名（例: low, medium, high）。
     Levels(Vec<String>),
     /// ON/OFF だけを持つ。OpenAI 互換の段階指定では表せない。
@@ -2839,7 +2839,7 @@ fn parse_thinking(body: &str) -> Thinking {
 }
 
 /// サーバー由来の段階名を、そのまま設定へ書いてよいか。
-fn level_name_ok(name: &str) -> bool {
+pub(crate) fn level_name_ok(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 60
         && !name.chars().any(|c| c.is_control() || c.is_whitespace())
@@ -2854,6 +2854,46 @@ fn ollama_native_root(base: &Base) -> Option<Base> {
     let url = base.url.trim_end_matches('/');
     let root = url.strip_suffix("/v1").unwrap_or(url);
     parse_base_url(root, crate::locale::Locale::English).ok()
+}
+
+/// One Ollama-family route a profile declares, with what a capability probe needs.
+pub(crate) struct OllamaRoute {
+    pub id: String,
+    pub base_url: String,
+    pub key_env: Option<String>,
+}
+
+/// Every `ollama` / `ollama-cloud` route the profile declares.
+pub(crate) fn ollama_routes(text: &str) -> Vec<OllamaRoute> {
+    routes_in(text, crate::locale::Locale::English)
+        .into_iter()
+        .filter(|route| matches!(route.id.as_str(), "ollama" | "ollama-cloud"))
+        .filter_map(|route| {
+            let base_url = route.base_url?;
+            Some(OllamaRoute {
+                id: route.id,
+                base_url,
+                key_env: route.api_key_env,
+            })
+        })
+        .collect()
+}
+
+/// Ask one route what a model publishes. The key, when the route needs one,
+/// comes from the environment variable the profile names.
+pub(crate) fn probe_route_thinking(
+    route: &OllamaRoute,
+    model: &str,
+    locale: crate::locale::Locale,
+) -> Thinking {
+    let key = route
+        .key_env
+        .as_deref()
+        .and_then(|name| std::env::var(name).ok());
+    let Ok(base) = parse_base_url(&route.base_url, locale) else {
+        return Thinking::Unknown;
+    };
+    probe_capabilities(&base, key.as_deref(), model, locale).thinking
 }
 
 /// POST /api/show が返す能力。
