@@ -5,7 +5,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
-### Added
+## [0.12.2] - 2026-10-27
+
+### Fixed
 
 - DSH **0.2.1-rc.4** に対応しました。厳格なツール境界（`features.agent_tool_sandbox` / `RDSH_SECURITY=1`）の
   監査済みアダプターに `dsh-tools-0.2.1-rc.4` を追加し、`rdsh-mcp-exposure` と
