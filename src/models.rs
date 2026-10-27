@@ -725,6 +725,332 @@ pub(crate) fn apply_profile(
     })
 }
 
+/// What a provider said about one model's reasoning levels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EffortProbe {
+    /// The model publishes named levels (low, high, ...).
+    Levels(Vec<String>),
+    /// The model only switches reasoning on or off; OpenAI-style levels cannot
+    /// express it, so nothing is written.
+    Toggle,
+    /// The model does not reason.
+    Unsupported,
+    /// The provider did not say (missing field or a failed request).
+    Unknown,
+}
+
+impl EffortProbe {
+    fn skipped_reason(&self) -> &'static str {
+        match self {
+            EffortProbe::Toggle => "toggle-only",
+            EffortProbe::Unsupported => "no-reasoning",
+            EffortProbe::Unknown => "unknown",
+            EffortProbe::Levels(_) => "",
+        }
+    }
+}
+
+/// The result of filling one provider block's reasoning levels.
+#[derive(Debug, Default)]
+pub(crate) struct EffortApplied {
+    pub text: String,
+    /// Ids that gained a `reasoningEfforts:` block.
+    pub filled: Vec<String>,
+    /// Ids that already declared their levels; left byte-for-byte alone.
+    pub kept: Vec<String>,
+    /// Ids the provider cannot express as levels, with the reason.
+    pub skipped: Vec<(String, &'static str)>,
+}
+
+/// The models one provider block lists, with whether each already declares
+/// `reasoningEfforts`.
+pub(crate) fn listed_models(text: &str, provider: &str) -> Result<Vec<(String, bool)>> {
+    let lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let site = locate_owned(&lines, provider)?;
+    let Some(models_line) = site.models_line else {
+        return Ok(Vec::new());
+    };
+    let end = site.models_end.min(lines.len());
+    let mut out = Vec::new();
+    for index in models_line + 1..end {
+        if indent_of(&lines[index]) != site.item_indent || item_body(&lines[index]).is_none() {
+            continue;
+        }
+        let Some(id) = item_id(&lines, index, site.item_indent) else {
+            continue;
+        };
+        let stop = block_end(&lines, index).min(end);
+        let declares =
+            (index..stop).any(|i| key_value(lines[i].trim_start(), "reasoningEfforts").is_some());
+        out.push((id, declares));
+    }
+    Ok(out)
+}
+
+/// Write the levels a provider published into the models that lack them.
+///
+/// A model that already declares `reasoningEfforts` is never touched: the
+/// profile may carry a hand-picked list, and a provider refresh must not
+/// overwrite it. A model the provider cannot express as levels is reported and
+/// left alone rather than guessed at.
+pub(crate) fn apply_efforts(
+    text: &str,
+    provider: &str,
+    probes: &[(String, EffortProbe)],
+) -> Result<EffortApplied> {
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let site = locate_owned(&lines, provider)?;
+    let mut applied = EffortApplied {
+        text: text.to_string(),
+        ..Default::default()
+    };
+    let Some(models_line) = site.models_line else {
+        return Ok(applied);
+    };
+    let _ = models_line;
+    if probes.is_empty() {
+        return Ok(applied);
+    }
+    if text.contains("\r\n") && text.replace("\r\n", "").contains('\n') {
+        bail!("the profile has mixed line endings; use one line ending before syncing efforts");
+    }
+    // Collect the insertions first, then apply them bottom to top so an earlier
+    // item's line numbers stay valid.
+    let mut insertions: Vec<(usize, Vec<String>)> = Vec::new();
+    for (id, probe) in probes {
+        let Some(item) = item_line(&lines, &site, id) else {
+            continue;
+        };
+        let stop = block_end(&lines, item).min(site.models_end.min(lines.len()));
+        if (item..stop).any(|i| key_value(lines[i].trim_start(), "reasoningEfforts").is_some()) {
+            applied.kept.push(id.clone());
+            continue;
+        }
+        let EffortProbe::Levels(names) = probe else {
+            applied.skipped.push((id.clone(), probe.skipped_reason()));
+            continue;
+        };
+        let names: Vec<&String> = names
+            .iter()
+            .filter(|name| crate::providers::level_name_ok(name))
+            .collect();
+        if names.is_empty() {
+            applied.skipped.push((id.clone(), "unknown"));
+            continue;
+        }
+        let key_indent =
+            item_field_indent(&lines, item, site.item_indent).unwrap_or(site.item_indent + 2);
+        let nested = key_indent + site.step;
+        let mut block = vec![format!("{}reasoningEfforts:", " ".repeat(key_indent))];
+        for name in &names {
+            block.push(format!(
+                "{}{}: {}",
+                " ".repeat(nested),
+                yaml_scalar(name),
+                yaml_scalar(name)
+            ));
+        }
+        applied.filled.push(id.clone());
+        insertions.push((stop, block));
+    }
+    if insertions.is_empty() {
+        return Ok(applied);
+    }
+    insertions.sort_by_key(|(at, _)| *at);
+    for (at, block) in insertions.into_iter().rev() {
+        let at = at.min(lines.len());
+        lines.splice(at..at, block);
+    }
+    applied.text = join(lines, text);
+    Ok(applied)
+}
+
+/// What one Ollama-family route reported for one profile.
+#[derive(Debug)]
+struct EffortReport {
+    profile: String,
+    provider: String,
+    source: String,
+    listed: usize,
+    filled: Vec<String>,
+    kept: Vec<String>,
+    skipped: Vec<(String, &'static str)>,
+    error: Option<String>,
+    written: bool,
+}
+
+impl EffortReport {
+    fn to_json(&self) -> Value {
+        json!({
+            "profile": self.profile,
+            "provider": self.provider,
+            "source": self.source,
+            "listed": self.listed,
+            "filled": self.filled,
+            "kept": self.kept,
+            "skipped": self.skipped.iter().map(|(id, reason)| json!({
+                "id": id,
+                "reason": reason,
+            })).collect::<Vec<_>>(),
+            "written": self.written,
+            "error": self.error,
+        })
+    }
+}
+
+/// Translate the provider's answer into what this module can write.
+fn effort_probe(thinking: crate::providers::Thinking) -> EffortProbe {
+    match thinking {
+        crate::providers::Thinking::Levels(names) => EffortProbe::Levels(names),
+        crate::providers::Thinking::Toggle => EffortProbe::Toggle,
+        crate::providers::Thinking::Unsupported => EffortProbe::Unsupported,
+        crate::providers::Thinking::Unknown => EffortProbe::Unknown,
+    }
+}
+
+/// `rdsh models efforts`: fill the `reasoningEfforts` a profile's Ollama
+/// routes publish but the profile never stored.
+///
+/// Only listed models are probed, only missing levels are written, and a
+/// provider that cannot express levels is reported instead of guessed at.
+pub(crate) fn cmd_models_efforts(
+    profile: Option<&str>,
+    provider: Option<&str>,
+    dry_run: bool,
+    json: bool,
+) -> Result<()> {
+    let locale = crate::locale::Locale::Japanese;
+    let profiles = profile_paths(profile)?;
+    let mut reports: Vec<EffortReport> = Vec::new();
+    let mut failed = false;
+    for (name, path) in &profiles {
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) => {
+                failed = true;
+                reports.push(EffortReport {
+                    profile: name.clone(),
+                    provider: "ollama".to_string(),
+                    source: path.display().to_string(),
+                    listed: 0,
+                    filled: Vec::new(),
+                    kept: Vec::new(),
+                    skipped: Vec::new(),
+                    error: Some(format!("cannot read {}: {error}", path.display())),
+                    written: false,
+                });
+                continue;
+            }
+        };
+        for route in crate::providers::ollama_routes(&text) {
+            if provider.is_some_and(|wanted| wanted != route.id) {
+                continue;
+            }
+            let mut report = EffortReport {
+                profile: name.clone(),
+                provider: route.id.clone(),
+                source: route.base_url.clone(),
+                listed: 0,
+                filled: Vec::new(),
+                kept: Vec::new(),
+                skipped: Vec::new(),
+                error: None,
+                written: false,
+            };
+            match listed_models(&text, &route.id) {
+                Ok(listed) => {
+                    report.listed = listed.len();
+                    let mut probes = Vec::new();
+                    for (id, declares) in &listed {
+                        if *declares {
+                            // Hand-picked levels stay as they are; say so instead of
+                            // silently leaving the model out of the report.
+                            report.kept.push(id.clone());
+                            continue;
+                        }
+                        let thinking = crate::providers::probe_route_thinking(&route, id, locale);
+                        probes.push((id.clone(), effort_probe(thinking)));
+                    }
+                    match apply_efforts(&text, &route.id, &probes) {
+                        Ok(applied) => {
+                            report.filled = applied.filled;
+                            report.kept.extend(applied.kept);
+                            report.skipped = applied.skipped;
+                            if !report.filled.is_empty() && !dry_run {
+                                match crate::auth::write_creds(
+                                    &path.display().to_string(),
+                                    &applied.text,
+                                ) {
+                                    Ok(()) => report.written = true,
+                                    Err(error) => {
+                                        failed = true;
+                                        report.error = Some(format!("{error:#}"));
+                                    }
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            failed = true;
+                            report.error = Some(format!("{error:#}"));
+                        }
+                    }
+                }
+                Err(error) => {
+                    failed = true;
+                    report.error = Some(format!("{error:#}"));
+                }
+            }
+            reports.push(report);
+        }
+    }
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dry_run": dry_run,
+                "routes": reports.iter().map(EffortReport::to_json).collect::<Vec<_>>(),
+            }))?
+        );
+    } else {
+        use std::io::Write as _;
+        if reports.is_empty() {
+            let _ = writeln!(
+                std::io::stdout(),
+                "[rdsh] no ollama or ollama-cloud route in the selected profile(s)"
+            );
+        }
+        for report in &reports {
+            let label = format!("{} {}", report.profile, report.provider);
+            if let Some(error) = &report.error {
+                let _ = writeln!(std::io::stdout(), "  {label}  error: {error}");
+                continue;
+            }
+            let mut parts = Vec::new();
+            if !report.filled.is_empty() {
+                parts.push(format!(
+                    "{} {}",
+                    if dry_run { "would fill" } else { "filled" },
+                    report.filled.join(", ")
+                ));
+            }
+            if !report.kept.is_empty() {
+                parts.push(format!("kept {}", report.kept.join(", ")));
+            }
+            for (id, reason) in &report.skipped {
+                parts.push(format!("skipped {id} ({reason})"));
+            }
+            if parts.is_empty() {
+                parts.push("up to date".to_string());
+            }
+            let _ = writeln!(std::io::stdout(), "  {label}  {}", parts.join("; "));
+        }
+    }
+    if failed {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
 fn join(lines: Vec<String>, original: &str) -> String {
     let newline = if original.contains("\r\n") {
         "\r\n"
@@ -1965,6 +2291,82 @@ mod tests {
             vec!["low".to_string(), "high".to_string(), "max".to_string()]
         );
         assert_eq!(models[2].input, vec!["text".to_string()]);
+    }
+
+    fn ollama_profile() -> &'static str {
+        "\
+- id: llm-pi-ai
+  config:
+    providers:
+      ollama:
+        baseURL: http://127.0.0.1:11434/v1
+        models:
+          - id: minimax-m3.1-flash
+            name: MiniMax M3.1 Flash
+            contextWindow: 200000
+            maxTokens: 8192
+            input:
+              - text
+          - id: qwen3.5-coder
+            name: Qwen3.5 Coder
+            reasoningEfforts:
+              low: low
+            input:
+              - text
+"
+    }
+
+    #[test]
+    fn efforts_fill_only_the_models_that_lack_them() {
+        let probes = vec![
+            (
+                "minimax-m3.1-flash".to_string(),
+                EffortProbe::Levels(vec!["low".to_string(), "high".to_string()]),
+            ),
+            ("qwen3.5-coder".to_string(), EffortProbe::Unknown),
+        ];
+        let applied = apply_efforts(ollama_profile(), "ollama", &probes).unwrap();
+        assert_eq!(applied.filled, vec!["minimax-m3.1-flash".to_string()]);
+        assert_eq!(applied.kept, vec!["qwen3.5-coder".to_string()]);
+        assert!(applied.skipped.is_empty());
+        assert!(applied.text.contains("            reasoningEfforts:"));
+        assert!(applied.text.contains("              low: low"));
+        assert!(applied.text.contains("              high: high"));
+        // The hand-picked list of the other model is untouched.
+        assert_eq!(applied.text.matches("reasoningEfforts:").count(), 2);
+        // Running again writes nothing.
+        let again = apply_efforts(&applied.text, "ollama", &probes).unwrap();
+        assert!(again.filled.is_empty());
+        assert_eq!(again.kept.len(), 2);
+    }
+
+    #[test]
+    fn efforts_never_guess_a_level_from_a_toggle_or_a_failure() {
+        let probes = vec![
+            ("minimax-m3.1-flash".to_string(), EffortProbe::Toggle),
+            ("qwen3.5-coder".to_string(), EffortProbe::Unsupported),
+        ];
+        let applied = apply_efforts(ollama_profile(), "ollama", &probes).unwrap();
+        assert!(applied.filled.is_empty());
+        assert_eq!(applied.text, ollama_profile());
+        // The model that already declares its own levels is kept, not skipped.
+        assert_eq!(applied.kept, vec!["qwen3.5-coder".to_string()]);
+        assert_eq!(
+            applied.skipped,
+            vec![("minimax-m3.1-flash".to_string(), "toggle-only")]
+        );
+    }
+
+    #[test]
+    fn listed_models_reports_which_entries_already_declare_efforts() {
+        let listed = listed_models(ollama_profile(), "ollama").unwrap();
+        assert_eq!(
+            listed,
+            vec![
+                ("minimax-m3.1-flash".to_string(), false),
+                ("qwen3.5-coder".to_string(), true),
+            ]
+        );
     }
 
     #[test]

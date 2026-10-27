@@ -211,18 +211,29 @@ test("native parallel children cannot exceed durable concurrency", async (t) => 
   assert.equal(result.disposals.length, result.dispatches.length);
 });
 test("native duplicate and undeclared task starts are refused before provider", async (t) => {
-  const f = await setup(t),
-    result = await f.invoke(
-      "concurrent",
-      'return await parallel([() => agent("same", {rdshTaskId:"a"}), () => agent("same", {rdshTaskId:"a"})]);',
-    );
+  const f = await setup(t);
+  // A loaded runner can lose the 2 s writer-lock race and fail the whole turn
+  // with plan_busy before either start is dispatched (issue #936). The scenario
+  // is deterministic, so retry that outcome instead of the assertion.
+  const invoke = async (scenario, script) => {
+    for (let attempt = 0; ; attempt++) {
+      const result = await f.invoke(scenario, script);
+      const busy = /plan_busy/.test(result.outcome?.error ?? "");
+      if (!busy || attempt === 2) return result;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  };
+  const result = await invoke(
+    "concurrent",
+    'return await parallel([() => agent("same", {rdshTaskId:"a"}), () => agent("same", {rdshTaskId:"a"})]);',
+  );
   assert.equal(
     result.dispatches.length,
     1,
     `expected one dispatch, got ${result.dispatches.length}: ${result.outcome.error ?? "no error"}`,
   );
   assert.match(result.outcome.error, /task_already_claimed/);
-  const unknown = await f.invoke(
+  const unknown = await invoke(
     "match",
     'return await agent("different", {rdshTaskId:"undeclared"});',
   );

@@ -637,6 +637,20 @@ enum ModelsAction {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Fill the reasoning levels an Ollama route publishes but the profile
+    /// never stored; existing hand-picked levels are left alone
+    Efforts {
+        #[arg(long = "profile")]
+        profile: Option<String>,
+        /// Restrict to one route id (ollama, ollama-cloud)
+        #[arg(long = "provider")]
+        provider: Option<String>,
+        /// Print what would change without writing the profile
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1786,6 +1800,17 @@ fn main() {
                 auto,
                 sync_json || json,
             ),
+            Some(ModelsAction::Efforts {
+                profile,
+                provider: effort_provider,
+                dry_run,
+                json: effort_json,
+            }) => models::cmd_models_efforts(
+                profile.or(cli.profile).as_deref(),
+                effort_provider.or(provider).as_deref(),
+                dry_run || dry,
+                effort_json || json,
+            ),
         },
         Some(Commands::Auth(args)) => auth::cmd_auth(args, dry, locale),
         Some(Commands::Provider { action }) => match action {
@@ -2581,6 +2606,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         "sync" => (
             "同步配置文件中的模型目录",
             "プロファイルのモデルカタログを同期",
+        ),
+        "efforts" => (
+            "从 Ollama 补全缺失的推理强度",
+            "Ollamaが公開する推論段階で不足分を補完",
         ),
         "prune" => ("将文本裁剪到令牌预算", "テキストをトークン予算まで切り詰め"),
         "compact" => ("压缩文本文件", "テキストファイルを圧縮"),
