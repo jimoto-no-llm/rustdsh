@@ -223,7 +223,17 @@ rdsh models --provider kimi-coding       # one provider only
 rdsh models sync                         # apply
 rdsh models sync --profile web --dry-run # preview one profile
 rdsh models --json                       # same report for a sidecar
+rdsh models efforts                      # fill Ollama reasoning levels the profile lacks
+rdsh models efforts --profile web --dry-run # preview that one
 ```
+
+`rdsh models efforts` is the Ollama half: `POST /api/show` publishes the
+levels a model accepts, and a profile that listed the model before that call
+could answer has none. It probes the listed models, writes the levels only
+where `reasoningEfforts` is absent, keeps a hand-picked list untouched, and
+reports a toggle-only, non-reasoning or unreachable model with the reason
+rather than inventing levels. `--json` reports `filled`, `kept` and `skipped`
+per route.
 
 The sync adds the ids a profile does not carry yet, and refreshes an existing
 entry's `name:` when the provider's current display name is not already part of
