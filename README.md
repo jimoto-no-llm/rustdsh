@@ -382,12 +382,21 @@ rdsh models                              # read-only: missing ids and stale name
 rdsh models --provider kimi-coding       # one provider only
 rdsh models sync                         # add missing entries, refresh stale names
 rdsh models sync --profile web --dry-run # preview one profile
+rdsh models efforts                      # fill Ollama reasoning levels the profile lacks
+rdsh models efforts --profile web --dry-run # preview that one
 ```
 
 Nothing is deleted, an existing entry keeps every other byte (a name the
 provider's current one already contains is left as written), and a profile the
 command does not recognize is refused instead of rewritten. The harness picks
 the changes up on the next config reload or restart.
+
+Ollama also publishes per-model reasoning levels on `POST /api/show`, and a
+model added before that call could not answer has no `reasoningEfforts`.
+`rdsh models efforts` asks the route once per listed model and fills only the
+models that lack them: a hand-picked list is kept as written, a toggle-only or
+non-reasoning model is reported instead of guessed, and a request that fails
+is reported as `unknown`. Re-running it is safe.
 
 ### Agent Tool Isolation
 

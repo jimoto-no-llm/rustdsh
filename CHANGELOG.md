@@ -5,6 +5,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `rdsh models efforts` を追加しました。Ollama／Ollama Cloud の経路について、`POST /api/show` が返す
+  モデルごとの推論段階を読み、`reasoningEfforts` が無いモデルだけを補完します。手で選んだ一覧は書き換えず、
+  ON/OFF だけのモデル・推論非対応のモデル・取得に失敗したモデルは、段階を推測せず理由付きで報告します（#992）。
+
 ## [0.12.2] - 2026-10-27
 
 ### Fixed
