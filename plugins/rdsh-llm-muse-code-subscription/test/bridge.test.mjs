@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { stat, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { EXPECTED_SCHEMA_FINGERPRINT } from "@muse-code/sdk/dist/src/fingerprint.js";
 import { runMuse } from "../muse.mjs";
 import { runWorker } from "../runner.mjs";
 import { MuseSubscriptionAdapter, apply } from "../index.js";
@@ -537,7 +538,9 @@ test("the supported Harness base adapter retains its released image metadata API
 });
 
 test("the pinned SDK accepts the released Muse CLI schema and identifies another schema as drift", () => {
-  const releasedSchema = "sha256:4e3200c3c9dc0cd7919d11022630d43f9bc1c5cdda375381e90b0183b5665069";
+  // The SDK owns the pin: read it instead of hardcoding a digest that a
+  // dependency bump would silently invalidate.
+  const releasedSchema = EXPECTED_SCHEMA_FINGERPRINT;
   assert.equal(checkServedFingerprint(releasedSchema), undefined);
   const warning = checkServedFingerprint("sha256:fixture-foreign-schema");
   assert.equal(warning.kind, "schemaFingerprintMismatch");
