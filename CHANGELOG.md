@@ -7,6 +7,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- DSH **0.2.2-alpha.2** に対応しました。厳格なツール境界の監査済みアダプターに `dsh-tools-0.2.2-alpha.2` を追加し、
+  0.2.2 でツールサービスが Cordis 上へ移ったのに合わせて、境界の注入位置をアダプターごとに持つようにしました。
 - `rdsh models efforts` を追加しました。Ollama／Ollama Cloud の経路について、`POST /api/show` が返す
   モデルごとの推論段階を読み、`reasoningEfforts` が無いモデルだけを補完します。手で選んだ一覧は書き換えず、
   ON/OFF だけのモデル・推論非対応のモデル・取得に失敗したモデルは、段階を推測せず理由付きで報告します（#992）。
