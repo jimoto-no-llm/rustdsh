@@ -106,6 +106,11 @@ rdsh --version && rdsh doctor   # verify install and original dsh
 rdsh setup                      # interactive setup (or rdsh setup --web for browser UI)
 ```
 
+Never set a CLI up before? [docs/SETUP.md](docs/SETUP.md) is a step-by-step
+runbook written to be handed to an AI agent: install, connect one model route
+(OpenAI credit, OpenCode Go, Command Code or Ollama), add the recommended
+plugins, and start a conversation, one verified step at a time.
+
 *Note: If you have an existing login from Codex CLI (ChatGPT OAuth) or opencode, import it with `rdsh auth --import --provider openai-codex`.*
 
 ### 3. Start a Conversation
@@ -806,6 +811,7 @@ For startup, run `rdsh bench --n 5`. See
 
 | Document | Description |
 | --- | --- |
+| [docs/SETUP.md](docs/SETUP.md) | Step-by-step setup runbook to hand to an AI agent (install, one model route, plugins) |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | End-to-end installation, usage, and recovery flow |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |

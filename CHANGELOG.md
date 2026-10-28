@@ -5,6 +5,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- セットアップ手順書 `docs/SETUP.md` を追加しました。CLI に不慣れな人向けに、AI エージェントへそのまま
+  読ませる前提で書いた実行手順です。導入、接続先を 1 つ選んでつなぐ（OpenAI・OpenCode Go・Command Code・Ollama）、
+  推奨プラグインの導入、会話の開始、詰まったときの早見表までを 1 ステップずつ並べています。
+
 ## [0.13.0] - 2026-10-28
 
 ### Added
