@@ -1251,7 +1251,7 @@ fn main() {
             compact::cmd_compact(&file, max_tokens.unwrap_or(cfg.compact.max_tokens), locale)
         }
         Some(Commands::Doctor { json: true }) => doctor_json(),
-        Some(Commands::Doctor { json: false }) => doctor(locale),
+        Some(Commands::Doctor { json: false }) => doctor(DoctorMode::from_terminal(locale), locale),
         Some(Commands::Sessions {
             project,
             limit,
@@ -3273,7 +3273,7 @@ fn doctor_json() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
+fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
     use std::io::Write;
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -3475,7 +3475,168 @@ fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
             }
         });
     }
+    doctor_mode_choice(mode, locale)?;
     Ok(())
+}
+
+/// What `rdsh doctor` does after the diagnosis: print the next step only, or
+/// offer the two ways to start a conversation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DoctorMode {
+    /// Print the summary and the next step; start nothing (`--json`).
+    Diagnose,
+    /// On a terminal, ask for the Web UI or the terminal; otherwise answer
+    /// with the default for this host (Web UI with a desktop session, the
+    /// terminal everywhere else).
+    Choose,
+}
+
+impl DoctorMode {
+    /// `doctor` with no explicit mode: a terminal gets the question, anything
+    /// else (a pipe, an agent) gets the non-blocking summary.
+    fn from_terminal(locale: locale::Locale) -> Self {
+        use std::io::IsTerminal as _;
+        if std::io::stdin().is_terminal() && std::io::stderr().is_terminal() {
+            let _ = locale;
+            DoctorMode::Choose
+        } else {
+            DoctorMode::Diagnose
+        }
+    }
+}
+
+/// The last lines of `rdsh doctor`: what to do next, and - on a terminal - the
+/// one question a first-time user can answer without knowing any command.
+/// Read the answer to the doctor question. `1`/`w`/`web` means the Web UI,
+/// `2`/`t`/`tui`/`terminal` the terminal, and anything else (an empty line, a
+/// closed stdin) the default for this host: the Web UI where a desktop session
+/// exists, the terminal everywhere else.
+fn mode_choice(answer: Option<&str>, desktop_session: bool) -> bool {
+    match answer {
+        Some("1") | Some("w") | Some("web") => true,
+        Some("2") | Some("t") | Some("tui") | Some("terminal") => false,
+        _ => desktop_session,
+    }
+}
+
+fn doctor_mode_choice(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
+    use std::io::Write as _;
+    let text = |english: &'static str, chinese: &'static str, japanese: &'static str| match locale {
+        locale::Locale::English => english,
+        locale::Locale::Chinese => chinese,
+        locale::Locale::Japanese => japanese,
+    };
+    let connected = !crate::auth::setup_needed();
+    let plugins = crate::plugins::doctor_lines(&desktop::OsEnv::from_process(), locale);
+    let mut next: Vec<String> = Vec::new();
+    if !connected {
+        next.push(
+            text(
+                "connect a model: rdsh setup --web (opens a browser page)",
+                "连接模型：rdsh setup --web（打开浏览器页面）",
+                "モデルをつなぐ: rdsh setup --web（ブラウザの画面が開きます）",
+            )
+            .to_string(),
+        );
+    }
+    if !plugins.is_empty() {
+        next.push(
+            text(
+                "add the bundled plugins: rdsh plugins install",
+                "补齐必需插件：rdsh plugins install",
+                "同梱プラグインを補う: rdsh plugins install",
+            )
+            .to_string(),
+        );
+    }
+    if next.is_empty() {
+        next.push(
+            text(
+                "ready: nothing else to set up",
+                "已就绪：无需其他设置",
+                "準備完了: ほかに設定はありません",
+            )
+            .to_string(),
+        );
+    }
+    let _ = writeln!(
+        std::io::stdout(),
+        "[rdsh] {}",
+        text("next", "下一步", "次の一手")
+    );
+    for line in &next {
+        let _ = writeln!(std::io::stdout(), "[rdsh]   {line}");
+    }
+    match mode {
+        DoctorMode::Diagnose => return Ok(()),
+        DoctorMode::Choose => {}
+    }
+    let desktop_session = crate::setup_web::a_desktop_session_is_available();
+    let web = text(
+        "Web UI (browser, opens automatically)",
+        "Web UI（浏览器，自动打开）",
+        "Web UI（ブラウザ。自動で開きます）",
+    );
+    let terminal = text(
+        "Terminal (stays in this window)",
+        "终端（留在此窗口）",
+        "ターミナル（この画面のまま）",
+    );
+    let mut answer = None;
+    if crate::setup_web::interactive_terminal() {
+        let _ = writeln!(std::io::stdout());
+        let _ = writeln!(
+            std::io::stdout(),
+            "[rdsh] {}",
+            text(
+                "where do you want to work?",
+                "想在哪里使用？",
+                "どこで使いますか？",
+            )
+        );
+        let _ = writeln!(std::io::stdout(), "[rdsh]   1) {web}");
+        let _ = writeln!(std::io::stdout(), "[rdsh]   2) {terminal}");
+        let _ = write!(
+            std::io::stdout(),
+            "[rdsh] {} [{}] ",
+            text("choose", "选择", "選択"),
+            if desktop_session { "1" } else { "2" }
+        );
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        if std::io::stdin().read_line(&mut line).is_ok() {
+            answer = Some(line.trim().to_string());
+        }
+    }
+    let start_web = mode_choice(answer.as_deref(), desktop_session);
+    if start_web {
+        let _ = writeln!(
+            std::io::stdout(),
+            "[rdsh] {} {web}",
+            text("starting", "启动", "起動")
+        );
+        passthrough::exec_boot("web", None, &[], &[], false, true, locale)
+    } else {
+        let _ = writeln!(
+            std::io::stdout(),
+            "[rdsh] {} {terminal}",
+            text("starting", "启动", "起動")
+        );
+        let _ = std::io::stdout().flush();
+        // The terminal replaces this process, exactly as `rdsh tui` does.
+        let exe = std::env::current_exe()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt as _;
+            let error = std::process::Command::new(exe).arg("tui").exec();
+            Err(anyhow::anyhow!(error))
+        }
+        #[cfg(not(unix))]
+        {
+            let status = std::process::Command::new(exe).arg("tui").status()?;
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    }
 }
 
 /// Best-effort, bounded `dsh --version` readout. Only the owned child is killed.
@@ -4842,5 +5003,31 @@ mod doctor_wrapper_tests {
             assert!(warnings[0].contains("not executable"), "{}", warnings[0]);
         }
         fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod doctor_choice_test {
+    use super::mode_choice;
+
+    #[test]
+    fn the_doctor_question_defaults_to_web_only_with_a_desktop_session() {
+        assert!(mode_choice(None, true));
+        assert!(!mode_choice(None, false));
+        assert!(mode_choice(Some(""), true));
+        assert!(!mode_choice(Some(""), false));
+    }
+
+    #[test]
+    fn the_answer_wins_over_the_default() {
+        for web in ["1", "w", "web"] {
+            assert!(mode_choice(Some(web), false), "{web}");
+        }
+        for tui in ["2", "t", "tui", "terminal"] {
+            assert!(!mode_choice(Some(tui), true), "{tui}");
+        }
+        // Unknown input falls back to the default rather than erroring.
+        assert!(mode_choice(Some("x"), true));
+        assert!(!mode_choice(Some("x"), false));
     }
 }

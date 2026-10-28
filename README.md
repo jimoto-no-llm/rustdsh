@@ -31,6 +31,10 @@ You are working on rdsh, a Rust launcher for dsh (DeepSeek Harness).
 - Report only commands you actually ran, with their exit codes.
 ```
 
+Setting up a person who has never used a CLI? Read [docs/SETUP.md](docs/SETUP.md) top to
+bottom first, follow its order, and answer questions from this README and `docs/` rather
+than guessing.
+
 ## Why rdsh?
 
 - ⚡ **Sub-millisecond process launch**: `rdsh --version` starts in ~0.90 ms with ~2.9 MB peak RSS, versus ~88 ms and ~66 MB for Node.js-based `dsh --version`. This is process launch only: a booted agent profile still runs upstream Node.js, so conversation startup and session memory match upstream. See [Benchmarks](#benchmarks).
