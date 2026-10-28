@@ -80,6 +80,7 @@ pub fn start_chat(kind: &str) -> anyhow::Result<()> {
             let app = crate::desktop::find_app(&crate::desktop::OsEnv::from_process())
                 .ok_or_else(|| anyhow::anyhow!("DeepSeek Harness Desktop was not found"))?;
             crate::auth::open_browser(&app.to_string_lossy(), crate::locale::Locale::English)
+                .map(|_| ())
         }
         "tui" | "web" => {
             anyhow::ensure!(

@@ -3,6 +3,15 @@
 The canonical repository is `jimoto-no-llm/rustdsh`; new repository, API,
 installer and badge links use that owner. Keep historical evidence intact.
 
+## Setting up for someone
+
+A person who has never used a CLI should be pointed at [docs/SETUP.md](docs/SETUP.md).
+Read the whole file before answering and follow its step order: open `rdsh setup --web`
+first, connect exactly one model route, then `rdsh plugins install --recommended=starter`,
+then `rdsh tui`. When something is unclear, search this repository first (README, docs/,
+CHANGELOG) and answer from what you found; never invent a command the repository does
+not document.
+
 ## Release work
 
 - Follow `docs/RELEASING.md` and the published `docs/releases/v0.2.0.md` format:

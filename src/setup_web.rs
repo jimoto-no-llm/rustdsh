@@ -9,6 +9,42 @@ use std::sync::Arc;
 const HTML: &str = include_str!("setup.html");
 const ICON: &str = include_str!("../assets/icon.svg");
 
+/// The one instruction that matters when no browser was opened for the person.
+fn paste_hint(locale: crate::locale::Locale) {
+    eprintln!(
+        "[rdsh setup] {}",
+        match locale {
+            crate::locale::Locale::English =>
+                "enter the token handoff file contents in the setup page; the token is never printed",
+            crate::locale::Locale::Chinese => "请在设置页面中输入令牌交接文件的内容；令牌绝不会打印",
+            crate::locale::Locale::Japanese =>
+                "セットアップページでトークン引き渡しファイルの内容を入力してください。トークンは表示されません",
+        }
+    );
+}
+
+/// Whether this run should open the setup page by itself.
+///
+/// A browser is assumed wherever a desktop session exists, even when stdin is
+/// not a terminal: an agent, a double-clicked launcher or `ssh -T` used to skip
+/// the page and make the person paste the handoff file by hand, which is where
+/// first-time setup stalled. A machine with no display keeps the URL line only,
+/// and RDSH_SETUP_OPEN=0 forces that quiet behavior anywhere.
+fn should_open_page() -> bool {
+    if std::env::var_os("RDSH_SETUP_OPEN").is_some_and(|value| value == "0" || value == "false") {
+        return false;
+    }
+    {
+        use std::io::IsTerminal as _;
+        if std::io::stdin().is_terminal() {
+            return true;
+        }
+    }
+    cfg!(any(target_os = "windows", target_os = "macos"))
+        || std::env::var_os("DISPLAY").is_some()
+        || std::env::var_os("WAYLAND_DISPLAY").is_some()
+}
+
 pub fn cmd_setup_web(
     port: u16,
     profile: &str,
@@ -68,22 +104,18 @@ pub fn cmd_setup_web(
         },
         handoff.path().display()
     );
-    eprintln!(
-        "[rdsh setup] {}",
-        match locale {
-            crate::locale::Locale::English =>
-                "enter the file contents in the setup page; the token is never printed",
-            crate::locale::Locale::Chinese => "请在设置页面中输入文件内容；令牌绝不会打印",
-            crate::locale::Locale::Japanese =>
-                "セットアップページでファイル内容を入力してください。トークンは表示されません",
-        }
-    );
-    use std::io::IsTerminal as _;
     // Keep the bearer token out of the browser-launch argv: open a protected
     // local launcher page that forwards with the token in the fragment, so a
     // first-time user lands on a connected page without pasting anything.
+    //
+    // The page is opened even when stdin is not a terminal (an agent, a
+    // double-clicked launcher, `ssh -T`): asking the person to paste the
+    // handoff file by hand is the step where first-time setup used to stall.
+    // A machine with no display (CI, a container) has nobody to open a browser
+    // for, so it keeps only the URL line above. RDSH_SETUP_OPEN=0 forces that
+    // quiet behavior even where a browser would be reachable.
     let mut _launcher = None;
-    if std::io::stdin().is_terminal() || std::env::var_os("RDSH_SETUP_OPEN").is_some() {
+    if should_open_page() {
         // The launcher lives until the server exits. Explorer can report a
         // failure status after opening the page, so never open a second tab.
         let opened = match crate::token_handoff::TokenHandoff::launcher(&base, &token, locale) {
@@ -94,21 +126,12 @@ pub fn cmd_setup_web(
             }
             Err(_) => crate::auth::open_browser(&base, locale),
         };
-        if let Err(e) = opened {
-            eprintln!(
-                "[rdsh setup] {} ({e:#}); {}",
-                match locale {
-                    crate::locale::Locale::English => "could not open browser",
-                    crate::locale::Locale::Chinese => "无法打开浏览器",
-                    crate::locale::Locale::Japanese => "ブラウザを開けませんでした",
-                },
-                match locale {
-                    crate::locale::Locale::English => "open the URL manually",
-                    crate::locale::Locale::Chinese => "请手动打开 URL",
-                    crate::locale::Locale::Japanese => "URL を手動で開いてください",
-                }
-            );
+        match opened {
+            Ok(true) => {}
+            Ok(false) | Err(_) => paste_hint(locale),
         }
+    } else {
+        paste_hint(locale);
     }
     let done = Arc::new(AtomicBool::new(false));
     let connections = Arc::new(AtomicUsize::new(0));
@@ -497,6 +520,37 @@ mod tests {
                 body.len()
             )
         })
+    }
+
+    /// The platforms whose opener needs no display variable of its own.
+    fn spawns_a_browser_without_one() -> bool {
+        cfg!(any(target_os = "windows", target_os = "macos"))
+    }
+
+    #[test]
+    fn the_page_opens_off_a_terminal_but_never_in_a_headless_session() {
+        // The quiet switch wins over everything else.
+        std::env::set_var("RDSH_SETUP_OPEN", "0");
+        assert!(!should_open_page());
+        std::env::remove_var("RDSH_SETUP_OPEN");
+        // A desktop session opens the page even without a terminal on stdin,
+        // which is the case an agent or a double-clicked launcher hits.
+        // A terminal on stdin opens it on every platform.
+        let stdin_is_terminal = {
+            use std::io::IsTerminal as _;
+            std::io::stdin().is_terminal()
+        };
+        assert_eq!(
+            should_open_page(),
+            stdin_is_terminal || spawns_a_browser_without_one()
+        );
+        // ...and a desktop session covers the case with no terminal at all.
+        if !stdin_is_terminal {
+            std::env::set_var("DISPLAY", ":1");
+            let with_display = should_open_page();
+            std::env::remove_var("DISPLAY");
+            assert!(with_display);
+        }
     }
 
     #[test]

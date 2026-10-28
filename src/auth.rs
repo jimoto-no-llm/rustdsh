@@ -2023,7 +2023,10 @@ fn launch_login(locale: crate::locale::Locale) -> bool {
     }
 }
 
-fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
+/// Spawn the platform opener. True means the command started; a desktop opener
+/// can still hand off and exit non-zero, so callers that only need to know
+/// whether someone tried to open the page must not treat that as a failure.
+fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<bool> {
     #[cfg(target_os = "windows")]
     let mut cmd = {
         let mut c = std::process::Command::new("explorer");
@@ -2053,10 +2056,8 @@ fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
             )
         )
     })?;
-    if st.success() {
-        Ok(())
-    } else {
-        anyhow::bail!(
+    if !st.success() {
+        eprintln!(
             "{} {st}",
             localized(
                 locale,
@@ -2064,8 +2065,9 @@ fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
                 "打开程序已退出",
                 "オープナーが終了しました"
             )
-        )
+        );
     }
+    Ok(true)
 }
 
 /// `--open`: reveal the settings locations in the OS file manager (the
@@ -2637,7 +2639,7 @@ pub(crate) fn command_on_path(bin: &str) -> bool {
 }
 
 /// Open a URL in the OS browser (best effort, used by `setup --web`).
-pub(crate) fn open_browser(url: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
+pub(crate) fn open_browser(url: &str, locale: crate::locale::Locale) -> anyhow::Result<bool> {
     open_path(url, locale)
 }
 
