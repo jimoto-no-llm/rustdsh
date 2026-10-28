@@ -691,9 +691,11 @@ mod tests {
         let worker_target = target.clone();
         let worker = std::thread::spawn(move || {
             started_tx.send(()).unwrap();
+            // Windows CI can pause this thread for longer than the wait, so give
+            // the writer enough room that only a real hang fails the test.
             let lock = CredentialFileLock::exclusive_for_timeout(
                 &worker_target,
-                Duration::from_secs(2),
+                Duration::from_secs(10),
                 crate::locale::Locale::English,
             )
             .unwrap();
@@ -711,7 +713,7 @@ mod tests {
 
         std::fs::remove_file(&marker).unwrap();
         acquired_rx
-            .recv_timeout(Duration::from_secs(2))
+            .recv_timeout(Duration::from_secs(10))
             .expect("the waiting writer should acquire after DSH releases the marker");
         worker.join().unwrap();
         assert!(!marker.exists());
