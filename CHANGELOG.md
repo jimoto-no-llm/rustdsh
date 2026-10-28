@@ -11,12 +11,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   読ませる前提で書いた実行手順です。導入、接続先を 1 つ選んでつなぐ（OpenAI・OpenCode Go・Command Code・Ollama）、
   推奨プラグインの導入、会話の開始、詰まったときの早見表までを 1 ステップずつ並べています。
 
+<<<<<<< HEAD
 ### Fixed
 
 - `rdsh setup --web` が、端末のない環境（AI エージェント経由・ランチャーからの起動・`ssh -T`）で
   ブラウザを開かず、トークン引き渡しファイルを手で貼る手順を求めていました。デスクトップセッションがあれば
   必ず画面を開くようにし、画面のない機械では従来どおり URL だけを出します（`RDSH_SETUP_OPEN=0` で抑制）。
 
+=======
+>>>>>>> origin/main
 ## [0.13.0] - 2026-10-28
 
 ### Added
