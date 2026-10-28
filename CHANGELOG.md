@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-28
+
 ### Added
 
 - DSH **0.2.2-alpha.2** に対応しました。厳格なツール境界の監査済みアダプターに `dsh-tools-0.2.2-alpha.2` を追加し、
