@@ -12,7 +12,18 @@ const adapters = Object.freeze({
   'dsh-tools-0.2.1-alpha.3': '614e4f50fff440f3f80cbe047148f7ad0ef2807ca27379e57f7e4f57925642cf',
   'dsh-tools-0.2.1-rc.3': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
   'dsh-tools-0.2.1-rc.4': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
+  'dsh-tools-0.2.2-alpha.2': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
 });
+// The boundary installs itself from the tool runtime's constructor. Each
+// upstream line moves that constructor around, so the anchor is per adapter:
+// 0.2.0-rc.2 through 0.2.1-rc.4 assign maxParallelSubCalls in the PTC runtime,
+// while 0.2.2 moved the service onto Cordis and names it in super().
+const LEGACY_CONSTRUCTOR =
+  '\t\tthis.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls);';
+const constructors = Object.freeze({
+  'dsh-tools-0.2.2-alpha.2': '\t\tsuper(ctx, "tools");',
+});
+
 const language = (() => {
   const value = (process.env.RDSH_SECURITY_LANG || process.env.RDSH_LANG || 'en').toLowerCase();
   if (value === 'zh' || value.startsWith('zh-') || value.startsWith('zh_')) return 'zh';
@@ -55,7 +66,7 @@ registerHooks({
     if (url !== target) return loaded;
     const source = typeof loaded.source === 'string' ? loaded.source : Buffer.from(loaded.source).toString('utf8');
     if (digest(source) !== expected) throw securityError('RUNTIME_CHANGED');
-    const marker = '\t\tthis.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls);';
+    const marker = constructors[process.env.RDSH_TOOL_ADAPTER ?? 'dsh-tools-0.2.0-rc.2'] ?? LEGACY_CONSTRUCTOR;
     if (source.split(marker).length !== 2) throw securityError('UNSUPPORTED_CONSTRUCTOR');
     const patched = source
       .replace(marker, marker + '\n\t\tglobalThis[Symbol.for("rdsh.tool-boundary.install")](this);');

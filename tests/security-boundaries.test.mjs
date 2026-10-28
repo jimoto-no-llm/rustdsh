@@ -24,6 +24,7 @@ function auditedRuntimeEnvironment() {
     alpha3: process.env.RDSH_AUDITED_RUNTIME_ALPHA3,
     rc3: process.env.RDSH_AUDITED_RUNTIME_RC3,
     rc4: process.env.RDSH_AUDITED_RUNTIME_RC4,
+    alpha22: process.env.RDSH_AUDITED_RUNTIME_ALPHA22,
   };
 }
 
@@ -55,6 +56,7 @@ test('audited preload accepts registered versions and the legacy unset rc2 adapt
     [runtimes.alpha3, 'dsh-tools-0.2.1-alpha.3'],
     [runtimes.rc3, 'dsh-tools-0.2.1-rc.3'],
     [runtimes.rc4, 'dsh-tools-0.2.1-rc.4'],
+    [runtimes.alpha22, 'dsh-tools-0.2.2-alpha.2'],
   ].filter(([runtime]) => runtime);
   if (pairs.length === 0) {
     t.skip('official audited runtime paths are supplied by the Linux security matrix');
@@ -243,6 +245,30 @@ test('unsupported runtime is refused without copying external login credentials'
   assert.equal(spawnSync(bin, ['auth', '--import', '--provider', 'openai-codex'], { env }).status, 0);
   assert.match(readFileSync(path.join(env.DSH_HOME, '.credentials.yaml'), 'utf8'), /DUMMY_ACCESS/);
   assert.equal(JSON.parse(spawnSync(bin, ['setup', '--json'], { env, encoding: 'utf8' }).stdout).needed, false);
+});
+
+test('the 0.2.2 tool service installs the boundary from its constructor', t => {
+  const runtime = process.env.RDSH_AUDITED_RUNTIME_ALPHA22;
+  if (!runtime) {
+    t.skip('the official 0.2.2-alpha.2 runtime path is supplied by the Linux security matrix');
+    return;
+  }
+  // 0.2.2 replaced the PTC runtime API, so the boundary now installs from the
+  // Cordis service constructor; the probe fails if the anchor moved again or if
+  // rdsh_inspect never reaches the service.
+  const probe = path.resolve('tests', 'guarded-runtime-probe-022.mjs');
+  const result = spawnSync(process.execPath, ['--import', securityPreload, probe], {
+    env: {
+      ...process.env,
+      RDSH_TOOL_RUNTIME: runtime,
+      RDSH_TOOL_ADAPTER: 'dsh-tools-0.2.2-alpha.2',
+      RDSH_SECURE_WORKSPACE: process.cwd(),
+      RDSH_SHARED_FILES: '[]',
+    },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'ok');
 });
 
 test('forged tool exports fail before delegated code runs', t => {

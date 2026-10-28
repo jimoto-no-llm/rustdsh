@@ -1338,9 +1338,20 @@ pub(crate) mod tests {
         drop(reserved);
         // free_port never hands out 0 and always returns a bindable loopback
         // port; re-binding right away proves the release.
-        let fresh = free_port().unwrap();
-        assert_ne!(fresh, 0);
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, fresh)).unwrap();
+        // free_port probes and releases the port, so another process can take it
+        // between the probe and this bind. A busy runner does exactly that, so
+        // retry instead of failing the suite on the race.
+        let (fresh, listener) = (0..5)
+            .find_map(|_| {
+                let fresh = free_port().unwrap();
+                assert_ne!(fresh, 0);
+                match TcpListener::bind((Ipv4Addr::LOCALHOST, fresh)) {
+                    Ok(listener) => Some((fresh, listener)),
+                    Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => None,
+                    Err(error) => panic!("bind 127.0.0.1:{fresh}: {error}"),
+                }
+            })
+            .expect("free_port kept handing out a taken port");
         assert!(port_in_use(fresh));
         drop(listener);
     }
