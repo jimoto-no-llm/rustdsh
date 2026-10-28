@@ -23,6 +23,19 @@ fn paste_hint(locale: crate::locale::Locale) {
     );
 }
 
+/// A desktop session exists, so a browser can be opened and seen.
+pub(crate) fn a_desktop_session_is_available() -> bool {
+    cfg!(any(target_os = "windows", target_os = "macos"))
+        || std::env::var_os("DISPLAY").is_some()
+        || std::env::var_os("WAYLAND_DISPLAY").is_some()
+}
+
+/// Both ends are a terminal: a question can be asked and the answer read.
+pub(crate) fn interactive_terminal() -> bool {
+    use std::io::IsTerminal as _;
+    std::io::stdin().is_terminal() && std::io::stderr().is_terminal()
+}
+
 /// Whether this run should open the setup page by itself.
 ///
 /// A browser is assumed wherever a desktop session exists, even when stdin is
