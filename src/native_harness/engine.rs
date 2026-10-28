@@ -439,7 +439,11 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
                 secrets: vec![],
             });
             let task = tokio::spawn(e.clone().run(1));
-            let id = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            // The runner is a Node child process. A loaded or instrumented
+            // runner (coverage builds start it far slower) can take well over
+            // 5 s to reach the approval, so wait long enough that only a real
+            // hang fails here.
+            let id = tokio::time::timeout(std::time::Duration::from_secs(30), async {
                 loop {
                     if let Some(p) = e.state.lock().unwrap().pending.as_ref() {
                         break p.id.clone();
@@ -448,7 +452,7 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
                 }
             })
             .await
-            .unwrap();
+            .expect("the runner never asked for approval within 30s");
             assert!(!task.is_finished());
             assert!(e
                 .state
