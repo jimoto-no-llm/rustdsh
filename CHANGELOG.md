@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-29
+
 ### Added
 
 - `rdsh doctor` の末尾に「次の一手」を出し、対話端末では Web UI かターミナルかを選べるようにしました。
