@@ -7,6 +7,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `rdsh doctor` の末尾に「次の一手」を出し、対話端末では Web UI かターミナルかを選べるようにしました。
+  何も入力せず Enter を押した場合は、デスクトップセッションがあれば Web UI、無ければターミナルで起動します。
+  パイプや AI エージェント経由（端末なし）では質問せず、今までどおり診断結果だけを出します。
 - セットアップ手順書 `docs/SETUP.md` を追加しました。CLI に不慣れな人向けに、AI エージェントへそのまま
   読ませる前提で書いた実行手順です。導入、接続先を 1 つ選んでつなぐ（OpenAI・OpenCode Go・Command Code・Ollama）、
   推奨プラグインの導入、会話の開始、詰まったときの早見表までを 1 ステップずつ並べています。
