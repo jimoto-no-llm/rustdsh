@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {frameJson,decodeConnect} from './protocol.mjs';import {pbFields,pbString,pbInt,decodeFields,pbText} from './protobuf.mjs';
+async function* chunks(...v){yield* v;}
+async function collect(v){const out=[];for await(const x of v)out.push(x);return out;}
+function terminal(v={}){const b=frameJson(v);b[0]=2;return b;}
+test('Connect accepts fragmented envelopes and requires terminal frame',async()=>{const b=Buffer.concat([frameJson({text:'日'}),terminal()]);assert.deepEqual(await collect(decodeConnect(chunks(b.subarray(0,3),b.subarray(3,8),b.subarray(8)))),[{text:'日'}]);await assert.rejects(collect(decodeConnect(chunks(frameJson({text:'x'})))),/Truncated/);});
+test('Connect rejects trailing data, oversize and nonobject JSON',async()=>{await assert.rejects(collect(decodeConnect(chunks(Buffer.concat([terminal(),frameJson({})])))),/followed/);const b=Buffer.alloc(5);b.writeUInt32BE(5000000,1);await assert.rejects(collect(decodeConnect(chunks(b))),/size limit/);await assert.rejects(collect(decodeConnect(chunks(frameJson('bad')))),/object/);});
+test('Connect surfaces RPC status without echoing secret',async()=>{await assert.rejects(collect(decodeConnect(chunks(terminal({error:{code:'unauthenticated',message:'bad secret-token-example'}})),{secrets:['secret-token-example']})),e=>e.code==='unauthenticated'&&!e.message.includes('secret-token-example'));});
+test('protobuf codec handles nested/repeated fields and rejects truncation',()=>{const b=pbFields(pbString(1,'日本語'),pbInt(2,123456),pbString(1,'second'));const f=decodeFields(b);assert.equal(pbText(f,1),'日本語');assert.equal(f.get(1).length,2);assert.equal(f.get(2)[0],123456n);assert.throws(()=>decodeFields(Buffer.from([10,5,1])),/Truncated/);assert.throws(()=>decodeFields(Buffer.from([128])),/Truncated/);});
