@@ -5,14 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- `rdsh files list` / `rdsh files get` を追加しました。セッションが `present` で宣言した
-  成果物（ファイル）を一覧し、コピーして保存できます。宣言されていないファイルは読みません。
-- `rdsh serve` に `GET /api/files`（一覧）と `GET /api/file?path=<path>`（ダウンロード）を追加しました。
-  ブラウザから直接保存できます。
-
-## [0.13.1] - 2026-10-28
+- WindowsでWebホストが異常終了した後の常駐運用向けに、回数制限とバックオフを持つ
+  任意の監視スクリプトを追加しました。終了コードを記録し、正常終了とCtrl+Cでは
+  再起動せず、既存サーバーと認証情報を保持します。
+- WindowsのNode 24.15.0で再現したTCP接続時のネイティブクラッシュについて、
+  修正を含む24.16.0以降への更新手順、独立した再現スクリプト、診断根拠を追加しました。
 
 ## [0.13.1] - 2026-10-29
 

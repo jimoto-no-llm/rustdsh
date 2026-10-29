@@ -111,6 +111,8 @@ See `dashboard/README.md`.
 
 - `install.sh` (Linux/macOS/WSL), `install.ps1` (Windows, incl. `-Wsl`).
 - `sync-dsh.sh` + `systemd/rdsh-sync.*`: keep the upstream Harness in sync.
+- `scripts/windows-web-supervisor.ps1`: opt-in bounded Web-host recovery on
+  Windows; see [WINDOWS-WEB-SERVICE.md](WINDOWS-WEB-SERVICE.md).
 - `plugins/`: Smart-DSH compat bundle, update banner, skill installer.
 
 The optional [MCP exposure bundle](../plugins/rdsh-mcp-exposure/README.md)

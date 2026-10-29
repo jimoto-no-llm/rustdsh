@@ -431,7 +431,14 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
 fn connect_within(port: u16) -> TcpStream {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
-        match TcpStream::connect(("127.0.0.1", port)) {
+        // On Windows an unreachable loopback port can block for ~2 s per
+        // attempt, so connect to the deadline rather than through a fixed
+        // number of tries.
+        let attempt = std::net::TcpStream::connect_timeout(
+            &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+            Duration::from_secs(1),
+        );
+        match attempt {
             Ok(stream) => return stream,
             Err(error) => {
                 assert!(
