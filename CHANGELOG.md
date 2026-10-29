@@ -5,6 +5,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- WindowsでWebホストが異常終了した後の常駐運用向けに、回数制限とバックオフを持つ
+  任意の監視スクリプトを追加しました。終了コードを記録し、正常終了とCtrl+Cでは
+  再起動せず、既存サーバーと認証情報を保持します。
+
 ## [0.13.1] - 2026-10-29
 
 ### Added

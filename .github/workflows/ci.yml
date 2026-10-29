@@ -439,6 +439,7 @@ jobs:
           # the rdsh settings tab; its ledger and unpacking are checked here.
           ./tests/installer-plugins.ps1
           ./tests/icon-assets.ps1
+          ./tests/windows-web-supervisor.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'
           $d = Join-Path $tmp 'dsh'
