@@ -7,6 +7,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `rdsh-mcp-exposure` を DSH **0.2.1-rc.3** の一式で動くようにしました。検証済みリリースの
+  矩陣に rc.3 と rc.4 を追加し、`devDependencies` を揃え、3 言語のエラーメッセージも更新しました。
+
 - WindowsでWebホストが異常終了した後の常駐運用向けに、回数制限とバックオフを持つ
   任意の監視スクリプトを追加しました。終了コードを記録し、正常終了とCtrl+Cでは
   再起動せず、既存サーバーと認証情報を保持します。
