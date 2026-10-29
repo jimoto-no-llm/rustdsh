@@ -231,9 +231,25 @@ function payloadScript({ copy, probes, lang }, table) {
 
 /** Insert a fragment at the top of `<head>`, or at the top of the document. */
 function insertInHead(html, fragment) {
-	const open = /<head(?:\s[^>]*)?>/i.exec(html);
-	if (open !== null) return `${html.slice(0, open.index + open[0].length)}${fragment}${html.slice(open.index + open[0].length)}`;
-	return `${fragment}${html}`;
+	// Same match as /<head(?:\s[^>]*)?>/i, scanned instead of executed: the
+	// unanchored regex re-tries at every position (CodeQL flags it as a
+	// polynomial backtracking pattern), while this stays one lowercased pass
+	// plus one forward scan. Anchor detection, case folding and the first
+	// '>' after optional whitespace are the rules the regex applied.
+	const lower = html.toLowerCase();
+	let from = 0;
+	for (;;) {
+		const at = lower.indexOf("<head", from);
+		if (at === -1) return `${fragment}${html}`;
+		const after = at + 5;
+		const ch = html[after];
+		if (ch === ">") return `${html.slice(0, after + 1)}${fragment}${html.slice(after + 1)}`;
+		if (ch !== undefined && /\s/.test(ch)) {
+			const gt = html.indexOf(">", after);
+			if (gt !== -1) return `${html.slice(0, gt + 1)}${fragment}${html.slice(gt + 1)}`;
+		}
+		from = at + 5;
+	}
 }
 
 /**

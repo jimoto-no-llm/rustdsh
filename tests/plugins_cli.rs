@@ -352,6 +352,6 @@ fn a_missing_checkout_fails_loudly_unless_bundled_plugins_are_declined() {
         .iter()
         .all(|spec| spec.starts_with("@deepseek-ai/")));
     assert!(json(&output)["failed"].as_array().unwrap().is_empty());
-    // web carries seven bundled essentials (the banner and the asset server are Web-only).
-    assert_eq!(json(&output)["skipped"].as_array().unwrap().len(), 7);
+    // web carries eight bundled essentials (the banner and the asset server are Web-only).
+    assert_eq!(json(&output)["skipped"].as_array().unwrap().len(), 8);
 }
