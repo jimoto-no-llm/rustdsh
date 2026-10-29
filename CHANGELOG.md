@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-10-29
+
 ### Added
 
 - DSH Web UI のモバイル/プラグイン群 `dsh-mobile-maxxing`（kuraneko1、MIT）を同梱し、既定で入れるようにしました。
