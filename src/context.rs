@@ -3075,7 +3075,7 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
     read_zstd_session(source, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT, None)
 }
 
-fn read_zstd_session(
+pub(crate) fn read_zstd_session(
     source: &Path,
     cap: usize,
     line_limit: usize,

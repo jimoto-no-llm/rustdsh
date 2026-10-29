@@ -262,6 +262,17 @@ rdsh --profile web        # ブラウザ（http://127.0.0.1:3080）
 rdsh tui                  # ターミナル
 ```
 
+### 成果物（ファイル）の保存
+
+セッションが `present` で宣言したファイルは、次のコマンドで一覧し、コピーして保存できます。
+
+```sh
+rdsh files list            # 何があるか見るだけ
+rdsh files get "/path/to/file" --out ~/Downloads/file.xlsx
+```
+
+Web のダッシュボードでは、`GET /api/files` で一覧が取れ、`GET /api/file?path=<path>` で直接ダウンロードできます。
+
 初回はモデルが選ばれていないことがあります。その場合は画面のモデル選択で、
 4 でつないだ経路のモデルを選んでください。
 
