@@ -69,6 +69,7 @@ mod exec_trust;
 mod executable;
 mod file_lock;
 mod file_security;
+mod files;
 mod guard;
 mod inspect;
 mod instruction_queue;
@@ -116,7 +117,7 @@ mod worker_scopes;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|files|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
   rdsh provider detect            credentials and local servers on this machine
   rdsh provider import --dry-run  what detection would write into the profile\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh plugins status             what a profile still misses (essential tier, read-only)\n  rdsh plugins install --profile web   attach the essential plugins after an upgrade\n  rdsh --passthrough tui          no slim env; only rdsh_inspect stays isolated\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
@@ -573,6 +574,11 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Files a session declared as deliverables: list them, or save a copy
+    Files {
+        #[command(subcommand)]
+        action: FilesAction,
+    },
     /// Keep a CLI-backed provider's model list in step with the local CLI
     /// catalog (Codex today), so a model released after the harness was built
     /// still reaches the model picker
@@ -614,6 +620,31 @@ enum PluginsAction {
         no_bundled: bool,
         #[arg(long = "json")]
         json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum FilesAction {
+    /// Files the session declared with `present`, newest session by default
+    List {
+        /// Session id (default: the most recently written transcript)
+        #[arg(long)]
+        session: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Copy one declared file to this machine (the working directory by default)
+    Get {
+        /// Absolute path reported by `rdsh files list`
+        path: String,
+        /// Destination file (default: its basename in the working directory)
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long)]
+        session: Option<String>,
+        /// Copy any readable file, not only one the session declared
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -1030,6 +1061,7 @@ const NATIVE_FIRST: &[&str] = &[
     "features",
     "cost-ledger",
     "models",
+    "files",
     "update",
     "serial-proxy",
     "worker-git",
@@ -1781,6 +1813,17 @@ fn main() {
                 } => deps::cmd_impact(target, depth.unwrap_or(3).clamp(1, 8), json),
             }
         }
+        Some(Commands::Files { action }) => match action {
+            FilesAction::List { session, json } => {
+                files::cmd_list(session.as_deref(), json, locale)
+            }
+            FilesAction::Get {
+                path,
+                out,
+                session,
+                force,
+            } => files::cmd_get(&path, out.as_deref(), session.as_deref(), force, locale),
+        },
         Some(Commands::Models {
             action,
             provider,
@@ -2603,6 +2646,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         "query" => ("查询依赖图中的符号", "依存グラフのシンボルを照会"),
         "impact" => ("显示受影响的文件", "影響を受けるファイルを表示"),
         "models" => ("查看与同步模型目录", "モデルカタログの表示と同期"),
+        "files" => (
+            "列出自会话的交付文件",
+            "セッションが作った成果物の一覧と保存",
+        ),
         "sync" => (
             "同步配置文件中的模型目录",
             "プロファイルのモデルカタログを同期",
@@ -2681,6 +2728,7 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "text" => ("要记忆的文本", "記憶するテキスト"),
         "kind" => ("条目类型", "項目の種類"),
         "session" => ("会话文件", "セッションファイル"),
+        "out" => ("保存目标路径", "保存先のパス"),
         "apply" => ("实际写入结果", "結果を実際に書き込む"),
         "path" => ("文件路径", "ファイルのパス"),
         "rdsh" => ("rdsh 可执行文件路径", "rdsh実行ファイルのパス"),

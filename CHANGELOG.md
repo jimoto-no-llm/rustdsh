@@ -5,6 +5,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `rdsh files list` / `rdsh files get` を追加しました。セッションが `present` で宣言した
+  成果物（ファイル）を一覧し、コピーして保存できます。宣言されていないファイルは読みません。
+- `rdsh serve` に `GET /api/files`（一覧）と `GET /api/file?path=<path>`（ダウンロード）を追加しました。
+  ブラウザから直接保存できます。
+
+## [0.13.1] - 2026-10-28
+
 ## [0.13.1] - 2026-10-29
 
 ### Added
