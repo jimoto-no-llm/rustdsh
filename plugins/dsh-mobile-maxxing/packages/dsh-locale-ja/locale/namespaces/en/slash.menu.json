@@ -1,0 +1,11 @@
+{
+  "command": "Commands",
+  "crumbs.aria": "Folder navigation",
+  "drill.aria": "Browse folder",
+  "drill.hint": "Browse folder",
+  "drill.key": "Tab",
+  "loading": "Loading…",
+  "skill": "Skills",
+  "subagent": "Subagents",
+  "suggestions.aria": "Trigger suggestions"
+}

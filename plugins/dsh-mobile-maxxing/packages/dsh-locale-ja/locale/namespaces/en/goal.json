@@ -1,0 +1,14 @@
+{
+  "action.cancel": "Cancel edit",
+  "action.clear": "Clear goal",
+  "action.edit": "Edit goal",
+  "action.pause": "Pause goal",
+  "action.resume": "Resume goal",
+  "action.save": "Save goal",
+  "commandInput.aria": "Command input",
+  "objective.aria": "Goal objective",
+  "phase.active": "Ongoing Goal",
+  "phase.active.disarmed": "Inactive Goal",
+  "phase.blocked": "Blocked Goal",
+  "phase.paused": "Paused Goal"
+}

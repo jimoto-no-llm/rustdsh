@@ -1,0 +1,7 @@
+{
+  "allowOnce": "Allow once",
+  "detail.aria": "Approval details",
+  "escalation": "Tool {toolName} requests privileged execution",
+  "reject": "Reject",
+  "waiting": "Waiting for approval"
+}

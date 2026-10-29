@@ -1,0 +1,16 @@
+{
+  "description": "Limit how long each command may run and how much it may output.",
+  "invalidNumber": "Enter a number, or leave blank to use the default.",
+  "maxOutputBytes": "Output cap per stream (bytes)",
+  "maxOutputBytesHint": "Output beyond this spills to a temporary file rather than being lost.",
+  "overridden": "Overridden",
+  "readOnly": "This deployment stores settings read-only.",
+  "reset": "Reset to default",
+  "save": "Save",
+  "saveFailed": "The deployment did not accept these values; they were left for you to correct.",
+  "saving": "Saving…",
+  "timeoutMs": "Command timeout (ms)",
+  "timeoutMsHint": "How long one command may run before it is terminated.",
+  "title": "Shell",
+  "unavailable": "This plugin is not loaded, so it cannot be configured right now."
+}

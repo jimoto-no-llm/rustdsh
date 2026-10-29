@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "name": "dsh-locale-ja",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Optional Japanese locale package for DSH: the sole ja language and namespace owner, released only when every key has a reviewed Japanese entry and no value falls back to English.",
+  "license": "MIT",
+  "nodeEngine": ">=22",
+  "clientLocalePeer": "0.2.1-rc.2 || 0.2.1-rc.3",
+  "author": "kuraneko1",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "locale",
+    "japanese",
+    "i18n"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kuraneko1/dsh-mobile-maxxing.git",
+    "directory": "packages/dsh-locale-ja"
+  },
+  "homepage": "https://github.com/kuraneko1/dsh-mobile-maxxing/tree/main/packages/dsh-locale-ja#readme",
+  "bugs": {
+    "url": "https://github.com/kuraneko1/dsh-mobile-maxxing/issues"
+  }
+}

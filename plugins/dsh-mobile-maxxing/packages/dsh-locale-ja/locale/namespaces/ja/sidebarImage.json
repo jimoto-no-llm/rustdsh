@@ -1,0 +1,13 @@
+{
+  "failed": "この画像を表示できませんでした。",
+  "loading": "ドキュメントを描画中…",
+  "preview": "画像プレビュー: {name}",
+  "title": "画像",
+  "unsupported": "画像プレビューにはファイル全体の内容が必要です。",
+  "zoomControls": "ズーム操作",
+  "zoomFitWidth": "幅に合わせる",
+  "zoomIn": "拡大",
+  "zoomMenu": "ズームを選択",
+  "zoomOut": "縮小",
+  "zoomValue": "{percent}%"
+}

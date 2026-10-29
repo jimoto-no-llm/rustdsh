@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 1,
+  "locale": "ja",
+  "status": "complete",
+  "developmentOnlyEnglishFallback": false,
+  "fallbackPolicy": "development-only-english",
+  "note": "Every key has a reviewed Japanese entry; no value is an English fallback.",
+  "dsh": {
+    "name": "@deepseek-ai/dsh",
+    "version": "0.2.1-rc.3"
+  },
+  "totals": {
+    "namespaces": 65,
+    "keys": 2915,
+    "translated": 2915,
+    "fallback": 0,
+    "translatedNamespaces": 65,
+    "fallbackNamespaces": 0,
+    "partialNamespaces": 0
+  },
+  "namespaces": {
+    "agent-team": {
+      "sourceHash": "sha256:b9ae4a6690ed98429481882ecba07a777f05396613ad31c9f6eb7fea0378f992",
+      "keys": 25,
+      "translated": 25,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "approval": {
+      "sourceHash": "sha256:99ecb95812a6ed63ce78543f97043c6690b23d449575d4fc39a5b8b64c8ee795",
+      "keys": 5,
+      "translated": 5,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "chat": {
+      "sourceHash": "sha256:de1536f966195cddce967cb1e9d39ccff3f184bf0b008275e3bff4af361fcfc1",
+      "keys": 191,
+      "translated": 191,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "command": {
+      "sourceHash": "sha256:45b82ed7f68323d6d76bbdeccb1d1e20fe984c92723190d881026121a79d54cb",
+      "keys": 28,
+      "translated": 28,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "common": {
+      "sourceHash": "sha256:6b64d0f68d7a33a5e3e849bd99a9552ef6d546af5824a9550d16be4b6789cbee",
+      "keys": 41,
+      "translated": 41,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "conversation": {
+      "sourceHash": "sha256:f77ddfa5e473863acf0fa0cb213a35205be76e14f9ca9629a653d9258a4674e6",
+      "keys": 375,
+      "translated": 375,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "cordis": {
+      "sourceHash": "sha256:2ff6f5170a72c3394e431334c94ead57ad71ce4a6df2ffadc901752f64eb3932",
+      "keys": 51,
+      "translated": 51,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "cotTranslation": {
+      "sourceHash": "sha256:adcb302da819c642f3fa5d7df4b48caef919110a7f4cd03cd131c158e632d48a",
+      "keys": 32,
+      "translated": 32,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "deepseek-model-label-1017": {
+      "sourceHash": "sha256:b131241b891834dba2d65087d9447c8b34838fb52cbb95b79e1aaa1d43738f67",
+      "keys": 1,
+      "translated": 1,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "deliverables": {
+      "sourceHash": "sha256:99dc5ae38af2f2ca4530eb2548dfcce224172e3f3c923c873e1844d66cfc93f4",
+      "keys": 60,
+      "translated": 60,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "directory-browser": {
+      "sourceHash": "sha256:735b482b7d2cb0cf627b8d4cea123a863d79e7b3b90dbbf854ecb95c9d009bc1",
+      "keys": 13,
+      "translated": 13,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "documentHtml": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 4,
+      "translated": 4,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "documentMarkdown": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 4,
+      "translated": 4,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "entryCustomization": {
+      "sourceHash": "sha256:d603f08e6fa764fe7ccf256773c468d2106086be3d071188a86bf905d8c980c3",
+      "keys": 5,
+      "translated": 5,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "feedback": {
+      "sourceHash": "sha256:66c90ba8444a6146228455ffe7d7746c404020d8bfec7a21bb20e240597cff51",
+      "keys": 20,
+      "translated": 20,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "goal": {
+      "sourceHash": "sha256:9e5e7e09f7dfc99e66391f7023969177a49651394315c90d91a76b4f3ab4181a",
+      "keys": 12,
+      "translated": 12,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "inspectorPanel": {
+      "sourceHash": "sha256:e62774a415c70a56447a07870423b763e0bb17ab11379b51a92d6096f941ed12",
+      "keys": 5,
+      "translated": 5,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "job": {
+      "sourceHash": "sha256:9efc103ee1c8ce974473d9ea885ef5c5dc03144d6f81b54e02a06cbdbb04957a",
+      "keys": 40,
+      "translated": 40,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "model": {
+      "sourceHash": "sha256:3bd35b117a1bd1522425ab03ad8556be39f311ed2eaf12fd95d60950b3abf9bc",
+      "keys": 23,
+      "translated": 23,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "open-in-app": {
+      "sourceHash": "sha256:188e94a64aa0b947615d44078a916373626aa78240fd18281de8ffaa7c260809",
+      "keys": 45,
+      "translated": 45,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "permission.access": {
+      "sourceHash": "sha256:b811a84c36952c8247180f3af3b883b8d5c1f678eda3e1cb38e8e325d89a539c",
+      "keys": 17,
+      "translated": 17,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "plan": {
+      "sourceHash": "sha256:e0813f959920b487b90ee369b0bf928efc4c584f57b1bb0dc38bf38bd386afe2",
+      "keys": 17,
+      "translated": 17,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "pluginManager": {
+      "sourceHash": "sha256:31977e874e9f66a443373627e14b5c9b0df3a258a5fe2418833d76d804684459",
+      "keys": 221,
+      "translated": 221,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "pluginMarket": {
+      "sourceHash": "sha256:355b0ed735850272be55fa6f2af3040e83247f071faa64bceece111fea403460",
+      "keys": 78,
+      "translated": 78,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "question": {
+      "sourceHash": "sha256:d7003152380a9e40d88795c2fa2b2cdc00b83ce629042e39b8933db34d88c3d5",
+      "keys": 31,
+      "translated": 31,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "reference": {
+      "sourceHash": "sha256:36acbd18b595d860b7af8ffffc4757f1e3c12dad1519fe4fdc8b66e803fbd167",
+      "keys": 15,
+      "translated": 15,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "schedule.catalog": {
+      "sourceHash": "sha256:b6f9271d382f89dde75e6f854ace70d7abc2e03ca1a539e1f5579682f9ad1e46",
+      "keys": 70,
+      "translated": 70,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "schedule.manager": {
+      "sourceHash": "sha256:b6f9271d382f89dde75e6f854ace70d7abc2e03ca1a539e1f5579682f9ad1e46",
+      "keys": 188,
+      "translated": 188,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "secretMask": {
+      "sourceHash": "sha256:b04741d6d25d942427e632688e5f52982e26b4d2a0ef803e107b6855bcdf5dd3",
+      "keys": 2,
+      "translated": 2,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "session-inspector": {
+      "sourceHash": "sha256:da646776b5cd126ea3850a5f1b9452aabec395ca4b828a2bd448e4731ea006ad",
+      "keys": 52,
+      "translated": 52,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "session-log-download": {
+      "sourceHash": "sha256:a92c3ef8382b754403a771a0d3a4ac6e24f9f4a3e4bc840bb2e4431924227055",
+      "keys": 10,
+      "translated": 10,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings": {
+      "sourceHash": "sha256:817f4c4e57d5fce3b35899fcbfd98a3af889f9b2d1c7414757a4f6fe310717e4",
+      "keys": 41,
+      "translated": 41,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.account": {
+      "sourceHash": "sha256:872cbe57beda00f197fbe84c05c7ea50e55e49ffa2d546fc9a9e9b7bc2eac997",
+      "keys": 94,
+      "translated": 94,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.agentLoop": {
+      "sourceHash": "sha256:d5e51a37b08b918f5bedd30624ef7cd99dbb71b3a779b0e74671e6c7776c5740",
+      "keys": 12,
+      "translated": 12,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.agentPreset": {
+      "sourceHash": "sha256:5edd759901141cd1accb40f9ba41007fa241a36cc0cacee7cc9a7533efd31d4e",
+      "keys": 47,
+      "translated": 47,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.locale": {
+      "sourceHash": "sha256:6b64d0f68d7a33a5e3e849bd99a9552ef6d546af5824a9550d16be4b6789cbee",
+      "keys": 1,
+      "translated": 1,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.models": {
+      "sourceHash": "sha256:5cbf79442851fc783ef4b7cc9f5110cb5f95c0347c712a627a30ed625b5d8b53",
+      "keys": 134,
+      "translated": 134,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.permission": {
+      "sourceHash": "sha256:b811a84c36952c8247180f3af3b883b8d5c1f678eda3e1cb38e8e325d89a539c",
+      "keys": 12,
+      "translated": 12,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.pluginInventory": {
+      "sourceHash": "sha256:ebe8ce381f13c1cb594871edeeffcfa8c7968e49a33b9ce5a780e8727097994a",
+      "keys": 37,
+      "translated": 37,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.plugins": {
+      "sourceHash": "sha256:c773b5108e59f9eb12be4bb3a171302fc6545db351380e9ca460ef5a75360c64",
+      "keys": 5,
+      "translated": 5,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.sessionLog": {
+      "sourceHash": "sha256:8cd55773cf10cb08cf50ce26e86fb1a986674b6c013fd04bbb30a378591d0493",
+      "keys": 4,
+      "translated": 4,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.shell": {
+      "sourceHash": "sha256:2d4a940ecb44b4bca2a23a0e0524db2949f8f2c5095426d9cff6db8e55b4b73a",
+      "keys": 14,
+      "translated": 14,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.subagent": {
+      "sourceHash": "sha256:b7c1fce78b02e7aabf589ca0ce600236e392551003a1a8bfc90e69524adbb397",
+      "keys": 35,
+      "translated": 35,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.theme": {
+      "sourceHash": "sha256:0a9a8ff32700e68fabe0a4f912c21c85289469c76af4bba4cf103e1438ac44ac",
+      "keys": 25,
+      "translated": 25,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "settings.webSearch": {
+      "sourceHash": "sha256:9e657b12c08b5db0ec734a0b1064842e2981f8922c93ee32b24d08bd04a726a2",
+      "keys": 27,
+      "translated": 27,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "shortcuts": {
+      "sourceHash": "sha256:c70e606c67f6f4b21aacdb2df5254ec15df10d97d832560f3a91090ff3d96d5f",
+      "keys": 56,
+      "translated": 56,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "shortcuts.layout": {
+      "sourceHash": "sha256:5d4c82b454b02d1bab88f2217b0b76629f3fac7143747350601d7c46a27d22a7",
+      "keys": 1,
+      "translated": 1,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebar": {
+      "sourceHash": "sha256:e3ebd6bb9a7baa52cde6fe8cb7728dfd02584f20ad0e2ca8263d970c1197ffa8",
+      "keys": 6,
+      "translated": 6,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarBrowser": {
+      "sourceHash": "sha256:a1c3e115f36fa7c8e69ab6235a19e073b412e0537f5ee992fa78fcc34201f4f4",
+      "keys": 26,
+      "translated": 26,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarCodePreview": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 3,
+      "translated": 3,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarDocumentPreview": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 22,
+      "translated": 22,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarExcel": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 15,
+      "translated": 15,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarFiles": {
+      "sourceHash": "sha256:eccee1309459100707fab2e137f04d98012c442b9f6cb34ab2135b0f8c1e2b3e",
+      "keys": 17,
+      "translated": 17,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarImage": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 11,
+      "translated": 11,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarOffice": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 15,
+      "translated": 15,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarPdf": {
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "keys": 15,
+      "translated": 15,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarRight": {
+      "sourceHash": "sha256:1ab2914479bde6647c3af955ec68b41d00c340b0aa11363da999b3785b0ce158",
+      "keys": 35,
+      "translated": 35,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "sidebarTerminal": {
+      "sourceHash": "sha256:c3e78c13e0f97f37698fc78e22c3650b2c8f35548a8bfd2038331906609e2b22",
+      "keys": 28,
+      "translated": 28,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "skill": {
+      "sourceHash": "sha256:331c3f30f2f9b2857e5b617d4dc81d9c68d07607ba74d05607d3008c2bcae7c0",
+      "keys": 8,
+      "translated": 8,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "slash.menu": {
+      "sourceHash": "sha256:9414f8d7faaa2b52771a2af33393018f1338049241e38e7cec5a404937505781",
+      "keys": 9,
+      "translated": 9,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "subagent": {
+      "sourceHash": "sha256:ca9ad0168235c367d665129fcc6463453e2ac56ba06e22c3a7fd58376c2589c3",
+      "keys": 41,
+      "translated": 41,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "trajectory": {
+      "sourceHash": "sha256:2d6d727f58e9e28b5af7f0df9d63d295b83c52f879ce1dc7077efc55e4cfaea8",
+      "keys": 192,
+      "translated": 192,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "voice-input": {
+      "sourceHash": "sha256:1306b77d183fd70c9da879cd3d09c5d6d48df15008c312cbb672ff4ba693c4f8",
+      "keys": 109,
+      "translated": 109,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "workflowRun": {
+      "sourceHash": "sha256:0706608f1f12f90621c1e7f03e61a9bce547765cb4ad2ff126c280fd077df630",
+      "keys": 18,
+      "translated": 18,
+      "fallback": 0,
+      "status": "translated"
+    },
+    "workspace": {
+      "sourceHash": "sha256:1730736401657d1377b8a62ba0582bd8ff68e1450b7ba0c8ec5c718fb45d9e09",
+      "keys": 119,
+      "translated": 119,
+      "fallback": 0,
+      "status": "translated"
+    }
+  }
+}

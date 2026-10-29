@@ -1,0 +1,13 @@
+{
+  "failed": "This image could not be displayed.",
+  "loading": "Rendering document...",
+  "preview": "Image preview: {name}",
+  "title": "Image",
+  "unsupported": "Image preview requires the complete file contents.",
+  "zoomControls": "Zoom controls",
+  "zoomFitWidth": "Fit width",
+  "zoomIn": "Zoom in",
+  "zoomMenu": "Choose zoom",
+  "zoomOut": "Zoom out",
+  "zoomValue": "{percent}%"
+}

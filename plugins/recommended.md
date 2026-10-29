@@ -103,6 +103,7 @@ upstream). Every other row is attached on every run.
 | `@deepseek-ai/dsh-mcp-client` | Use tools from external MCP servers (`mcp__<server>__<tool>`) |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
 | `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
+| `dsh-mobile-maxxing` | PWA install, phone/tablet UX, in-app and Web Push notifications, and CJK Markdown tables for the Web UI. Bundled after `rdsh-mobile-ui` so its rules take priority over the Smart-DSH-derived layout. See [its README](dsh-mobile-maxxing/README.md). |
 | `rdsh-answer-guard` | When a turn ends with the reply only in the reasoning channel, the reader sees no answer and the agent looks stuck. The guard steers one reminder so the model restates it as text. `rdsh features off answer_guard` disables it — see [its README](rdsh-answer-guard/README.md). |
 | `rdsh-update-banner` | Release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5). |
 | `rdsh-no-feedback` | Turn off DSH's Like/Dislike on assistant messages and the `/feedback` dialog and command. Attached by default (`rdsh features on feedback` restores the surface — see [its README](rdsh-no-feedback/README.md). |

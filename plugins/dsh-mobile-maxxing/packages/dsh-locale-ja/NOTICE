@@ -1,0 +1,21 @@
+dsh-locale-ja — notices
+=======================
+
+The package code and its Japanese translations are Copyright (c) 2026 kuraneko1.
+The English locale snapshot it embeds is Copyright (c) 2026 DeepSeek.
+Both are distributed under the MIT License in LICENSE, which carries both
+copyright notices above the permission notice and disclaimer.
+
+English snapshot
+----------------
+locale/upstream.json and locale/namespaces/en/*.json reproduce the English
+locale dictionaries shipped in DeepSeek Harness 0.2.1-rc.3. They were extracted
+unchanged from the @deepseek-ai/* client packages recorded as owners and
+sources in locale/upstream.json, including @deepseek-ai/dsh-client-locale
+0.2.1-rc.3. No English value was authored or reworded here.
+
+Japanese translations
+---------------------
+locale/namespaces/ja/*.json and the Japanese values in the generated client.js
+are derivative translations of that English snapshot by kuraneko1, distributed
+under the same MIT License.

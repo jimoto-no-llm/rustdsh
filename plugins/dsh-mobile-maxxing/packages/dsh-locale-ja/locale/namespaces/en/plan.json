@@ -1,0 +1,19 @@
+{
+  "chip.exitFailed": "Failed to exit plan mode",
+  "chip.label": "Plan",
+  "chip.on.aria": "Plan mode on, press to turn off",
+  "chip.on.title": "Plan mode on — click to turn off (/plan off)",
+  "preview.action": "Open",
+  "preview.document": "Plan · Markdown",
+  "preview.expired": "This temporary plan preview has expired. Reopen it from the pending review card.",
+  "preview.failed": "Could not load plan",
+  "preview.full": "View full plan",
+  "preview.historyUnavailable": "Session history is unavailable",
+  "preview.invalidAddress": "Invalid plan address",
+  "preview.loading": "Loading plan…",
+  "preview.notFound": "This plan was not found",
+  "preview.open": "Open plan in sidebar",
+  "preview.openNamed": "Open plan: {title}",
+  "preview.title": "Plan",
+  "preview.unavailable": "Plan preview is unavailable"
+}

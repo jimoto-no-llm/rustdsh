@@ -1,0 +1,19 @@
+{
+  "autoRefresh": "Auto refresh",
+  "autoRefresh.disable": "Disable auto refresh",
+  "autoRefresh.enable": "Enable auto refresh",
+  "empty": "Empty directory",
+  "entry.other": "Not a file or a directory, so it cannot be opened.",
+  "error.notDirectory": "That is not a directory.",
+  "error.notFound": "That directory is gone. It may have been moved or deleted.",
+  "error.outsideWorkspace": "That directory is outside the workspace, so the sidebar will not read it.",
+  "error.unavailable": "Read failed: {message}",
+  "guide.description": "Browse files in this session's workspace",
+  "guide.title": "Workspace files",
+  "loading": "Reading…",
+  "noWorkspace": "This session has no workspace directory.",
+  "reload": "Reload",
+  "shortcut.noSession": "Select a session first",
+  "truncated": "Too many entries, showing only some of them.",
+  "type.label": "Files"
+}

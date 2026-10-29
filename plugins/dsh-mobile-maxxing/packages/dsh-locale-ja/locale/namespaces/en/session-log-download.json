@@ -1,0 +1,12 @@
+{
+  "dialog.close": "Close",
+  "dialog.commandFailed": "Could not start the Session export.",
+  "dialog.errorTitle": "Session export failed",
+  "dialog.preparingDescription": "Preparing a ZIP containing this Session, its sub-Sessions, and attachments.",
+  "dialog.preparingTitle": "Exporting Session",
+  "dialog.successDescription": "The browser is downloading the Session ZIP.",
+  "dialog.successTitle": "Session download started",
+  "header.more": "More actions",
+  "menu.download": "Download session log",
+  "menu.feedback": "Feedback"
+}

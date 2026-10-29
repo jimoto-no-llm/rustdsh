@@ -1,0 +1,17 @@
+{
+  "candidate.noCwd": "(no cwd)",
+  "crumb.root": "Workspace",
+  "fileOpen.close": "Close",
+  "fileOpen.failed": "Couldn’t open “{path}”. Try again or close this message.",
+  "fileOpen.retry": "Retry",
+  "fileOpen.title": "Couldn’t open file",
+  "section.files": "Files & folders",
+  "section.sessions": "Sessions",
+  "section.subagents": "Subagents",
+  "time.days": "{n}d",
+  "time.hours": "{n}h",
+  "time.minutes": "{n}min",
+  "time.months": "{n}mo",
+  "time.now": "now",
+  "time.years": "{n}y"
+}

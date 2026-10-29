@@ -1,0 +1,6 @@
+{
+  "description": "Help improve DeepSeek models and products.",
+  "failed": "Could not save preference",
+  "saved": "Preference saved",
+  "title": "Upload Session Log when using the official model API"
+}

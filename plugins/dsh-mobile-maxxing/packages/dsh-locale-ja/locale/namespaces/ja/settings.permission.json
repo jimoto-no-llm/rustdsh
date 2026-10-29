@@ -1,0 +1,14 @@
+{
+  "confirm.acknowledge": "リスクを理解した上で続行します",
+  "confirm.cancel": "キャンセル",
+  "confirm.description": "フルアクセスでは、新しいセッションで確認手順が減り、機密操作・ファイル変更・外部コマンドを含む多くの操作を直接実行できます。以降のタスクを信頼できる場合にのみ使用してください。",
+  "confirm.enable": "フルアクセスを有効化",
+  "confirm.title": "フルアクセスを有効にしますか？",
+  "description": "新しいセッションの既定の権限モードを選択",
+  "loading": "読み込み中",
+  "preset.fullAccess": "フルアクセス",
+  "preset.readOnly": "読み取り専用",
+  "preset.workspaceWrite": "ワークスペース書き込み",
+  "title": "権限",
+  "unavailable": "利用不可"
+}

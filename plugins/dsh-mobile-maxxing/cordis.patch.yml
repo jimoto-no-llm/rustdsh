@@ -1,0 +1,13 @@
+# Registers this package. Everything it ships — PWA shell, phone UX,
+# notifications — is one plugin. The CJK autolink fix is a
+# separate package because it rewrites the PC renderer:
+# the client module system maps one package to one browser module, so the
+# behaviours cannot be separate packages without also being separate modules.
+#
+# The implementation lives in packages/dsh-mobile-maxxing/; this file and the root
+# package.json are what make the repository itself installable
+# (`dsh plugin add https://github.com/kuraneko1/dsh-mobile-maxxing`).
+- insert:
+    - id: dsh-mobile-maxxing
+      name: "dsh-mobile-maxxing"
+      config: {}

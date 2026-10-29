@@ -1,0 +1,20 @@
+{
+  "member.empty": "Empty member name",
+  "member.open": "Open {name}",
+  "phase.empty": "Empty phase name",
+  "phase.unassigned": "Unphased",
+  "run.empty": "No members started",
+  "run.members.one": "{count} member",
+  "run.members.other": "{count} members",
+  "run.title": "{name}",
+  "status.cancelled": "Cancelled",
+  "status.completed": "Completed",
+  "status.failed": "Failed",
+  "status.interrupted": "Interrupted",
+  "status.running": "Running",
+  "statusCount.cancelled": "Cancelled {count}",
+  "statusCount.completed": "Completed {count}",
+  "statusCount.failed": "Failed {count}",
+  "statusCount.interrupted": "Interrupted {count}",
+  "statusCount.running": "Running {count}"
+}
