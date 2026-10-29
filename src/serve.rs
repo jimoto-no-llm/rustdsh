@@ -175,6 +175,9 @@ fn handle(
             return Ok(());
         }
     }
+    if (method, path) == ("GET", "/api/file") {
+        return handle_file_download(&mut s, query).map_err(|e| anyhow::anyhow!("{e}"));
+    }
     let (status, ctype, payload): (u16, &str, Cow<'_, str>) = match (method, path) {
         ("GET", "/") => (
             200,
@@ -251,10 +254,111 @@ fn handle(
             "application/json",
             Cow::Owned(crate::inspect::names_json("profiles")),
         ),
+        ("GET", "/api/files") => {
+            let session = query.split('&').find_map(|kv| {
+                let mut it = kv.splitn(2, '=');
+                match (it.next(), it.next()) {
+                    (Some("session"), Some(v)) => Some(v.to_string()),
+                    _ => None,
+                }
+            });
+            match crate::files::deliverables(session.as_deref()) {
+                Ok((label, files)) => {
+                    let body = serde_json::json!({
+                        "session": label,
+                        "files": files.iter().map(|item| serde_json::json!({
+                            "path": item.path,
+                            "description": item.description,
+                            "bytes": item.bytes,
+                            "exists": item.bytes.is_some(),
+                        })).collect::<Vec<_>>(),
+                    });
+                    (200, "application/json", Cow::Owned(body.to_string()))
+                }
+                Err(error) => (
+                    404,
+                    "application/json",
+                    Cow::Owned(format!("{{\"error\":\"{error}\"}}")),
+                ),
+            }
+        }
         _ => (404, "application/json", Cow::Borrowed(NOT_FOUND_JSON)),
     };
     crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
     Ok(())
+}
+
+/// Stream one declared deliverable so a browser can save a copy.
+fn handle_file_download(s: &mut std::net::TcpStream, query: &str) -> std::io::Result<()> {
+    let Some(path) = query.split('&').find_map(|kv| {
+        let mut it = kv.splitn(2, '=');
+        match (it.next(), it.next()) {
+            (Some("path"), Some(v)) => Some(v),
+            _ => None,
+        }
+    }) else {
+        return crate::local_http::respond(
+            s,
+            400,
+            "application/json",
+            b"{\"error\":\"missing path\"}",
+        );
+    };
+    let source = std::path::PathBuf::from(percent_decode(path));
+    let declared = match crate::files::deliverables(None) {
+        Ok((_, files)) => files,
+        Err(error) => {
+            let body = format!("{{\"error\":\"{error}\"}}");
+            return crate::local_http::respond(s, 404, "application/json", body.as_bytes());
+        }
+    };
+    let canonical = match crate::files::checked_source(&source, &declared) {
+        Ok(path) => path,
+        Err(error) => {
+            let body = format!("{{\"error\":\"{error}\"}}");
+            return crate::local_http::respond(s, 403, "application/json", body.as_bytes());
+        }
+    };
+    let bytes = match std::fs::read(&canonical) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            let body = format!("{{\"error\":\"{error}\"}}");
+            return crate::local_http::respond(s, 500, "application/json", body.as_bytes());
+        }
+    };
+    let name = crate::files::download_name(&canonical);
+    let ctype = crate::files::content_type(&canonical);
+    let header = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Disposition: attachment; filename=\"{}\"\r\n\r\n",
+        ctype,
+        bytes.len(),
+        name
+    );
+    use std::io::Write as _;
+    let _ = s.write_all(header.as_bytes());
+    let _ = s.write_all(&bytes);
+    let _ = s.flush();
+    Ok(())
+}
+
+/// Minimal percent-decoding for a query parameter.
+fn percent_decode(input: &str) -> String {
+    let mut out = Vec::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
+            if let Ok(byte) = u8::from_str_radix(hex, 16) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 fn doctor_json() -> String {
