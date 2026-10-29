@@ -1,0 +1,7 @@
+{
+  "create": "プラグインを作成",
+  "createPrompt.conversation": "DSHの会話ビュー用プラグインを作成してください。",
+  "createPrompt.rightbar": "DSHの右サイドバーに項目を追加するプラグインを作成してください。",
+  "createPrompt.sidebar": "DSHの左サイドバーに項目を追加するプラグインを作成してください。",
+  "install": "他のプラグインを探す"
+}

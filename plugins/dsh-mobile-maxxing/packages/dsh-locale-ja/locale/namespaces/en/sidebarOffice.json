@@ -1,0 +1,17 @@
+{
+  "busy": "Office preview is busy. Try again shortly.",
+  "changed": "The file changed while being read. Reopen the preview.",
+  "closeDetails": "Close font details",
+  "failed": "Office conversion did not produce a usable PDF. Check the file and try again.",
+  "invalid": "This Office file cannot be previewed. It may be damaged, password protected, or have the wrong extension.",
+  "loading": "Rendering document...",
+  "missingFontsCount": "Fonts: {count}",
+  "missingFontsDescription": "These fonts are unavailable for this preview. Text and layout may differ from the original document.",
+  "missingFontsTitle": "Missing fonts",
+  "retry": "Retry",
+  "timeout": "Office conversion timed out. Try again.",
+  "title": "Office document",
+  "tooLarge": "The Office file or converted PDF exceeds the preview size limit. Reduce the file size or adjust the preview configuration.",
+  "unavailable": "Office previews are unavailable. Enable the document preview service on the computer running DeepSeek Harness.",
+  "viewMissingFonts": "Missing fonts: {count}. Click to view."
+}

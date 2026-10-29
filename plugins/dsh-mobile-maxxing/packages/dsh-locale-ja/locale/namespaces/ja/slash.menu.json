@@ -1,0 +1,11 @@
+{
+  "command": "コマンド",
+  "crumbs.aria": "フォルダーナビゲーション",
+  "drill.aria": "フォルダーを参照",
+  "drill.hint": "フォルダーを参照",
+  "drill.key": "Tab",
+  "loading": "読み込み中…",
+  "skill": "スキル",
+  "subagent": "サブエージェント",
+  "suggestions.aria": "トリガーの候補"
+}

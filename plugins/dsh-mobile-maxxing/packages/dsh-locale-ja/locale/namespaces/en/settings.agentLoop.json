@@ -1,0 +1,14 @@
+{
+  "description": "Control how the Agent dispatches tool calls.",
+  "invalidNumber": "Enter a number, or leave blank to use the default.",
+  "maxParallel": "Parallel tool calls",
+  "maxParallelHint": "Upper bound on parallel-safe calls running at once within one step.",
+  "overridden": "Overridden",
+  "readOnly": "This deployment stores settings read-only.",
+  "reset": "Reset to default",
+  "save": "Save",
+  "saveFailed": "The deployment did not accept these values; they were left for you to correct.",
+  "saving": "Saving…",
+  "title": "Agent loop",
+  "unavailable": "This plugin is not loaded, so it cannot be configured right now."
+}

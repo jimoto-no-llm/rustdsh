@@ -5,6 +5,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- DSH Web UI のモバイル/プラグイン群 `dsh-mobile-maxxing`（kuraneko1、MIT）を同梱し、既定で入れるようにしました。
+  PWA 化、スマホ・タブレット向け UX、アプリ内通知と Web Push、CJK の Markdown 表を提供します。
+  `rdsh-mobile-ui`（Smart-DSH 由来）より後に読み込むため、同じ箇所は `dsh-mobile-maxxing` が優先されます。
+
 ## [0.14.0] - 2026-10-29
 
 ### Added

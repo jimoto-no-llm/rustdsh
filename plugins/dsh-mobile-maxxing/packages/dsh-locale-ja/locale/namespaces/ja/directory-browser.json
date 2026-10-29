@@ -1,0 +1,15 @@
+{
+  "browser.cancel": "キャンセル",
+  "browser.create": "作成",
+  "browser.createIn": "「{name}」内に新しいフォルダー",
+  "browser.editPath": "パスを編集",
+  "browser.folderName": "フォルダー名",
+  "browser.home": "ホーム",
+  "browser.loading": "読み込み中…",
+  "browser.newFolder": "新しいフォルダー",
+  "browser.open": "開く",
+  "browser.showHidden": "隠しファイルを表示",
+  "browser.title": "ワークスペースディレクトリを選択",
+  "browser.truncated": "フォルダーが多すぎるため、先頭のみ表示しています。",
+  "browser.untitledFolder": "名称未設定フォルダー"
+}

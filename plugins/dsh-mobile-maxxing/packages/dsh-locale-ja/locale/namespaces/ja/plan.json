@@ -1,0 +1,19 @@
+{
+  "chip.exitFailed": "プランモードを終了できませんでした",
+  "chip.label": "プラン",
+  "chip.on.aria": "プランモードはオンです。押すとオフになります",
+  "chip.on.title": "プランモードはオンです — クリックでオフ (/plan off)",
+  "preview.action": "開く",
+  "preview.document": "プラン · Markdown",
+  "preview.expired": "この一時的なプランプレビューは期限切れです。保留中のレビューカードから開き直してください。",
+  "preview.failed": "プランを読み込めませんでした",
+  "preview.full": "プラン全体を表示",
+  "preview.historyUnavailable": "セッション履歴を利用できません",
+  "preview.invalidAddress": "プランのアドレスが不正です",
+  "preview.loading": "プランを読み込み中…",
+  "preview.notFound": "このプランは見つかりませんでした",
+  "preview.open": "プランをサイドバーで開く",
+  "preview.openNamed": "プランを開く: {title}",
+  "preview.title": "プラン",
+  "preview.unavailable": "プランプレビューを利用できません"
+}

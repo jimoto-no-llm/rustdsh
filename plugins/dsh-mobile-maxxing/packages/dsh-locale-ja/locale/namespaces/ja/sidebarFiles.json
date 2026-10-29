@@ -1,0 +1,19 @@
+{
+  "autoRefresh": "自動更新",
+  "autoRefresh.disable": "自動更新を無効化",
+  "autoRefresh.enable": "自動更新を有効化",
+  "empty": "空のディレクトリ",
+  "entry.other": "ファイルでもディレクトリでもないため開けません。",
+  "error.notDirectory": "ディレクトリではありません。",
+  "error.notFound": "そのディレクトリはもうありません。移動または削除された可能性があります。",
+  "error.outsideWorkspace": "そのディレクトリはワークスペースの外にあるため、サイドバーでは読み取りません。",
+  "error.unavailable": "読み取りに失敗しました: {message}",
+  "guide.description": "このセッションのワークスペースのファイルを閲覧",
+  "guide.title": "ワークスペースのファイル",
+  "loading": "読み込み中…",
+  "noWorkspace": "このセッションにはワークスペースディレクトリがありません。",
+  "reload": "再読み込み",
+  "shortcut.noSession": "先にセッションを選択してください",
+  "truncated": "項目が多すぎるため、一部のみ表示しています。",
+  "type.label": "ファイル"
+}

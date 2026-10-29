@@ -1,0 +1,22 @@
+{
+  "action.dislike": "Bad response",
+  "action.dislikeActive": "Remove rating",
+  "action.like": "Good response",
+  "action.likeActive": "Remove rating",
+  "category.instruction-following": "Instruction understanding and following",
+  "category.other": "Other",
+  "category.product-interaction": "Product features and interaction",
+  "category.resource-cost": "Resource usage and cost",
+  "category.security-privacy-permission": "Security, privacy, and permissions",
+  "category.service-stability": "Stability and speed",
+  "category.task-result": "Task result",
+  "dialog.categories": "Feedback category",
+  "dialog.detail": "Feedback details",
+  "dialog.hint": "Add details to help us improve. Your submission will include the current conversation log.",
+  "dialog.title": "Submit feedback",
+  "error.conflict": "This feedback changed elsewhere; the latest state is shown",
+  "error.generic": "Could not save feedback",
+  "error.load": "Could not load feedback",
+  "error.noteTooLarge": "The description is too long; shorten it and submit again",
+  "toast.recorded": "Thanks for your feedback"
+}

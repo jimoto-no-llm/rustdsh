@@ -272,7 +272,7 @@ PKGS="
 @deepseek-ai/dsh-tool-bash-persistent
 @deepseek-ai/dsh-mcp-client
 "
-ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui rdsh-answer-guard"
+ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui dsh-mobile-maxxing rdsh-answer-guard"
 if [ "$PROFILE" = "web" ]; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-update-banner"
 fi

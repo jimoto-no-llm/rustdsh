@@ -45,6 +45,11 @@
       "why": "phone-width Web layout"
     },
     {
+      "package": "dsh-mobile-maxxing",
+      "bundled": true,
+      "why": "PWA, phone/tablet UX and notifications for the Web UI"
+    },
+    {
       "package": "rdsh-answer-guard",
       "bundled": true,
       "why": "restate reasoning-only replies as text"

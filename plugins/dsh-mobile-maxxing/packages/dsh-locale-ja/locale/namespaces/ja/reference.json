@@ -1,0 +1,17 @@
+{
+  "candidate.noCwd": "(作業ディレクトリなし)",
+  "crumb.root": "ワークスペース",
+  "fileOpen.close": "閉じる",
+  "fileOpen.failed": "「{path}」を開けませんでした。もう一度試すか、このメッセージを閉じてください。",
+  "fileOpen.retry": "再試行",
+  "fileOpen.title": "ファイルを開けませんでした",
+  "section.files": "ファイルとフォルダー",
+  "section.sessions": "セッション",
+  "section.subagents": "サブエージェント",
+  "time.days": "{n}日",
+  "time.hours": "{n}時間",
+  "time.minutes": "{n}分",
+  "time.months": "{n}か月",
+  "time.now": "今",
+  "time.years": "{n}年"
+}

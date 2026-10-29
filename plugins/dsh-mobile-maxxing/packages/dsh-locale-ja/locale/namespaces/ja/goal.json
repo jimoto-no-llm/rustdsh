@@ -1,0 +1,14 @@
+{
+  "action.cancel": "編集をキャンセル",
+  "action.clear": "ゴールをクリア",
+  "action.edit": "ゴールを編集",
+  "action.pause": "ゴールを一時停止",
+  "action.resume": "ゴールを再開",
+  "action.save": "ゴールを保存",
+  "commandInput.aria": "コマンド入力",
+  "objective.aria": "ゴールの目的",
+  "phase.active": "進行中のゴール",
+  "phase.active.disarmed": "待機中のゴール",
+  "phase.blocked": "ブロックされたゴール",
+  "phase.paused": "一時停止中のゴール"
+}

@@ -1,0 +1,73 @@
+{
+  "name": "dsh-mobile-maxxing",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "DSH Web GUI をインストール可能なアプリにし、スマホ/タブレット向けUX・通知・小物をまとめて改善する統合プラグイン",
+  "exports": {
+    ".": "./packages/dsh-mobile-maxxing/index.js",
+    "./client": "./packages/dsh-mobile-maxxing/client.js",
+    "./locale/*.json": "./packages/dsh-mobile-maxxing/locale/*.json",
+    "./icon": "./packages/dsh-mobile-maxxing/assets/icon-192.png"
+  },
+  "files": [
+    "packages/dsh-mobile-maxxing/index.js",
+    "packages/dsh-mobile-maxxing/client.js",
+    "packages/dsh-mobile-maxxing/sw.js",
+    "packages/dsh-mobile-maxxing/notify",
+    "packages/dsh-mobile-maxxing/lib",
+    "packages/dsh-mobile-maxxing/locale/*.json",
+    "packages/dsh-mobile-maxxing/assets/*.png",
+    "packages/dsh-mobile-maxxing/assets/*.svg",
+    "packages/dsh-mobile-maxxing/docs/*.png",
+    "packages/dsh-mobile-maxxing/docs/*.md",
+    "packages/dsh-mobile-maxxing/README.md",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test packages/dsh-mobile-maxxing/tests/*.test.mjs packages/dsh-md-rendering/tests/*.test.mjs",
+    "test:locale": "node --test packages/dsh-locale-ja/test/*.test.mjs",
+    "extract:locale": "node tools/extract-upstream.mjs",
+    "check:locale": "node tools/extract-upstream.mjs --check",
+    "build:locale": "node tools/build-client.mjs",
+    "check:locale:generated": "node tools/build-client.mjs --check",
+    "merge:locale": "node tools/merge-batches.mjs",
+    "e2e": "node packages/dsh-mobile-maxxing/tests/e2e.mjs",
+    "pack:all": "node scripts/pack-all.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "dsh-mobile-maxxing",
+    "description": "PWA化、スマホ/タブレットの操作感、通知（アプリ内バナーとWeb Push）、CJK表示の修正をまとめて提供します。"
+  },
+  "author": "kuraneko1",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "pwa",
+    "mobile",
+    "ios",
+    "web-push",
+    "japanese"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kuraneko1/dsh-mobile-maxxing.git"
+  },
+  "homepage": "https://github.com/kuraneko1/dsh-mobile-maxxing#readme",
+  "bugs": {
+    "url": "https://github.com/kuraneko1/dsh-mobile-maxxing/issues"
+  }
+}

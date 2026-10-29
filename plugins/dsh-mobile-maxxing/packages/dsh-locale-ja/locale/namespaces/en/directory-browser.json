@@ -1,0 +1,15 @@
+{
+  "browser.cancel": "Cancel",
+  "browser.create": "Create",
+  "browser.createIn": "New folder in \"{name}\"",
+  "browser.editPath": "Edit path",
+  "browser.folderName": "Folder name",
+  "browser.home": "Home",
+  "browser.loading": "Loading…",
+  "browser.newFolder": "New folder",
+  "browser.open": "Open",
+  "browser.showHidden": "Show hidden files",
+  "browser.title": "Select Workspace Directory",
+  "browser.truncated": "Too many folders to list; only the beginning is shown.",
+  "browser.untitledFolder": "Untitled folder"
+}

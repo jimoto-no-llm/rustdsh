@@ -1,0 +1,1838 @@
+{
+  "schemaVersion": 1,
+  "snapshotLocale": "en",
+  "dsh": {
+    "name": "@deepseek-ai/dsh",
+    "version": "0.2.1-rc.3"
+  },
+  "totals": {
+    "namespaces": 65,
+    "keys": 2915,
+    "locales": {
+      "en": 2915,
+      "zh": 2915
+    }
+  },
+  "namespaces": {
+    "agent-team": {
+      "fileName": "agent-team.json",
+      "owners": [
+        "@deepseek-ai/dsh-experimental-client-ui-agent-team"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-experimental-client-ui-agent-team",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 470,
+          "sha256": "sha256:5740a0ab636520ee318e052146fa64cb5019f7fb98cda4344fd1266521b99cdb"
+        }
+      ],
+      "sourceHash": "sha256:b9ae4a6690ed98429481882ecba07a777f05396613ad31c9f6eb7fea0378f992",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 25,
+        "zh": 25
+      },
+      "dictionaryHashes": {
+        "en": "sha256:0a74a9bb00be0d5b0ee64d740a4785786807ba377a24f825f96751ed3b366fcb",
+        "zh": "sha256:27a4d9095fe944f928e9af75b97a0dd12d4445c12e527a8679ebe394335bf7d8"
+      }
+    },
+    "approval": {
+      "fileName": "approval.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-approval"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-approval",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 316,
+          "sha256": "sha256:d5ae6ff6ebdef5bfa1ef76e3c10024095ed5b6c51ce793abb9e8af3781a9eae4"
+        }
+      ],
+      "sourceHash": "sha256:99ecb95812a6ed63ce78543f97043c6690b23d449575d4fc39a5b8b64c8ee795",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 5,
+        "zh": 5
+      },
+      "dictionaryHashes": {
+        "en": "sha256:093d60f2cb4b98462ac5765b99d78cfffea05b4253137987e730d66e9c21a6d1",
+        "zh": "sha256:815e7ed0af4b8715b0221c4cc8444de0846bb189434fb3d918c5cd39138855b8"
+      }
+    },
+    "chat": {
+      "fileName": "chat.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-chat"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-chat",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 13110,
+          "sha256": "sha256:a00e5176d1257d51604cefbe9a15d326d4283439df31f76ba20ff690c76e10a1"
+        }
+      ],
+      "sourceHash": "sha256:de1536f966195cddce967cb1e9d39ccff3f184bf0b008275e3bff4af361fcfc1",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 191,
+        "zh": 191
+      },
+      "dictionaryHashes": {
+        "en": "sha256:5959fd886951650ee67045237b7af9ea2d2cc517029d0dc1bb97686fc64d106f",
+        "zh": "sha256:67a27f903dee2d832c8156efe82246a689a8399e258b2c69dbabf349cb5eba2d"
+      }
+    },
+    "command": {
+      "fileName": "command.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-commands"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-commands",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 2067,
+          "sha256": "sha256:8582c8fa0442f88bc6d28287011ef33032e69a59db461f9f00908c1d63b5bf64"
+        }
+      ],
+      "sourceHash": "sha256:45b82ed7f68323d6d76bbdeccb1d1e20fe984c92723190d881026121a79d54cb",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 28,
+        "zh": 28
+      },
+      "dictionaryHashes": {
+        "en": "sha256:187503ee9448a84765939fe02268a5bd1833de3a86ad827e362576b056789350",
+        "zh": "sha256:71eb3e9d8dbd24b1b93d8e4a200eab5a6a90b005d217d4877fe42af9a93d9a7b"
+      }
+    },
+    "common": {
+      "fileName": "common.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-locale",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1518,
+          "sha256": "sha256:bad8fe9bfb07af2a60c80933be65ceafdaab5386f404fb264401c7e540a36e16"
+        }
+      ],
+      "sourceHash": "sha256:6b64d0f68d7a33a5e3e849bd99a9552ef6d546af5824a9550d16be4b6789cbee",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 41,
+        "zh": 41
+      },
+      "dictionaryHashes": {
+        "en": "sha256:4b36d929fd4cbe238fc31be362c23f80f836603f9eed6cf2eda24d019f1d145c",
+        "zh": "sha256:641a0be18aaa061d6abcb24c839c2b44b5c7fa8cc46d52787e4a1c06c7e90b9c"
+      }
+    },
+    "conversation": {
+      "fileName": "conversation.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-conversation",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 19716,
+          "sha256": "sha256:b81765f0998430bbf5ab6389e89a082b799f017275c5abe1efb3c701f0fa708a"
+        }
+      ],
+      "sourceHash": "sha256:f77ddfa5e473863acf0fa0cb213a35205be76e14f9ca9629a653d9258a4674e6",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 375,
+        "zh": 375
+      },
+      "dictionaryHashes": {
+        "en": "sha256:254797951578036e55fa6e20494ff4f0f516f591ea11be10e7bdb92b399b17ee",
+        "zh": "sha256:081858ec8b2633eac3b50f5fa384225323f47a64d43917cecbcd6da09b690296"
+      }
+    },
+    "cordis": {
+      "fileName": "cordis.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-cordis"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-cordis",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1348,
+          "sha256": "sha256:605bac42a6b4e33b2f3b8eeb760e8b9a28733d801cf3a8974e820de7dad7050e"
+        }
+      ],
+      "sourceHash": "sha256:2ff6f5170a72c3394e431334c94ead57ad71ce4a6df2ffadc901752f64eb3932",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 51,
+        "zh": 51
+      },
+      "dictionaryHashes": {
+        "en": "sha256:e5f81b940ce55520ad5d90358bc982b790cbb5e9fe3f2a43e3d7fa48b1941eea",
+        "zh": "sha256:2c21b4c851786c77dbe47da76fa80ec70efdd41e10216e3c62fbeefe220436df"
+      }
+    },
+    "cotTranslation": {
+      "fileName": "cotTranslation.json",
+      "owners": [
+        "@deepseek-ai/dsh-experimental-client-ui-cot-translation"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-experimental-client-ui-cot-translation",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 963,
+          "sha256": "sha256:c0c083bef06f811219476c59bd5d7ecf2e6b2da2deb9199f73d616cff2c79f32"
+        }
+      ],
+      "sourceHash": "sha256:adcb302da819c642f3fa5d7df4b48caef919110a7f4cd03cd131c158e632d48a",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 32,
+        "zh": 32
+      },
+      "dictionaryHashes": {
+        "en": "sha256:1556c21acdf71db722f29ad081ecc9fb368d5179fd6d47a9fddde25766e81e95",
+        "zh": "sha256:76d206b16fc3be6425fa2af5b985ff6a0b6f1a671f04396dbf81df2c72eaf456"
+      }
+    },
+    "deepseek-model-label-1017": {
+      "fileName": "deepseek-model-label-1017.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-deepseek-model-label-1017"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-deepseek-model-label-1017",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 59,
+          "sha256": "sha256:8b3acd762d35d34b5f29c7442c2532a4abe13fea777bf8ed23a7a87a0882b4b9"
+        }
+      ],
+      "sourceHash": "sha256:b131241b891834dba2d65087d9447c8b34838fb52cbb95b79e1aaa1d43738f67",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 1,
+        "zh": 1
+      },
+      "dictionaryHashes": {
+        "en": "sha256:50facb6316aa276d2990ae0dd3ecbd7409fdcac6d458e1dd0d2020390182ccc1",
+        "zh": "sha256:50facb6316aa276d2990ae0dd3ecbd7409fdcac6d458e1dd0d2020390182ccc1"
+      }
+    },
+    "deliverables": {
+      "fileName": "deliverables.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-deliverables"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-deliverables",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 2269,
+          "sha256": "sha256:0b786f9c89e728ac33926b452536daaea678d9e7741a579126e406a232cb03ed"
+        }
+      ],
+      "sourceHash": "sha256:99dc5ae38af2f2ca4530eb2548dfcce224172e3f3c923c873e1844d66cfc93f4",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 60,
+        "zh": 60
+      },
+      "dictionaryHashes": {
+        "en": "sha256:9d67507e1bff84ced7a4d23cd0b373ee597ac151ac420bc336af080a02413336",
+        "zh": "sha256:1072de43e1c7a821acf776b442961cec5dca0f573ba3facd557b09b0b6a5c641"
+      }
+    },
+    "directory-browser": {
+      "fileName": "directory-browser.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-directory-picker-browse"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-directory-picker-browse",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1013,
+          "sha256": "sha256:55af354b2c4ace0c2e676264cd56c24b7d5b9da005e40269a1c0a1f1bb76fdea"
+        }
+      ],
+      "sourceHash": "sha256:735b482b7d2cb0cf627b8d4cea123a863d79e7b3b90dbbf854ecb95c9d009bc1",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 13,
+        "zh": 13
+      },
+      "dictionaryHashes": {
+        "en": "sha256:6ecca1dc25f36f7d788ae69f17e03aa3ff1c136285ac3f4d8d98780f67275bfc",
+        "zh": "sha256:4b4e99a650d93d3a35682018f7f9bcfe6d95a1625acff4efbaef64c0db51439c"
+      }
+    },
+    "documentHtml": {
+      "fileName": "documentHtml.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4513,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 4,
+        "zh": 4
+      },
+      "dictionaryHashes": {
+        "en": "sha256:e736258ef8b965d56dc8f3697236be9c7fcd5538352f3f2eedfce9f89c5b30d4",
+        "zh": "sha256:e8bf21562bbfda995223a68e9b0d5c8a677b201d6e5ac92c6aa29951cb791255"
+      }
+    },
+    "documentMarkdown": {
+      "fileName": "documentMarkdown.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1687,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 4,
+        "zh": 4
+      },
+      "dictionaryHashes": {
+        "en": "sha256:ad9a1cbb48ddacd7ee508bec449fe72555f21a06e19b3acfd9bd9567e48d4d2e",
+        "zh": "sha256:3d9fbe05acdc6e4c88e18957787c51ef52e3e04f77bbedd694a303acd50dac9d"
+      }
+    },
+    "entryCustomization": {
+      "fileName": "entryCustomization.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-entry-customization"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-entry-customization",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 103,
+          "sha256": "sha256:287f36fe74f6be3eb5ab51ec0c1f09ae8cacea8a01fe56b3966553106c69f7e4"
+        }
+      ],
+      "sourceHash": "sha256:d603f08e6fa764fe7ccf256773c468d2106086be3d071188a86bf905d8c980c3",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 5,
+        "zh": 5
+      },
+      "dictionaryHashes": {
+        "en": "sha256:d350c17d4d490f46a07c07bf485a7dbd53da43462d3f876f5177b7532785f5a3",
+        "zh": "sha256:51a2cac850e6a2fff3032de3f2f8f2e12c9e4e0f74d51aa3c0b41505c30a1073"
+      }
+    },
+    "feedback": {
+      "fileName": "feedback.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-message-feedback"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-message-feedback",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 791,
+          "sha256": "sha256:62cf5e8b35bba8856c4bfc4d70e210ea4dad7a01c4f5d59d47b3cbe06df07baa"
+        }
+      ],
+      "sourceHash": "sha256:66c90ba8444a6146228455ffe7d7746c404020d8bfec7a21bb20e240597cff51",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 20,
+        "zh": 20
+      },
+      "dictionaryHashes": {
+        "en": "sha256:15ceb7041ff4f72d2f158075f498fb41f05330548d198414929a3f32c0b0beda",
+        "zh": "sha256:828d7d797520e7bbf14c3c612eefc6dc19785646e1a20eda1fd2791b6690ab8e"
+      }
+    },
+    "goal": {
+      "fileName": "goal.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-goal"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-goal",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 573,
+          "sha256": "sha256:bd8e08a20c040729678c66fdeb5f823e6fbdb8a4b17feadd8e26a63a87294d0c"
+        }
+      ],
+      "sourceHash": "sha256:9e5e7e09f7dfc99e66391f7023969177a49651394315c90d91a76b4f3ab4181a",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 12,
+        "zh": 12
+      },
+      "dictionaryHashes": {
+        "en": "sha256:817d17f6122e136785c93313d9cbbcd279a71075f87b7c9cf614bde074972f28",
+        "zh": "sha256:bca4da43bc858e82a7c7ca9cdf7c160c2d58b4bd5ab9f2907b2c618d161d4591"
+      }
+    },
+    "inspectorPanel": {
+      "fileName": "inspectorPanel.json",
+      "owners": [
+        "@deepseek-ai/dsh-experimental-inspector"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-experimental-inspector",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.page.js",
+          "line": 232,
+          "sha256": "sha256:5c5d9781f517cfa72edc219ae834fad49774007c1304caf8f8538013f3d982d7"
+        }
+      ],
+      "sourceHash": "sha256:e62774a415c70a56447a07870423b763e0bb17ab11379b51a92d6096f941ed12",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 5,
+        "zh": 5
+      },
+      "dictionaryHashes": {
+        "en": "sha256:5d5002abba84ac7ec54128623d38c8d48dd853267d3b83271b033facef6da885",
+        "zh": "sha256:8ef12471afa6a6f3fa7d635260b5b90c05c4ebee81f8bfc89d842146bedd6111"
+      }
+    },
+    "job": {
+      "fileName": "job.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-jobs"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-jobs",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 623,
+          "sha256": "sha256:ad8f57b1b5b9adcd09b197b97ced17e3da4b9dcd0615d25a07f1282beba89fc8"
+        }
+      ],
+      "sourceHash": "sha256:9efc103ee1c8ce974473d9ea885ef5c5dc03144d6f81b54e02a06cbdbb04957a",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 40,
+        "zh": 40
+      },
+      "dictionaryHashes": {
+        "en": "sha256:1cfaf761a1781873691df6f84da1e4c4155e5b7142c4ea4ea5e54a8ae1f8fe09",
+        "zh": "sha256:ffa08d2ea6bca13fa4c4b7fb9ff74ea0d1706a08891f782867b0917c66011f47"
+      }
+    },
+    "model": {
+      "fileName": "model.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-model-selection"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-model-selection",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1858,
+          "sha256": "sha256:18f6e74e203d50f66c8e30552d52e070d06941514cb0e72b149683c092a3ba2a"
+        }
+      ],
+      "sourceHash": "sha256:3bd35b117a1bd1522425ab03ad8556be39f311ed2eaf12fd95d60950b3abf9bc",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 23,
+        "zh": 23
+      },
+      "dictionaryHashes": {
+        "en": "sha256:618f60d7d8e31595c1b233c2d6e8241875a9f16ae564f3bfba257b562e542c0b",
+        "zh": "sha256:1f12e6b68a8be9decc0638579cbb71f7d79ed0fa1859f24af600da31fdb33a47"
+      }
+    },
+    "open-in-app": {
+      "fileName": "open-in-app.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-open-in-app"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-open-in-app",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 787,
+          "sha256": "sha256:f799d4d26587e2cd03cf88a5af546b4b90d57b2372b012fb5f9999a7313e7d67"
+        }
+      ],
+      "sourceHash": "sha256:188e94a64aa0b947615d44078a916373626aa78240fd18281de8ffaa7c260809",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 45,
+        "zh": 45
+      },
+      "dictionaryHashes": {
+        "en": "sha256:66a99a3446548b3359913a3c739d9d37970491658e33405a2cc60a4a38f0eea1",
+        "zh": "sha256:9818ef8ae386989cac705dd94cec7139967e05fa3b201a76312a02a0475fb980"
+      }
+    },
+    "permission.access": {
+      "fileName": "permission.access.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-permission-presets"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-permission-presets",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 760,
+          "sha256": "sha256:0c5d7757b657615b3f34a5712d73e30af6726e5fb48d5947881533e6fdbdfcdd"
+        }
+      ],
+      "sourceHash": "sha256:b811a84c36952c8247180f3af3b883b8d5c1f678eda3e1cb38e8e325d89a539c",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 17,
+        "zh": 17
+      },
+      "dictionaryHashes": {
+        "en": "sha256:9e38bdb19ff5fa719aabdcec40cba8292fc4e5bbdea62af59c44e95bf53ec779",
+        "zh": "sha256:559664b97a06eddd6012e72c7c539233c5a0f9d97892372f7cd062758dc375ab"
+      }
+    },
+    "plan": {
+      "fileName": "plan.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-plan"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-plan",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 622,
+          "sha256": "sha256:0db2f8bba3de687b815919732785756a6c2fb61b2b5695ad95e43b200c35d108"
+        }
+      ],
+      "sourceHash": "sha256:e0813f959920b487b90ee369b0bf928efc4c584f57b1bb0dc38bf38bd386afe2",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 17,
+        "zh": 17
+      },
+      "dictionaryHashes": {
+        "en": "sha256:3f13a693740dcfd0d2f4eb4a9a0b7f8aa4b8138bfc4a46a53ee94438cdbb0e8d",
+        "zh": "sha256:fa3b2c2561f14b605c74cbefc39b5c0649240c26ab9ccb0fdb6bd881c3046557"
+      }
+    },
+    "pluginManager": {
+      "fileName": "pluginManager.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-plugin-manager",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4373,
+          "sha256": "sha256:61beea0fe856b054fe9dee4cfa5492f54df973ffd18ab85d5ea37beff52991d1"
+        }
+      ],
+      "sourceHash": "sha256:31977e874e9f66a443373627e14b5c9b0df3a258a5fe2418833d76d804684459",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 221,
+        "zh": 221
+      },
+      "dictionaryHashes": {
+        "en": "sha256:191cb7c9e5a56559d73fd9e18884ed83aa1e382c529bce36408384f9c5162e65",
+        "zh": "sha256:302f0ed4a48bef9c2791cda8c595d339eb41a4dca99fbf51cda04848e131bc41"
+      }
+    },
+    "pluginMarket": {
+      "fileName": "pluginMarket.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-plugin-market"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-plugin-market",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1596,
+          "sha256": "sha256:e961988dd984dc527b0bfeed37f6ae45b4a72392a2eb21676350359d8a127a60"
+        }
+      ],
+      "sourceHash": "sha256:355b0ed735850272be55fa6f2af3040e83247f071faa64bceece111fea403460",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 78,
+        "zh": 78
+      },
+      "dictionaryHashes": {
+        "en": "sha256:1363f0a248879a1ce878e15eb7a804515545d90649b632064322962334ec2fa4",
+        "zh": "sha256:4cb598c432095b4fddaa30f851c95f50260c0dfce2515c31d85a2fe634088a74"
+      }
+    },
+    "question": {
+      "fileName": "question.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-user-questions"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-user-questions",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1900,
+          "sha256": "sha256:78e1ae223b1577acf121de4fc336bce664175b63d7ca3820c46a16d0c6b931c6"
+        }
+      ],
+      "sourceHash": "sha256:d7003152380a9e40d88795c2fa2b2cdc00b83ce629042e39b8933db34d88c3d5",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 31,
+        "zh": 31
+      },
+      "dictionaryHashes": {
+        "en": "sha256:46803269f68a2ddd15e237afbba0215e6d2b38a9c3102ae473b1a485a09a1fbb",
+        "zh": "sha256:31fd16921e1b65fb6dc90ce6b296a6366598347f9da552171867a4b157360290"
+      }
+    },
+    "reference": {
+      "fileName": "reference.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-reference"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-reference",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 268,
+          "sha256": "sha256:3d179111c51381733c7d0ec13c60ee4d9444c1dfb474ef28a0127654b8ba28a3"
+        }
+      ],
+      "sourceHash": "sha256:36acbd18b595d860b7af8ffffc4757f1e3c12dad1519fe4fdc8b66e803fbd167",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 15,
+        "zh": 15
+      },
+      "dictionaryHashes": {
+        "en": "sha256:80b9ed152e43144124d2f622dfba7466442b0fa5149582f63f15d19a711161a8",
+        "zh": "sha256:52e1b9d5a13a28db791322910261fc272d39364239e89d021c808b93733c04b4"
+      }
+    },
+    "schedule.catalog": {
+      "fileName": "schedule.catalog.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-schedule"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-schedule",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 7385,
+          "sha256": "sha256:46f2cfd0bfc2be7ae2159a6f52f929911e0087b7b48c62de7f31c675fbe0a0a0"
+        }
+      ],
+      "sourceHash": "sha256:b6f9271d382f89dde75e6f854ace70d7abc2e03ca1a539e1f5579682f9ad1e46",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 70,
+        "zh": 70
+      },
+      "dictionaryHashes": {
+        "en": "sha256:745fcfe0222f520687143f580ab9d4682742a572ef86098002aa83f72bbcc6e5",
+        "zh": "sha256:75d7e38fbeb817692548b81bb2b6be5b36c3f006cb0974746f3f5ea6b046810b"
+      }
+    },
+    "schedule.manager": {
+      "fileName": "schedule.manager.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-schedule"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-schedule",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 7389,
+          "sha256": "sha256:46f2cfd0bfc2be7ae2159a6f52f929911e0087b7b48c62de7f31c675fbe0a0a0"
+        }
+      ],
+      "sourceHash": "sha256:b6f9271d382f89dde75e6f854ace70d7abc2e03ca1a539e1f5579682f9ad1e46",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 188,
+        "zh": 188
+      },
+      "dictionaryHashes": {
+        "en": "sha256:c4425a32462bc19b0561e890bcbb082c3666ebb606d4c0c9278b77887b0336ef",
+        "zh": "sha256:f1bf781b63d458b97cbc8d6302f34c1979d008c6b5a67608a7f3530427451fae"
+      }
+    },
+    "secretMask": {
+      "fileName": "secretMask.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-secret-mask"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-secret-mask",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 680,
+          "sha256": "sha256:5a592ed2f89094ce1e4503b1040bdeb8e956e8a29429b1fa444ef99f223f140b"
+        }
+      ],
+      "sourceHash": "sha256:b04741d6d25d942427e632688e5f52982e26b4d2a0ef803e107b6855bcdf5dd3",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 2,
+        "zh": 2
+      },
+      "dictionaryHashes": {
+        "en": "sha256:f10f519fc1c99ebd0ce643ae3ee0efa1ec0d6303732791c772917fdd8bf979c2",
+        "zh": "sha256:80cf75653b3b29e5bdc4ce4e79e07f34cf1db197f422435d7e238ecfe125df91"
+      }
+    },
+    "session-inspector": {
+      "fileName": "session-inspector.json",
+      "owners": [
+        "@deepseek-ai/dsh-experimental-session-inspector"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-experimental-session-inspector",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4232,
+          "sha256": "sha256:8737144f1fd1a19aefe6675af596ef67f89ca7cfd9457bd4bf41ff997b3e8e7f"
+        }
+      ],
+      "sourceHash": "sha256:da646776b5cd126ea3850a5f1b9452aabec395ca4b828a2bd448e4731ea006ad",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 52,
+        "zh": 52
+      },
+      "dictionaryHashes": {
+        "en": "sha256:7e0be0eb8421564b9f4b393d28f97ac0a2f10668fee4827522c713be6ef2c931",
+        "zh": "sha256:546940df7a5fb349e9c7b05b55004e30b0fc073abfbc60baa572ea20b181e37b"
+      }
+    },
+    "session-log-download": {
+      "fileName": "session-log-download.json",
+      "owners": [
+        "@deepseek-ai/dsh-session-log-export"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-session-log-export",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 275,
+          "sha256": "sha256:7ac601f68c6c7749c586462a1d27b1ac69019a4ba7cc7aff60de89838fa350fb"
+        }
+      ],
+      "sourceHash": "sha256:a92c3ef8382b754403a771a0d3a4ac6e24f9f4a3e4bc840bb2e4431924227055",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 10,
+        "zh": 10
+      },
+      "dictionaryHashes": {
+        "en": "sha256:79e9d119433e21d5ba7f47c843465ee0e12ab507c251d7c4f21343a3e213c4b1",
+        "zh": "sha256:c29065d3ad71b1b6408c1dd6b63fd5ba7c2f565177ff7ec3a604479854b544f0"
+      }
+    },
+    "settings": {
+      "fileName": "settings.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-general"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-general",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1101,
+          "sha256": "sha256:83e9e6da1eb83c80b58f642ba96de8860302bc753940caf40bf2f8f092d30c3d"
+        }
+      ],
+      "sourceHash": "sha256:817f4c4e57d5fce3b35899fcbfd98a3af889f9b2d1c7414757a4f6fe310717e4",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 41,
+        "zh": 41
+      },
+      "dictionaryHashes": {
+        "en": "sha256:e216241a6a01b1ab78fd98551bee7113b4aa871dc459b53d7153139b7aae469d",
+        "zh": "sha256:4258eee4bbbe96e1f913631403482a30dcbc224c9df8308f6431dc28337d1969"
+      }
+    },
+    "settings.account": {
+      "fileName": "settings.account.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-account"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-account",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4431,
+          "sha256": "sha256:3968e491fafd298d836b3ccb9b68fa64d0384e488bfe251267aba949d6cdd67a"
+        }
+      ],
+      "sourceHash": "sha256:872cbe57beda00f197fbe84c05c7ea50e55e49ffa2d546fc9a9e9b7bc2eac997",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 94,
+        "zh": 94
+      },
+      "dictionaryHashes": {
+        "en": "sha256:03bbbd99d67998c9c9187d04bd510f7cbf11a8939b649cfe28fa0c4ee9dcab64",
+        "zh": "sha256:5f17c72c87ab3bfececb626f2d81b6fb593a4d95c882a7aad35e0faa01cd1543"
+      }
+    },
+    "settings.agentLoop": {
+      "fileName": "settings.agentLoop.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-agent-loop"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-agent-loop",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 150,
+          "sha256": "sha256:3306228a2ec0f620d21e91e893ee74823befcb7c9ec98248bb89d2d47531915b"
+        }
+      ],
+      "sourceHash": "sha256:d5e51a37b08b918f5bedd30624ef7cd99dbb71b3a779b0e74671e6c7776c5740",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 12,
+        "zh": 12
+      },
+      "dictionaryHashes": {
+        "en": "sha256:ec146c3d07503ab0eac39279b499736a873b174e75a47b271b8762720556e986",
+        "zh": "sha256:742a4b992e49d559666d5c6fa49b78cb5727e7d2551096978c2c6b379ea37c61"
+      }
+    },
+    "settings.agentPreset": {
+      "fileName": "settings.agentPreset.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-agent-preset"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-agent-preset",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 2343,
+          "sha256": "sha256:b5990540be57e44c391aa7caf83def0249c82342e54449ae1d382f1506d7f895"
+        }
+      ],
+      "sourceHash": "sha256:5edd759901141cd1accb40f9ba41007fa241a36cc0cacee7cc9a7533efd31d4e",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 47,
+        "zh": 47
+      },
+      "dictionaryHashes": {
+        "en": "sha256:1e5ef174e383ffc5b484bcb2bf0f2ed37a0798b780b5c51803ac1ee55b99ab97",
+        "zh": "sha256:fbfbcebb1d1f7c253635186c510e003b4196c46ffebcd516125533f63150f64d"
+      }
+    },
+    "settings.locale": {
+      "fileName": "settings.locale.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-locale",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1522,
+          "sha256": "sha256:bad8fe9bfb07af2a60c80933be65ceafdaab5386f404fb264401c7e540a36e16"
+        }
+      ],
+      "sourceHash": "sha256:6b64d0f68d7a33a5e3e849bd99a9552ef6d546af5824a9550d16be4b6789cbee",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 1,
+        "zh": 1
+      },
+      "dictionaryHashes": {
+        "en": "sha256:363ec63dd997eb4680177c4a87ac40a1416c4bb35015dd4d24c7146f90a63034",
+        "zh": "sha256:f3407bc9aec172b4e7ee874cb4f244b2e83b954c4f8b036d7fa822eeddae2dc9"
+      }
+    },
+    "settings.models": {
+      "fileName": "settings.models.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-models"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-models",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4437,
+          "sha256": "sha256:190498e15358bcd3fe6810fe6368023a20b0403e3ea493bc979eca9bdb593b28"
+        }
+      ],
+      "sourceHash": "sha256:5cbf79442851fc783ef4b7cc9f5110cb5f95c0347c712a627a30ed625b5d8b53",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 134,
+        "zh": 134
+      },
+      "dictionaryHashes": {
+        "en": "sha256:8e2a6793c5b4f6de0c9fe05878389e08cb3aed05aaaad5c52c716745e6f3442c",
+        "zh": "sha256:50380ece8c1d8727d59e106840e3a3ccbef2366869e8ecc3d758e6f2e5863ef0"
+      }
+    },
+    "settings.permission": {
+      "fileName": "settings.permission.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-permission-presets"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-permission-presets",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 781,
+          "sha256": "sha256:0c5d7757b657615b3f34a5712d73e30af6726e5fb48d5947881533e6fdbdfcdd"
+        }
+      ],
+      "sourceHash": "sha256:b811a84c36952c8247180f3af3b883b8d5c1f678eda3e1cb38e8e325d89a539c",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 12,
+        "zh": 12
+      },
+      "dictionaryHashes": {
+        "en": "sha256:38b7c446657d9639a93bd04ec7e8e0a20098764bfc34f1b221e8efd123549b17",
+        "zh": "sha256:e9dbfe667dba0046c53011a4465f5995e68d9441dac0c255cb1af499e482ce23"
+      }
+    },
+    "settings.pluginInventory": {
+      "fileName": "settings.pluginInventory.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-plugin-inventory"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 734,
+          "sha256": "sha256:39d4fb8b64ae636ddd6185c00fc99844a14fb48121ff98f94383585f5c71b7a6"
+        }
+      ],
+      "sourceHash": "sha256:ebe8ce381f13c1cb594871edeeffcfa8c7968e49a33b9ce5a780e8727097994a",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 37,
+        "zh": 37
+      },
+      "dictionaryHashes": {
+        "en": "sha256:da45fa63bc6d966ba471936334082333ac7e5dcd6d013fe7ccf92f63ebf006ba",
+        "zh": "sha256:2556ebc41d924161e62f4dded65bd4d0fc6f66da5d487012e009dd34318d8719"
+      }
+    },
+    "settings.plugins": {
+      "fileName": "settings.plugins.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-plugins"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-plugins",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 169,
+          "sha256": "sha256:9a83a5b1a312ca1fc3ff44cde7b9f3481305ff40f92f74bad7e95af80fdd94aa"
+        }
+      ],
+      "sourceHash": "sha256:c773b5108e59f9eb12be4bb3a171302fc6545db351380e9ca460ef5a75360c64",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 5,
+        "zh": 5
+      },
+      "dictionaryHashes": {
+        "en": "sha256:76d3c4a747f2faf0e2500c26dfc54ae786026631a10b2834422a30f7b232178b",
+        "zh": "sha256:d3df97c8daf099ea2a6a80fddd9849ad4d95a892f27e3e595071c631da377ac3"
+      }
+    },
+    "settings.sessionLog": {
+      "fileName": "settings.sessionLog.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-session-log"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-session-log",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 143,
+          "sha256": "sha256:c70e33483e9e980f8a056bf071270321d0634c2818673e4ce62b6c6404462fc5"
+        }
+      ],
+      "sourceHash": "sha256:8cd55773cf10cb08cf50ce26e86fb1a986674b6c013fd04bbb30a378591d0493",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 4,
+        "zh": 4
+      },
+      "dictionaryHashes": {
+        "en": "sha256:4c014bbf6860438347dcd98012042386f0a8b812e34066468dedbac0f594dd8e",
+        "zh": "sha256:e650c03bc373fa3ae254ca7143a04cec838b1b2d4ca75ef9a554217f78dc6284"
+      }
+    },
+    "settings.shell": {
+      "fileName": "settings.shell.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-shell"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-shell",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 172,
+          "sha256": "sha256:916cf7db03e347d1b3bd8bf9fb5566862d32971a5e96587a2f385b42492a1533"
+        }
+      ],
+      "sourceHash": "sha256:2d4a940ecb44b4bca2a23a0e0524db2949f8f2c5095426d9cff6db8e55b4b73a",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 14,
+        "zh": 14
+      },
+      "dictionaryHashes": {
+        "en": "sha256:7682817890009af7858d39a669b42ce8ec60dae2213bdfec35784508a8edc27c",
+        "zh": "sha256:3860c1b9b4e78b61be3adeeaa4ed9c2a903c506e3b7dc327c8b0a8d91e0a7839"
+      }
+    },
+    "settings.subagent": {
+      "fileName": "settings.subagent.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-subagent"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-subagent",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 816,
+          "sha256": "sha256:158f820ef0a2300870f5e38cd9ce8255912684128bbd83df2fe48af33fc1e682"
+        }
+      ],
+      "sourceHash": "sha256:b7c1fce78b02e7aabf589ca0ce600236e392551003a1a8bfc90e69524adbb397",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 35,
+        "zh": 35
+      },
+      "dictionaryHashes": {
+        "en": "sha256:7dd548baa8004097b53afa405089748734ce5705c36795b6f90b31b9a1c79397",
+        "zh": "sha256:56911e39decfc6651a45264a4a1705b81e9b1648f75a83e1f97da9d9a211281a"
+      }
+    },
+    "settings.theme": {
+      "fileName": "settings.theme.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-theme",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 2024,
+          "sha256": "sha256:f9915fb53d5f156e75291e63be66c80e607a82bfd03c7d583e0a12ebef5a6cb8"
+        }
+      ],
+      "sourceHash": "sha256:0a9a8ff32700e68fabe0a4f912c21c85289469c76af4bba4cf103e1438ac44ac",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 25,
+        "zh": 25
+      },
+      "dictionaryHashes": {
+        "en": "sha256:12dc623e67627464fe372a806a617d55aebc3831edfd6d7f4e1ce1990e24e751",
+        "zh": "sha256:5617aad39738430dce4f96e36ee87168e2be71a417bf6b65c3396c9b63616129"
+      }
+    },
+    "settings.webSearch": {
+      "fileName": "settings.webSearch.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-settings-web-search"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-settings-web-search",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 495,
+          "sha256": "sha256:f725361adf2c5565a7a86b21f210b1da8a66f9140c4f3df36d489d28e9e7c2f1"
+        }
+      ],
+      "sourceHash": "sha256:9e657b12c08b5db0ec734a0b1064842e2981f8922c93ee32b24d08bd04a726a2",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 27,
+        "zh": 27
+      },
+      "dictionaryHashes": {
+        "en": "sha256:0879c302a206a651b1527911e588c5ac7559b6884f917ebd029f55a6970913e6",
+        "zh": "sha256:9f58687c83fe808160a84a9cd42695cdf303b0ce4355fa0bd441893b4d2d71be"
+      }
+    },
+    "shortcuts": {
+      "fileName": "shortcuts.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-shortcuts"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-shortcuts",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1059,
+          "sha256": "sha256:391480789d462ace74b20aa6f38693f1914680f718b3693bffe1891774306af4"
+        }
+      ],
+      "sourceHash": "sha256:c70e606c67f6f4b21aacdb2df5254ec15df10d97d832560f3a91090ff3d96d5f",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 56,
+        "zh": 56
+      },
+      "dictionaryHashes": {
+        "en": "sha256:dab7ad3b1b7db962f8ef6233a7a7d5facd05c233d72fcd371bfc37195b0e456e",
+        "zh": "sha256:7335ed0da487b48eeea01e27b706edbba00566ac76e4f4d9ed74c0fc73a893de"
+      }
+    },
+    "shortcuts.layout": {
+      "fileName": "shortcuts.layout.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-layout",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 602,
+          "sha256": "sha256:686fb83c91c8ff8d03c365bb666ef34dacc3dd110eb768deacbc7998b885c8c1"
+        }
+      ],
+      "sourceHash": "sha256:5d4c82b454b02d1bab88f2217b0b76629f3fac7143747350601d7c46a27d22a7",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 1,
+        "zh": 1
+      },
+      "dictionaryHashes": {
+        "en": "sha256:84fd9422ac5fe01a332a490c185a6c02c15cf43f4027c275019986a5d07f5281",
+        "zh": "sha256:613973b17cf3c500912c0ef26f91305e60fc13a75ef1ed98c6b0d71c8580ed91"
+      }
+    },
+    "sidebar": {
+      "fileName": "sidebar.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 562,
+          "sha256": "sha256:739421bef37cc5b1fb45ff76ce732bdcaede7820a684c3ff0c9de9ae97108194"
+        }
+      ],
+      "sourceHash": "sha256:e3ebd6bb9a7baa52cde6fe8cb7728dfd02584f20ad0e2ca8263d970c1197ffa8",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 6,
+        "zh": 6
+      },
+      "dictionaryHashes": {
+        "en": "sha256:f29669e6af779c20d808f8376986143cc94b7d1d5beb60acb9f62f271d9ffda6",
+        "zh": "sha256:0db1b0f59a5cf90d82541f505c4bf82dc032236915cf3977071e3bb9a3b238f2"
+      }
+    },
+    "sidebarBrowser": {
+      "fileName": "sidebarBrowser.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-browser"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-browser",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1599,
+          "sha256": "sha256:e35ba782c90299dfaee4c8e3c17398a0412972ccefd449a7626eee58717fcba4"
+        }
+      ],
+      "sourceHash": "sha256:a1c3e115f36fa7c8e69ab6235a19e073b412e0537f5ee992fa78fcc34201f4f4",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 26,
+        "zh": 26
+      },
+      "dictionaryHashes": {
+        "en": "sha256:bbce555e1cdfe8749ab0eb91df35d82fae295cf3f26bc1d21f880cac971ba92e",
+        "zh": "sha256:fa9f376ae70cb4db375dcf56a4d9a104bc37dbabdfc5c5e7c0bd51d355d44b72"
+      }
+    },
+    "sidebarCodePreview": {
+      "fileName": "sidebarCodePreview.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 5479,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 3,
+        "zh": 3
+      },
+      "dictionaryHashes": {
+        "en": "sha256:7eaa27812f16572cacb6e7d213f5dc5c1df9f40dd32dc97dbe35ba5bffa3e77b",
+        "zh": "sha256:96e6af23a561ee66bb8e0b5cc640f7f80f19cf47dbcfe349666f648218f70141"
+      }
+    },
+    "sidebarDocumentPreview": {
+      "fileName": "sidebarDocumentPreview.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 7210,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 22,
+        "zh": 22
+      },
+      "dictionaryHashes": {
+        "en": "sha256:582fad6216ea4e931e5c424f335223a24b2205d511aed6f84f21abf4131061c9",
+        "zh": "sha256:5441f8b97a588d66d17a6ac054cf64ba1355fa80bb88c4c36ba3234f403faa49"
+      }
+    },
+    "sidebarExcel": {
+      "fileName": "sidebarExcel.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 6253,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 15,
+        "zh": 15
+      },
+      "dictionaryHashes": {
+        "en": "sha256:df2261d7d08317be2741961a92fc35e2baaf90d9e2ac352cecf785914ade7291",
+        "zh": "sha256:fa987afa05b29ef3c2f263df383f22b1145225eeb3a067c7da94774ac9e807ee"
+      }
+    },
+    "sidebarFiles": {
+      "fileName": "sidebarFiles.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-files"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-files",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 997,
+          "sha256": "sha256:d5974bf247e187eecf820f8ee8d5a7c9373fd66d111c6815b087ed8fe3ccc808"
+        }
+      ],
+      "sourceHash": "sha256:eccee1309459100707fab2e137f04d98012c442b9f6cb34ab2135b0f8c1e2b3e",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 17,
+        "zh": 17
+      },
+      "dictionaryHashes": {
+        "en": "sha256:fc0da6c1b5c855198db4542f904843adee0135da5cdd4e5fbe6c35add4bfcf79",
+        "zh": "sha256:25cca0de9d93afde06dd943901d7eb36f46e4dc6d2bce97612fe955d9bb8f55c"
+      }
+    },
+    "sidebarImage": {
+      "fileName": "sidebarImage.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 5261,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 11,
+        "zh": 11
+      },
+      "dictionaryHashes": {
+        "en": "sha256:9aa982c4238dbfa8c18dc45389079281af8eb1147447d2233a2fc45d858c7861",
+        "zh": "sha256:62fc26bb40bb0943af08a052cd43ee8a7f964878b1764e90ea3839ac41da2f22"
+      }
+    },
+    "sidebarOffice": {
+      "fileName": "sidebarOffice.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 6045,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 15,
+        "zh": 15
+      },
+      "dictionaryHashes": {
+        "en": "sha256:5c2a4c797cf8631ecc56b1c70b9a9b5eb4057360b9c799522f70a77ac03b5e9d",
+        "zh": "sha256:7a6ceb8f4b6da62fbf394b779fb892df0af27b71f0743052a8de867b28e202c6"
+      }
+    },
+    "sidebarPdf": {
+      "fileName": "sidebarPdf.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 5381,
+          "sha256": "sha256:3c8259fed8fb6d8cf1af6ecc2c7f478df4eacab4628b91e4c9ad8defdc5fb595"
+        }
+      ],
+      "sourceHash": "sha256:ae03d56f2690de9256035e5d84323b254572d8cc2788b00f3ff4e7fa365bc995",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 15,
+        "zh": 15
+      },
+      "dictionaryHashes": {
+        "en": "sha256:a781e2cba111fa8d52bb6dfe0b74ba712cc462f46b8e8b4313c354332e23ae9a",
+        "zh": "sha256:c2ddf78969036c930a7711474cfb2133aee892e87a00b3193dae02a68a5cc861"
+      }
+    },
+    "sidebarRight": {
+      "fileName": "sidebarRight.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 4972,
+          "sha256": "sha256:9dec9cf5c17e0bde9ea7a00b2438aa2551ba38c735cb65f48d28078b8e76bb3e"
+        }
+      ],
+      "sourceHash": "sha256:1ab2914479bde6647c3af955ec68b41d00c340b0aa11363da999b3785b0ce158",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 35,
+        "zh": 35
+      },
+      "dictionaryHashes": {
+        "en": "sha256:a034bf1319c92d5dad60633450687283155ff6eee9f51b165be5f8bbcb096a4a",
+        "zh": "sha256:9554928688c9f60a7a0154f675523b0462afdaa95017b0712c652a85f90e12f4"
+      }
+    },
+    "sidebarTerminal": {
+      "fileName": "sidebarTerminal.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-sidebar-terminal"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-sidebar-terminal",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 434,
+          "sha256": "sha256:999adc8712854da63dd62944c51af1bf57fd9bdfcb65e7ad0d8c196f6e979b73"
+        }
+      ],
+      "sourceHash": "sha256:c3e78c13e0f97f37698fc78e22c3650b2c8f35548a8bfd2038331906609e2b22",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 28,
+        "zh": 28
+      },
+      "dictionaryHashes": {
+        "en": "sha256:91638ca0e974db8c38717888529fa5d7bf9c97e9e84ffda7c728258668c1265f",
+        "zh": "sha256:ba09a3c5627ba540b2de287111d49053ef2c78617c802bfc39e4c840ba6b7746"
+      }
+    },
+    "skill": {
+      "fileName": "skill.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-skill"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-skill",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 355,
+          "sha256": "sha256:a0acc17b955b1262208613a84b2192868417b6d8b3b8f222e4e9dc480c7ad2f8"
+        }
+      ],
+      "sourceHash": "sha256:331c3f30f2f9b2857e5b617d4dc81d9c68d07607ba74d05607d3008c2bcae7c0",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 8,
+        "zh": 8
+      },
+      "dictionaryHashes": {
+        "en": "sha256:0313ceb28c7a459aafc5690c0777a0698f709897c2c4c24ac59e969fe5a64c7d",
+        "zh": "sha256:07b251b6664698bf26974c2d6e0150ba7dbfbcd0950f368ad3c786b7a69ed21c"
+      }
+    },
+    "slash.menu": {
+      "fileName": "slash.menu.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-input-trigger"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-input-trigger",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 1902,
+          "sha256": "sha256:4a9605b0a811354ed49495790b331bf4f5198ff41614920d9d0c488e22a0f2af"
+        }
+      ],
+      "sourceHash": "sha256:9414f8d7faaa2b52771a2af33393018f1338049241e38e7cec5a404937505781",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 9,
+        "zh": 9
+      },
+      "dictionaryHashes": {
+        "en": "sha256:358f5f92cd79136b28e6b1139336b79cdb74c372d0ec48c56006ad76f3a089f3",
+        "zh": "sha256:4dc9a89eeeebd0ba6e55aab09c91b6babbfa0ddc2778273923e4fc1ec1553403"
+      }
+    },
+    "subagent": {
+      "fileName": "subagent.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-subagent"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-subagent",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 957,
+          "sha256": "sha256:18dab257ed94d91d66ce0e5d90836fa9ed49349e04cee04a3e30dc7f834ccb25"
+        }
+      ],
+      "sourceHash": "sha256:ca9ad0168235c367d665129fcc6463453e2ac56ba06e22c3a7fd58376c2589c3",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 41,
+        "zh": 41
+      },
+      "dictionaryHashes": {
+        "en": "sha256:3f7eadbba7035df2c351647caadc42385309703c56a617dec47b346423ea054b",
+        "zh": "sha256:10178ec4d9cb90f5252dc932dc1e35b85d43a896e061eb6a2408c324c036f5cd"
+      }
+    },
+    "trajectory": {
+      "fileName": "trajectory.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-trajectory"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-trajectory",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 8188,
+          "sha256": "sha256:b11426f89d3b4302964b491d7826a29fe3de390be4bbfae325375f54fe6919ad"
+        }
+      ],
+      "sourceHash": "sha256:2d6d727f58e9e28b5af7f0df9d63d295b83c52f879ce1dc7077efc55e4cfaea8",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 192,
+        "zh": 192
+      },
+      "dictionaryHashes": {
+        "en": "sha256:4bbfb62b5c65d44d97e98fe91f0ac2064b003f49ee5f942944b85e4ee1bd121d",
+        "zh": "sha256:6489ebfce23dbf6bf9c7da03e5f2941470eb73e0e1e098dd88399f1168fca80d"
+      }
+    },
+    "voice-input": {
+      "fileName": "voice-input.json",
+      "owners": [
+        "@deepseek-ai/dsh-experimental-client-ui-voice-input"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-experimental-client-ui-voice-input",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 2876,
+          "sha256": "sha256:00b2b3334e01588489b0183cad54ab07ee716bcaccb2e8cdaf1159e61863f2a1"
+        }
+      ],
+      "sourceHash": "sha256:1306b77d183fd70c9da879cd3d09c5d6d48df15008c312cbb672ff4ba693c4f8",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 109,
+        "zh": 109
+      },
+      "dictionaryHashes": {
+        "en": "sha256:9a499b2406783e15e1c937728134eb40cd0431b1e6f9a0398ac5c69d83ba9b77",
+        "zh": "sha256:b6fbd79535818d6a0578e9a7ca53141fceca232ca2a7b39bd0b94476eae9260d"
+      }
+    },
+    "workflowRun": {
+      "fileName": "workflowRun.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-workflow-run"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-workflow-run",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 651,
+          "sha256": "sha256:c0e08d98885bfc4733c470c80520a460798060ccb9d08778bbef3dfc8011cbcf"
+        }
+      ],
+      "sourceHash": "sha256:0706608f1f12f90621c1e7f03e61a9bce547765cb4ad2ff126c280fd077df630",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 18,
+        "zh": 18
+      },
+      "dictionaryHashes": {
+        "en": "sha256:c18bfdaa628fea8a65708e12f123279b37a66bb2346ab3adf5b44d577fe21bd8",
+        "zh": "sha256:c5e93031e75573eb4833a3c5606d18c29c67d19767dc746a9c586d7857c5f2f5"
+      }
+    },
+    "workspace": {
+      "fileName": "workspace.json",
+      "owners": [
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ],
+      "sources": [
+        {
+          "package": "@deepseek-ai/dsh-client-ui-workspace",
+          "packageVersion": "0.2.1-rc.3",
+          "file": "lib/client.js",
+          "line": 5044,
+          "sha256": "sha256:9c2c17a66a5c20de00ac2852cb76debb5237439e97f877403bcaa2a471086544"
+        }
+      ],
+      "sourceHash": "sha256:1730736401657d1377b8a62ba0582bd8ff68e1450b7ba0c8ec5c718fb45d9e09",
+      "locales": [
+        "en",
+        "zh"
+      ],
+      "keyCounts": {
+        "en": 119,
+        "zh": 119
+      },
+      "dictionaryHashes": {
+        "en": "sha256:164547df21456749f885dee8083844a9fcb28f72f118b5480cf2843387bc778f",
+        "zh": "sha256:b8d23c259adfac08e900f2ddeede656338617138c097db7dae6606673d6664e6"
+      }
+    }
+  }
+}
