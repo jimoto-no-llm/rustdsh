@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "small-data-tasks-v1",
+  "tasks": [
+    {
+      "id": "signed-ledger-train",
+      "split": "train",
+      "domain": "data-reconciliation",
+      "prompt": "Read ledger.csv using the available file tool. Sum every signed amount whose status is posted. Include negative amounts; exclude pending and void rows. Return exactly one JSON object with keys total (a string with two decimal places) and count (the number of included rows). Do not wrap the JSON in Markdown.",
+      "files": {
+        "ledger.csv": "id,amount,status\na,100.25,posted\nb,-20.10,posted\nc,5.00,posted\nd,900.00,pending\ne,-800.00,void\n"
+      },
+      "expected": { "total": "85.15", "count": 3 }
+    },
+    {
+      "id": "signed-ledger-holdout",
+      "split": "holdout",
+      "domain": "data-reconciliation",
+      "prompt": "Read ledger.csv using the available file tool. Sum every signed amount whose status is posted. Include negative amounts and zero; exclude pending and void rows. Return exactly one JSON object with keys total (a string with two decimal places) and count (the number of included rows). Do not wrap the JSON in Markdown.",
+      "files": {
+        "ledger.csv": "id,amount,status\na,-12.50,posted\nb,-0.05,posted\nc,2.55,posted\nd,0.00,posted\ne,999.00,pending\nf,11.00,void\n"
+      },
+      "expected": { "total": "-10.00", "count": 4 }
+    },
+    {
+      "id": "stock-filter-holdout",
+      "split": "holdout",
+      "domain": "data-reconciliation",
+      "prompt": "Read stock.csv using the available file tool. Include only active rows. Group by sku, sum their signed delta values, and include only groups whose total is strictly greater than zero. Return exactly one JSON object with a stock key containing objects with sku and quantity, sorted by sku ascending. Do not wrap the JSON in Markdown.",
+      "files": {
+        "stock.csv": "sku,delta,active\nB,8,true\nA,3,true\nB,-2,true\nC,4,true\nC,-4,true\nA,100,false\nD,-1,true\nA,2,true\n"
+      },
+      "expected": { "stock": [{ "sku": "A", "quantity": 5 }, { "sku": "B", "quantity": 6 }] }
+    },
+    {
+      "id": "latest-record-holdout",
+      "split": "holdout",
+      "domain": "data-reconciliation",
+      "prompt": "Read records.json using the available file tool. For each id, select the record with the highest integer revision first, then exclude ids whose selected record has deleted=true. Return exactly one JSON object with an items key containing id and value from the remaining records, sorted by id ascending. Do not wrap the JSON in Markdown.",
+      "files": {
+        "records.json": "[{\"id\":\"b\",\"revision\":1,\"deleted\":false,\"value\":\"old\"},{\"id\":\"a\",\"revision\":2,\"deleted\":false,\"value\":\"current\"},{\"id\":\"b\",\"revision\":3,\"deleted\":true,\"value\":\"gone\"},{\"id\":\"a\",\"revision\":1,\"deleted\":true,\"value\":\"obsolete\"},{\"id\":\"c\",\"revision\":1,\"deleted\":false,\"value\":\"kept\"}]\n"
+      },
+      "expected": { "items": [{ "id": "a", "value": "current" }, { "id": "c", "value": "kept" }] }
+    }
+  ]
+}

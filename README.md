@@ -770,6 +770,8 @@ For startup, run `rdsh bench --n 5`. See
 
 ## Documentation
 
+- [Harness² plugin and controlled baseline comparison](plugins/rdsh-harness2/README.md)
+
 - [OpenCode models in Web and TUI](docs/OPENCODE-MODELS.md)
 
 - [TUI profile setup](docs/TUI-SETUP.md)

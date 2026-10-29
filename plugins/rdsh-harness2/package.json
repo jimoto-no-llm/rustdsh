@@ -1,0 +1,42 @@
+{
+  "name": "rdsh-harness2",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Isolated native rdsh headless substrate for harness2 comparisons",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "index.mjs",
+    "runner.mjs",
+    "validation.mjs",
+    "cordis.patch.yml",
+    "python/*.py",
+    "python/README.md",
+    "python/tests/*.py",
+    "evaluation/*.json",
+    "test/*.mjs",
+    "README.md",
+    "evaluation/*.md",
+    "evaluation/*.mjs",
+    "coding-tools.mjs",
+    "source-policy.mjs",
+    "grade-coding.mjs"
+  ],
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "acorn": "8.19.0"
+  }
+}

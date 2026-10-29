@@ -1,0 +1,856 @@
+{
+  "version": 1,
+  "date": "2026-10-19",
+  "benchmarkKind": "code-edit-and-test",
+  "holdoutComparisonComplete": true,
+  "adaptationComplete": false,
+  "overallComplete": false,
+  "provider": "cursor-sdk",
+  "model": "composer-2.5",
+  "upstreamCommit": "1cfe254e8d25b15f37048c3730134686abe60335",
+  "suiteSha256": "d4eca9f29a63d43116e1b46a3ee3f277dfa5a51bed273263c83118c36b17685d",
+  "runtime": {
+    "node": "v26.12.0",
+    "rdsh": "rdsh 0.9.1",
+    "dsh": "0.2.0-rc.2",
+    "maxSteps": 24,
+    "timeoutMs": 600000,
+    "sandbox": "macos-sandbox-exec"
+  },
+  "method": "harness2.core.recursion.run_parallel(k=1) + trivial_selection",
+  "training": {
+    "totals": {
+      "sessions": 7,
+      "failedSessions": 1,
+      "wallMsSum": 339892.14633200027,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "inputTotalTokens": null
+      },
+      "costUsd": null
+    },
+    "additionalOverBaseline": {
+      "sessions": 6,
+      "failedSessions": 1,
+      "wallMsSum": 281906.74895699974,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "inputTotalTokens": null
+      },
+      "costUsd": null
+    },
+    "row": {
+      "taskId": "ttl-lru-cache",
+      "split": "train",
+      "mode": "task-local-adaptation",
+      "complete": false,
+      "adaptationComplete": false,
+      "baseline": {
+        "passed": true,
+        "completed": true,
+        "nativeCompleted": true,
+        "sourceChanged": true,
+        "allowedChanges": true,
+        "visibleTestsUnchanged": true,
+        "nativeActions": {
+          "edit": 2,
+          "test": 1,
+          "read": 3
+        },
+        "finalVisibleTestsPass": true,
+        "hiddenTestsComplete": true,
+        "visible": {
+          "version": 1,
+          "ok": true,
+          "exitCode": 0,
+          "tests": 2,
+          "passed": 2,
+          "failed": 0,
+          "sandbox": "macos-sandbox-exec",
+          "sourcePolicy": "pure-esm-fixture-v1",
+          "hostileCodeBoundary": false,
+          "timedOut": false,
+          "outputLimited": false,
+          "wallMs": 185
+        },
+        "hidden": {
+          "version": 1,
+          "ok": true,
+          "exitCode": 0,
+          "tests": 8,
+          "passed": 8,
+          "failed": 0,
+          "sandbox": "macos-sandbox-exec",
+          "sourcePolicy": "pure-esm-fixture-v1",
+          "hostileCodeBoundary": false,
+          "timedOut": false,
+          "outputLimited": false,
+          "wallMs": 184
+        },
+        "changedPaths": [
+          "src/cache.mjs",
+          "src/expiry.mjs"
+        ],
+        "artifactSha256": "4fa3633722d5f44904c4ede6248b9baed5ee7d4b7be9f8ec63f249643bf84a27",
+        "modelWallMs": 57904,
+        "gradingWallMs": 369,
+        "nativeError": null,
+        "externalGradingError": null
+      },
+      "improved": {
+        "passed": true,
+        "completed": true,
+        "nativeCompleted": true,
+        "sourceChanged": true,
+        "allowedChanges": true,
+        "visibleTestsUnchanged": true,
+        "nativeActions": {
+          "edit": 2,
+          "test": 1,
+          "read": 4
+        },
+        "finalVisibleTestsPass": true,
+        "hiddenTestsComplete": true,
+        "visible": {
+          "version": 1,
+          "ok": true,
+          "exitCode": 0,
+          "tests": 2,
+          "passed": 2,
+          "failed": 0,
+          "sandbox": "macos-sandbox-exec",
+          "sourcePolicy": "pure-esm-fixture-v1",
+          "hostileCodeBoundary": false,
+          "timedOut": false,
+          "outputLimited": false,
+          "wallMs": 183
+        },
+        "hidden": {
+          "version": 1,
+          "ok": true,
+          "exitCode": 0,
+          "tests": 8,
+          "passed": 8,
+          "failed": 0,
+          "sandbox": "macos-sandbox-exec",
+          "sourcePolicy": "pure-esm-fixture-v1",
+          "hostileCodeBoundary": false,
+          "timedOut": false,
+          "outputLimited": false,
+          "wallMs": 185
+        },
+        "changedPaths": [
+          "src/cache.mjs",
+          "src/expiry.mjs"
+        ],
+        "artifactSha256": "09932346361a6404059166e6ce51a9aa66ef914d44d663ab8fc81075453ac857",
+        "modelWallMs": 53900,
+        "gradingWallMs": 368,
+        "nativeError": null,
+        "externalGradingError": null
+      }
+    },
+    "warnings": [
+      {
+        "taskId": "ttl-lru-cache",
+        "stage": "dom1",
+        "reason": "rollout produced no deliverable"
+      }
+    ],
+    "frozenOrigin": {
+      "taskId": "ttl-lru-cache",
+      "stage": "agg1",
+      "runId": "ttl-lru-cache-agg1",
+      "adaptationComplete": false,
+      "aggregateFellBack": false
+    }
+  },
+  "holdout": {
+    "metrics": {
+      "baseline": {
+        "passedTasks": 2,
+        "tasks": 3,
+        "nativeCompleted": 3,
+        "publicPassed": 6,
+        "publicTests": 6,
+        "hiddenPassed": 23,
+        "hiddenTests": 24,
+        "meanSeconds": 58.65,
+        "nativeActions": {
+          "read": 9,
+          "edit": 7,
+          "test": 4
+        }
+      },
+      "improved": {
+        "passedTasks": 3,
+        "tasks": 3,
+        "nativeCompleted": 3,
+        "publicPassed": 6,
+        "publicTests": 6,
+        "hiddenPassed": 24,
+        "hiddenTests": 24,
+        "meanSeconds": 68.79833333333333,
+        "nativeActions": {
+          "read": 12,
+          "edit": 6,
+          "test": 3
+        }
+      }
+    },
+    "rows": [
+      {
+        "taskId": "bounded-map-settled",
+        "split": "holdout",
+        "mode": "frozen-training-harness",
+        "complete": true,
+        "baseline": {
+          "passed": true,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 3,
+            "test": 2,
+            "read": 3
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": true,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 180
+          },
+          "hidden": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 8,
+            "passed": 8,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 190
+          },
+          "changedPaths": [
+            "src/map-limit.mjs",
+            "src/run-item.mjs"
+          ],
+          "artifactSha256": "a8725d1c008365f5fc6ee37c43b8b264a4ebd6bbe600cd2e17d2391345424cfd",
+          "modelWallMs": 65637,
+          "gradingWallMs": 370,
+          "nativeError": null,
+          "externalGradingError": null
+        },
+        "improved": {
+          "passed": true,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 2,
+            "test": 1,
+            "read": 4
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": true,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 178
+          },
+          "hidden": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 8,
+            "passed": 8,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 177
+          },
+          "changedPaths": [
+            "src/map-limit.mjs",
+            "src/run-item.mjs"
+          ],
+          "artifactSha256": "75e8275bf630bba884e201f203fd9338734905c18ecfae4ff1b34b03b94aa48d",
+          "modelWallMs": 71704,
+          "gradingWallMs": 355,
+          "nativeError": null,
+          "externalGradingError": null
+        }
+      },
+      {
+        "taskId": "paginated-records",
+        "split": "holdout",
+        "mode": "frozen-training-harness",
+        "complete": true,
+        "baseline": {
+          "passed": true,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 2,
+            "test": 1,
+            "read": 3
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": true,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 189
+          },
+          "hidden": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 8,
+            "passed": 8,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 185
+          },
+          "changedPaths": [
+            "src/collect-pages.mjs",
+            "src/merge-records.mjs"
+          ],
+          "artifactSha256": "b394322cf719e840239b6d592b2a6f0573d1131c7645c8217446391df388ffd8",
+          "modelWallMs": 59102,
+          "gradingWallMs": 374,
+          "nativeError": null,
+          "externalGradingError": null
+        },
+        "improved": {
+          "passed": true,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 2,
+            "test": 1,
+            "read": 4
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": true,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 187
+          },
+          "hidden": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 8,
+            "passed": 8,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 186
+          },
+          "changedPaths": [
+            "src/collect-pages.mjs",
+            "src/merge-records.mjs"
+          ],
+          "artifactSha256": "fee744e0f8f59812067beec0e966cfcde5482bb14e36e2a05f2e88d6b635cecf",
+          "modelWallMs": 55026,
+          "gradingWallMs": 373,
+          "nativeError": null,
+          "externalGradingError": null
+        }
+      },
+      {
+        "taskId": "dependency-schedule",
+        "split": "holdout",
+        "mode": "frozen-training-harness",
+        "complete": true,
+        "baseline": {
+          "passed": false,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 2,
+            "test": 1,
+            "read": 3
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": false,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 177
+          },
+          "hidden": {
+            "version": 1,
+            "ok": false,
+            "exitCode": 1,
+            "tests": 8,
+            "passed": 7,
+            "failed": 1,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 179
+          },
+          "changedPaths": [
+            "src/plan-build.mjs",
+            "src/validate-nodes.mjs"
+          ],
+          "artifactSha256": "8ba36a599b0a0de3f45edf2d7324fef7954525948eecb1a0f03b90eb1a95417e",
+          "modelWallMs": 51211,
+          "gradingWallMs": 356,
+          "nativeError": null,
+          "externalGradingError": null
+        },
+        "improved": {
+          "passed": true,
+          "completed": true,
+          "nativeCompleted": true,
+          "sourceChanged": true,
+          "allowedChanges": true,
+          "visibleTestsUnchanged": true,
+          "nativeActions": {
+            "edit": 2,
+            "test": 1,
+            "read": 4
+          },
+          "finalVisibleTestsPass": true,
+          "hiddenTestsComplete": true,
+          "visible": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 177
+          },
+          "hidden": {
+            "version": 1,
+            "ok": true,
+            "exitCode": 0,
+            "tests": 8,
+            "passed": 8,
+            "failed": 0,
+            "sandbox": "macos-sandbox-exec",
+            "sourcePolicy": "pure-esm-fixture-v1",
+            "hostileCodeBoundary": false,
+            "timedOut": false,
+            "outputLimited": false,
+            "wallMs": 185
+          },
+          "changedPaths": [
+            "src/plan-build.mjs",
+            "src/validate-nodes.mjs"
+          ],
+          "artifactSha256": "d0e8153c2053a704d3942172879bd6cf00f85a1c12bd5b84a003476e52daa7ef",
+          "modelWallMs": 79665,
+          "gradingWallMs": 362,
+          "nativeError": null,
+          "externalGradingError": null
+        }
+      }
+    ],
+    "frozenHarnessSha256": "0355b8cf594f67e242e6a6d39af29ba11cd00c41659868767646a5d7da462c98"
+  },
+  "posthocCounterexample": {
+    "preRegistered": false,
+    "purpose": "exploratory counterexample from independent source inspection; not used for harness adaptation or primary scores",
+    "rows": {
+      "base": {
+        "version": 1,
+        "ok": true,
+        "exitCode": 0,
+        "tests": 1,
+        "passed": 1,
+        "failed": 0,
+        "sandbox": "macos-sandbox-exec",
+        "sourcePolicy": "pure-esm-fixture-v1",
+        "hostileCodeBoundary": false,
+        "timedOut": false,
+        "outputLimited": false,
+        "wallMs": 195
+      },
+      "frozen": {
+        "version": 1,
+        "ok": false,
+        "exitCode": 1,
+        "tests": 1,
+        "passed": 0,
+        "failed": 1,
+        "sandbox": "macos-sandbox-exec",
+        "sourcePolicy": "pure-esm-fixture-v1",
+        "hostileCodeBoundary": false,
+        "timedOut": false,
+        "outputLimited": false,
+        "wallMs": 187
+      }
+    }
+  },
+  "sourceReview": {
+    "reviewedArtifacts": 10,
+    "scope": "Full generated source inspection for process/stdout/exit, test/assert/global/prototype manipulation, added tests and external IO; artifact hash and workspace content consistency.",
+    "tamperingFound": false,
+    "artifactSha256": {
+      "bounded-map-settled-base": "a8725d1c008365f5fc6ee37c43b8b264a4ebd6bbe600cd2e17d2391345424cfd",
+      "bounded-map-settled-frozen": "75e8275bf630bba884e201f203fd9338734905c18ecfae4ff1b34b03b94aa48d",
+      "dependency-schedule-base": "8ba36a599b0a0de3f45edf2d7324fef7954525948eecb1a0f03b90eb1a95417e",
+      "dependency-schedule-frozen": "d0e8153c2053a704d3942172879bd6cf00f85a1c12bd5b84a003476e52daa7ef",
+      "paginated-records-base": "b394322cf719e840239b6d592b2a6f0573d1131c7645c8217446391df388ffd8",
+      "paginated-records-frozen": "fee744e0f8f59812067beec0e966cfcde5482bb14e36e2a05f2e88d6b635cecf",
+      "ttl-lru-cache-agg1": "09932346361a6404059166e6ce51a9aa66ef914d44d663ab8fc81075453ac857",
+      "ttl-lru-cache-base": "4fa3633722d5f44904c4ede6248b9baed5ee7d4b7be9f8ec63f249643bf84a27",
+      "ttl-lru-cache-dom1": "1cb6248e0c0e16a03b74afda3a0ad2e80371bcb56171a1431cc71927077f4df7",
+      "ttl-lru-cache-inv1": "35b2bba13af7b2d26dfaee95117a3a64b7411c76c330799301ff6224b9718136"
+    },
+    "functionalFindings": [
+      "dependency-schedule-base reports self-cycle before completing missing dependency checks; primary hidden detects it.",
+      "paginated-records-frozen null sentinel collides with a legal string cursor; exploratory counterexample detects it."
+    ]
+  },
+  "grading": {
+    "sourcePolicy": "pure-esm-fixture-v1",
+    "hostileCodeBoundary": false,
+    "regradingReason": "Native model sessions were already running when the grader gained mandatory sourceFiles. Original grade failures are retained; scores here independently regrade unchanged saved artifacts without any new model calls or harness selection.",
+    "originalReportSha256": "b7072e8506f0115fe25da2e1f5b2a313ddc23df2b27de06d255fa4903acb14ce",
+    "validatedReportSha256": "4b56a0a6c8a39248141aafea5feb5b7c0c36dd61b943d22cf641e28ea70bb1a7",
+    "gradingWallMs": 3665,
+    "unchangedArtifactHashesVerified": true
+  },
+  "costUsd": null,
+  "tokenUsage": {
+    "inputTokens": null,
+    "outputTokens": null,
+    "cacheReadTokens": null,
+    "cacheWriteTokens": null,
+    "inputTotalTokens": null
+  },
+  "sessions": [
+    {
+      "label": "ttl-lru-cache-base",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 57985.3973750005,
+      "providerWallMs": 57904,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "inv1.a1",
+      "role": "improver",
+      "ok": true,
+      "wallMs": 48540.72300000007,
+      "providerWallMs": 48456,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "dom1.a1",
+      "role": "improver",
+      "ok": true,
+      "wallMs": 50648.343541999566,
+      "providerWallMs": 50559,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "ttl-lru-cache-inv1",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 41142.137583000476,
+      "providerWallMs": 41062,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "ttl-lru-cache-dom1",
+      "role": "solver",
+      "ok": false,
+      "wallMs": 25302.215207999325,
+      "providerWallMs": 25218,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "agg1.a1",
+      "role": "improver",
+      "ok": true,
+      "wallMs": 62291.54533300061,
+      "providerWallMs": 62202,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "ttl-lru-cache-agg1",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 53981.78429099971,
+      "providerWallMs": 53900,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "bounded-map-settled-base",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 65716.55737499986,
+      "providerWallMs": 65637,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "bounded-map-settled-frozen",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 71792.15250000016,
+      "providerWallMs": 71704,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "paginated-records-base",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 59189.11949999983,
+      "providerWallMs": 59102,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "paginated-records-frozen",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 55109.52595800154,
+      "providerWallMs": 55026,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "dependency-schedule-base",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 51290.6627500015,
+      "providerWallMs": 51211,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    },
+    {
+      "label": "dependency-schedule-frozen",
+      "role": "solver",
+      "ok": true,
+      "wallMs": 79746.69208299929,
+      "providerWallMs": 79665,
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null
+      },
+      "costUsd": null
+    }
+  ],
+  "pluginFilesAtStart": {
+    "index.mjs": "e171c291ced94a1784bcb9ec0fcb5235e5a68e24a285c7c906685c2d1d2b5a58",
+    "runner.mjs": "d73a68e249ea93e181475576e864d2597e216e7c52ac3d083074c138e4c03e47",
+    "validation.mjs": "08bfa4d07c88a632f367b384ea4f619b7b370a6aaba5a3b254fffee1a11bfea8",
+    "coding-tools.mjs": "ab3b638aa507bf505953ed7b464018e2651d840e08a2c3dca188d40bc5273885",
+    "grade-coding.mjs": "c2992d9a48db6bbc8044de361ad1ad02d740b378f1453004cc86b355c5ddb10e",
+    "python/rdsh_harness2.py": "632070e02c6ef150d4437ca5eb5f60ab5440d2fc18223e4cbc95684a2f7a971a",
+    "python/rdsh_coding.py": "a678987ec0965f02e34bbce830f8262df2d5697ef4ad3ae1d7e9938848e14ec7",
+    "evaluation/coding-tasks.json": "9d45b69a1d4358024da97563736c9f96c50bb84a05802cd83a0a8304f588b694"
+  },
+  "pluginFilesAfterValidation": {
+    "index.mjs": "e171c291ced94a1784bcb9ec0fcb5235e5a68e24a285c7c906685c2d1d2b5a58",
+    "runner.mjs": "d73a68e249ea93e181475576e864d2597e216e7c52ac3d083074c138e4c03e47",
+    "validation.mjs": "08bfa4d07c88a632f367b384ea4f619b7b370a6aaba5a3b254fffee1a11bfea8",
+    "coding-tools.mjs": "db771a50b81a1d9db973dec0f0a2000df5ec7aff30239325c80de1e593f76d6a",
+    "grade-coding.mjs": "147935ebce5160215bdd68ab19760900637715eebc179e0fe9cbfe68a1a936f1",
+    "python/rdsh_harness2.py": "632070e02c6ef150d4437ca5eb5f60ab5440d2fc18223e4cbc95684a2f7a971a",
+    "python/rdsh_coding.py": "4fc9ba9b57b349f36f260d058ac1e092a8d8fe0593a130958bc8bd2934e4978c",
+    "evaluation/coding-tasks.json": "9d45b69a1d4358024da97563736c9f96c50bb84a05802cd83a0a8304f588b694"
+  },
+  "runs": {
+    "native": "coding-comparison-v1",
+    "regrading": "coding-comparison-v1/validation-v2",
+    "posthoc": "coding-comparison-v1/posthoc-cursor-collision"
+  },
+  "validation": {
+    "javascript": {
+      "pass": 24,
+      "fail": 0,
+      "skip": 0
+    },
+    "python": {
+      "pass": 18,
+      "fail": 0,
+      "skip": 0
+    },
+    "referenceFixturePublic": {
+      "pass": 8,
+      "fail": 0
+    },
+    "referenceFixtureHidden": {
+      "pass": 32,
+      "fail": 0
+    }
+  },
+  "limitations": [
+    "Small deterministic coding fixture suite; no statistical quality claim.",
+    "Each source starts from the same fixture; hidden grades are computed only after selection.",
+    "Improvers can read visible source, native trajectories and edited artifacts, never trusted hidden tests or grades.",
+    "Source editing and fixed Node test execution use restricted plugin tools, not general shell access.",
+    "Train results adapt on the same task; frozen holdouts do not adapt.",
+    "Provider token counts/cost remain null when native provider does not report them.",
+    "Source screening and manual review are required; arbitrary hostile JavaScript is not a trusted grading boundary.",
+    "One training task; three holdouts, one run per arm, sequential baseline then improved.",
+    "Posthoc cursor collision is exploratory and excluded from predefined primary scores.",
+    "Baseline uses native rdsh with common read/edit/fixed-test tools and empty candidate Markdown; full daily shell workflow is not evaluated.",
+    "The failed dom1 probe remains recorded; valid agg1 is not a fallback aggregate.",
+    "Original grading failures due to mandatory sourceFiles schema added during running sessions are preserved separately; new grades use identical saved artifacts, with no new model calls."
+  ]
+}

@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-harness2
+      name: rdsh-harness2
+      config: {}

@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "date": "2026-10-19",
+  "comparisonComplete": true,
+  "provider": "cursor-sdk",
+  "model": "composer-2.5",
+  "upstreamCommit": "1cfe254e8d25b15f37048c3730134686abe60335",
+  "runtime": {
+    "rdshBinaryVersion": "rdsh 0.9.1",
+    "nodeVersion": "v26.12.0",
+    "dshVersion": "0.2.0-rc.2",
+    "cursorSdkVersion": "1.0.37"
+  },
+  "training": {
+    "complete": false,
+    "baselinePassed": true,
+    "aggregatePassed": true,
+    "sessions": 8,
+    "additionalSessionsOverBaseline": 7,
+    "additionalSecondsOverBaseline": 296.605,
+    "warnings": [
+      "inv1 improver failed with NATIVE_TURN_FAILED and its probe used the baseline fallback",
+      "dom1 first proposal contained invalid JSON; one bounded repair succeeded"
+    ]
+  },
+  "holdout": {
+    "metrics": {
+      "baseline": {
+        "passed": 3,
+        "completed": 3,
+        "tasks": 3,
+        "meanSeconds": 23.369
+      },
+      "improved": {
+        "passed": 3,
+        "completed": 3,
+        "tasks": 3,
+        "meanSeconds": 29.278
+      }
+    },
+    "rows": [
+      {
+        "taskId": "signed-ledger-holdout",
+        "complete": true,
+        "baseline": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "improved": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "baselineSeconds": 22.855,
+        "improvedSeconds": 34.643
+      },
+      {
+        "taskId": "stock-filter-holdout",
+        "complete": true,
+        "baseline": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "improved": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "baselineSeconds": 25.57,
+        "improvedSeconds": 20.528
+      },
+      {
+        "taskId": "latest-record-holdout",
+        "complete": true,
+        "baseline": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "improved": {
+          "passed": true,
+          "validJson": true,
+          "completed": true
+        },
+        "baselineSeconds": 21.682,
+        "improvedSeconds": 32.664
+      }
+    ],
+    "sessions": 6,
+    "frozenHarnessSha256": "0ce6ae56c3096cd84bc4d93777486c07fad021a21d3c2618d1c3b9644f266f2b"
+  },
+  "costUsd": null,
+  "tokenUsage": {
+    "inputTokens": null,
+    "outputTokens": null,
+    "cacheReadTokens": null,
+    "cacheWriteTokens": null,
+    "inputTotalTokens": null
+  },
+  "pluginFilesSha256": {
+    "plugins/rdsh-harness2/index.mjs": "7c17ea6f5901ba3a9b26f3f3230fb2aec72861a06f81269bea6e8988cf1a1bd7",
+    "plugins/rdsh-harness2/runner.mjs": "f8c2fe51a4eae87f5dfd92e89f800447afebe8619b04f12480d31cf995f3eaa9",
+    "plugins/rdsh-harness2/validation.mjs": "857a151702a024d56a60d0cba8c1a3f93c9a90b247670a9d14f577dbaa9a5d48",
+    "plugins/rdsh-harness2/python/rdsh_harness2.py": "ce4514455006833d97f2a7f28ce71b2ba574368fe8df327816f5e48e53156a52",
+    "plugins/rdsh-harness2/evaluation/small-tasks.json": "ce52eeb248feffb457b1211520df162aa900430eab97f23ee26abd4fd19e4c26"
+  },
+  "providerBridgeSha256": {
+    "index.mjs": "d27d1050b933769b1348859b293f6df83bc8bc5d6cf4692172d05ecc1a2cb7d4",
+    "cursor-sdk.mjs": "2ecf75af8d884e90376ade53de5c33c58dace6e97ed99f2722e4a2f817c12e09",
+    "cursor-sdk-runner.mjs": "76a850fc2b39ddfeb3b7621bacd98e553413f692137915dfb69ef17df1782eed",
+    "json-turn.mjs": "aa65e9b19d8904d47e83fffe6228e13b60c73104dd9708a777ae0bd7f88b56f0"
+  },
+  "runs": {
+    "training": "comparison-cursor-v2",
+    "frozenComparison": "comparison-cursor-frozen-v3",
+    "excludedAntigravityPilot": "comparison-v1"
+  },
+  "limitations": [
+    "One training task and three held-out tasks, one run per arm.",
+    "Both arms use the same native read-only fixture tool surface.",
+    "The earlier failed proposal is preserved; adaptation is not reported as fully successful.",
+    "Official SDK JSON bridge did not expose token usage or prices.",
+    "Antigravity pilot had SDK execution failures; excluded from quality and latency comparison.",
+    "UI, full shell workflows, and Windows are outside this validation."
+  ]
+}

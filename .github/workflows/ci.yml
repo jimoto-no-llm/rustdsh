@@ -259,6 +259,26 @@ jobs:
           for language in en zh-CN ja; do
             RDSH_LANG="$language" RDSH_NATIVE_MODULES="$RUNNER_TEMP/rdsh-headless-candidate/node_modules" node tests/e2e/answer-guard-native.mjs
           done
+      - name: Test the Harness2 native plugin without model calls
+        run: |
+          npm ci --ignore-scripts --prefix plugins/rdsh-harness2
+          npm test --prefix plugins/rdsh-harness2
+        env:
+          RDSH_HARNESS2_DSH_PACKAGE: ${{ runner.temp }}/rdsh-headless-candidate/node_modules/@deepseek-ai/dsh
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check out the pinned Harness2 core
+        uses: actions/checkout@v7
+        with:
+          repository: google-research/harness2
+          ref: 1cfe254e8d25b15f37048c3730134686abe60335
+          path: .local/harness2-ci
+          persist-credentials: false
+      - name: Test the Harness2 Python adapter without model calls
+        run: |
+          python -m pip install --no-deps -e .local/harness2-ci
+          PYTHONPATH=plugins/rdsh-harness2/python python -m unittest discover -s plugins/rdsh-harness2/python/tests -v
       - name: Test the direct-model SDK adapters without DSH
         working-directory: plugins/rdsh-direct-models
         run: |
