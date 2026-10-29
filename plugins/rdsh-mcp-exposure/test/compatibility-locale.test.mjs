@@ -13,7 +13,7 @@ import { apply } from '../index.js';
 const versions = (version = DSH_VERSION) => Object.fromEntries(DSH_PACKAGES.map(name => [name, version]));
 
 test('each exact supported release accepts coherent peers and rejects mixed, unknown, future and missing peers', () => {
-  assert.deepEqual(DSH_VERSIONS, ['0.2.0-rc.2', '0.2.1-alpha.3']);
+  assert.deepEqual(DSH_VERSIONS, ['0.2.0-rc.2', '0.2.1-alpha.3', '0.2.1-rc.3', '0.2.1-rc.4']);
   for (const release of DSH_VERSIONS) {
     assert.doesNotThrow(() => assertDshVersions(versions(release)));
     for (const name of DSH_PACKAGES) {
@@ -42,9 +42,9 @@ test('saved language localizes owned configuration, runtime and guarded-launcher
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, symbol);
   process.env.DSH_HOME = home;
   const expected = {
-    en: { servers: 'servers must contain between 1 and 64 connections', version: 'rdsh-mcp-exposure requires matching DSH 0.2.0-rc.2 or 0.2.1-alpha.3 packages', ptc: 'PTC-only exposure requires an existing original DSH PTC runtime', guarded: 'The guarded rdsh launcher reserves its audited Native tool set; this bundle requires an existing authorized original DSH composition' },
-    ja: { servers: 'serversの接続数は1件以上64件以下にしてください', version: 'rdsh-mcp-exposureには、版を揃えたDSH 0.2.0-rc.2または0.2.1-alpha.3が必要です', ptc: 'PTC専用の公開には、既存のオリジナルDSH PTCランタイムが必要です', guarded: '保護されたrdshランチャーは監査済みのNativeツール群を専用に使用します。このバンドルには、許可された既存のオリジナルDSH構成が必要です' },
-    'zh-CN': { servers: 'servers必须包含1到64个连接', version: 'rdsh-mcp-exposure需要版本一致的DSH 0.2.0-rc.2或0.2.1-alpha.3', ptc: '仅PTC公开需要已有的原版DSH PTC运行时', guarded: '受保护的rdsh启动器专用经过审核的Native工具集；此包需要已有且获得授权的原版DSH配置' },
+    en: { servers: 'servers must contain between 1 and 64 connections', version: 'rdsh-mcp-exposure requires matching DSH 0.2.0-rc.2, 0.2.1-alpha.3, 0.2.1-rc.3 or 0.2.1-rc.4 packages', ptc: 'PTC-only exposure requires an existing original DSH PTC runtime', guarded: 'The guarded rdsh launcher reserves its audited Native tool set; this bundle requires an existing authorized original DSH composition' },
+    ja: { servers: 'serversの接続数は1件以上64件以下にしてください', version: 'rdsh-mcp-exposureには、版を揃えたDSH 0.2.0-rc.2、0.2.1-alpha.3、0.2.1-rc.3、0.2.1-rc.4が必要です', ptc: 'PTC専用の公開には、既存のオリジナルDSH PTCランタイムが必要です', guarded: '保護されたrdshランチャーは監査済みのNativeツール群を専用に使用します。このバンドルには、許可された既存のオリジナルDSH構成が必要です' },
+    'zh-CN': { servers: 'servers必须包含1到64个连接', version: 'rdsh-mcp-exposure需要版本一致的DSH 0.2.0-rc.2、0.2.1-alpha.3、0.2.1-rc.3或0.2.1-rc.4', ptc: '仅PTC公开需要已有的原版DSH PTC运行时', guarded: '受保护的rdsh启动器专用经过审核的Native工具集；此包需要已有且获得授权的原版DSH配置' },
   };
   const config = { servers: [{ connection: { serverName: 'docs' }, exposure: 'ptc-only' }] };
   try {

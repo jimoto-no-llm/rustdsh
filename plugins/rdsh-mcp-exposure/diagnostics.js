@@ -5,7 +5,7 @@ import { join } from 'node:path';
 const messages = {
   en: {
     guardedNative: 'The guarded rdsh launcher reserves its audited Native tool set; this bundle requires an existing authorized original DSH composition',
-    version: 'rdsh-mcp-exposure requires matching DSH 0.2.0-rc.2 or 0.2.1-alpha.3 packages',
+    version: 'rdsh-mcp-exposure requires matching DSH 0.2.0-rc.2, 0.2.1-alpha.3, 0.2.1-rc.3 or 0.2.1-rc.4 packages',
     ptcRuntime: 'PTC-only exposure requires an existing original DSH PTC runtime',
     object: '{label} must be an object',
     field: '{label} contains an unsupported field',
@@ -25,7 +25,7 @@ const messages = {
   },
   ja: {
     guardedNative: '保護されたrdshランチャーは監査済みのNativeツール群を専用に使用します。このバンドルには、許可された既存のオリジナルDSH構成が必要です',
-    version: 'rdsh-mcp-exposureには、版を揃えたDSH 0.2.0-rc.2または0.2.1-alpha.3が必要です',
+    version: 'rdsh-mcp-exposureには、版を揃えたDSH 0.2.0-rc.2、0.2.1-alpha.3、0.2.1-rc.3、0.2.1-rc.4が必要です',
     ptcRuntime: 'PTC専用の公開には、既存のオリジナルDSH PTCランタイムが必要です',
     object: '{label}はオブジェクトにしてください',
     field: '{label}に未対応のフィールドがあります',
@@ -45,7 +45,7 @@ const messages = {
   },
   'zh-CN': {
     guardedNative: '受保护的rdsh启动器专用经过审核的Native工具集；此包需要已有且获得授权的原版DSH配置',
-    version: 'rdsh-mcp-exposure需要版本一致的DSH 0.2.0-rc.2或0.2.1-alpha.3',
+    version: 'rdsh-mcp-exposure需要版本一致的DSH 0.2.0-rc.2、0.2.1-alpha.3、0.2.1-rc.3或0.2.1-rc.4',
     ptcRuntime: '仅PTC公开需要已有的原版DSH PTC运行时',
     object: '{label}必须是对象',
     field: '{label}包含不支持的字段',
