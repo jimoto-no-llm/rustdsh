@@ -26,6 +26,32 @@ rdsh features off search-web
 自動で導入して使います（`rdsh rustxng install` で先に導入しておくこともできます）。
 導入を止めたいときは `RUSTXNG_SKIP_INSTALL=1` を付けます。
 
+### サイドカーの自動更新
+
+rdsh が導入した `~/.local/bin/rustxng` だけが更新の対象です。`RUSTXNG_BIN` で指した
+バイナリ、`RUSTXNG_URL` の外部インスタンス、PATH 上の別の場所にある rustxng は
+利用者の管理物として一切触りません。
+
+- `rdsh search-web` と `rdsh rustxng start` は、最後の確認から 24 時間以上たっていれば
+  バックグラウンドで最新リリースを確認します（`RUSTXNG_UPDATE_INTERVAL_HOURS` で間隔を
+  変更、`0` で毎回）。確認と更新は切り離したプロセスで行うので、検索は待たされません。
+  更新が終わっていなければ今回は古い版で動き、次回から新しい版になります。
+  ネットワークに失敗しても何も表示せず、失敗が続くと間隔を 1 時間から倍々に（上限 24 時間）
+  伸ばします。状態は `$DSH_HOME/rustxng-update.json` に記録します。
+- 取得先は RustXNG のリリース（https、リダイレクトも GitHub 系のみ）だけです。
+  ダウンロードしたバイナリの sha256 を API の `digest` と `.sha256` に照合し
+  （食い違い・両方取得不可なら拒否）、同じディレクトリの一時ファイルで `--version`
+  が動くのを確かめてから atomic に置き換えます。置換後の起動確認に失敗すれば
+  直前の版（`rustxng.prev`、Windows は `rustxng.prev.exe`）へ戻します。
+- rdsh が起動して記録しているサイドカーだけは、更新後の次の利用時に再起動して新しい版に
+  します。利用者が自分で起動したプロセスは止めません。
+- `rdsh rustxng update` で手動更新、`rdsh rustxng update --check` で取得も置換もせずに
+  「導入済み / 最新 / 更新あり」だけ確認できます（`--json` 対応）。
+  `rdsh rustxng status` は導入版・確認済みの最新版・最終確認・自動更新の有効/無効を、
+  `rdsh doctor` は古い場合の警告を（ネットワークなしで）示します。
+- 自動更新だけを止めるには `RUSTXNG_SKIP_UPDATE=1`。`RUSTXNG_SKIP_INSTALL=1` のときも
+  更新は止まります。
+
 サイドカーは依存の無い単一バイナリで、Docker 版 SearXNG のような
 常設スタック（Python・Redis・コンテナ）を要求しません。目安:
 バイナリ約 14MB（初回ダウンロードのみ）、常駐メモリー約 10MB、

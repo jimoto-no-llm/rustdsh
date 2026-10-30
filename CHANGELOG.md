@@ -5,6 +5,17 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- rdsh が導入した RustXNG サイドカー（`~/.local/bin/rustxng`）を、GitHub の最新リリースへ
+  自動で追従させるようにしました。`rdsh search-web` / `rdsh rustxng start` の前に、24 時間ごと
+  （`RUSTXNG_UPDATE_INTERVAL_HOURS` で変更）にバックグラウンドで確認し、検索を待たせません。
+  sha256（API の `digest` と `.sha256`）を照合し、起動確認つきで atomic に置き換え、
+  失敗時は直前の版（`rustxng.prev`）へ戻します。`RUSTXNG_BIN` / `RUSTXNG_URL` / PATH 上の別の
+  rustxng は触りません。`RUSTXNG_SKIP_UPDATE=1` で自動更新だけを止められます。
+- `rdsh rustxng update [--check] [--json]` を追加しました。`rdsh rustxng status` は導入版・最新版・
+  最終確認・自動更新の有効/無効を表示し、`rdsh doctor` は古い場合に警告します。
+
 ## [0.14.1] - 2026-10-29
 
 ### Added
