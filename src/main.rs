@@ -102,6 +102,7 @@ mod task_outcomes;
 mod terminal_safe;
 #[cfg(test)]
 mod test_support;
+mod tmp_guard;
 mod token_handoff;
 mod tokens;
 mod tool_security;
@@ -3294,6 +3295,7 @@ fn doctor_json() -> anyhow::Result<()> {
     if profiles.is_err() {
         warnings.push("local profiles directory is unreadable or absent".to_string());
     }
+    warnings.extend(tmp_guard::doctor_lines(locale::Locale::English));
     let report = serde_json::json!({
         "schema": 1,
         "ok": ok,
@@ -3490,6 +3492,11 @@ fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
         say(w);
     }
     for w in wrapper_warnings(shadowed, locale) {
+        say(w);
+    }
+    // dsh-workspace-changes snapshot hygiene: big untracked paths and
+    // leftover orphan directories. Read-only; doctor never deletes.
+    for w in tmp_guard::doctor_lines(locale) {
         say(w);
     }
     say(format!(
