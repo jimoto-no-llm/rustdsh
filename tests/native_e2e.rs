@@ -1438,10 +1438,13 @@ fn doctor_reports_orphan_snapshots_and_large_untracked_paths() {
         text.contains("tmp guard: untracked 'huge-untracked.bin'"),
         "expected the untracked-path warning, got: {text}"
     );
-    assert!(
-        text.contains("tmp guard: 1 orphan dsh workspace snapshot dir"),
-        "expected the orphan warning, got: {text}"
-    );
+    // Orphan reclaim and its doctor warning are Linux/macOS only.
+    if cfg!(unix) {
+        assert!(
+            text.contains("tmp guard: 1 orphan dsh workspace snapshot dir"),
+            "expected the orphan warning, got: {text}"
+        );
+    }
     assert!(orphan.is_dir(), "doctor must not delete anything");
 
     let json = fixture.run(&["doctor", "--json"], b"");
@@ -1454,8 +1457,10 @@ fn doctor_reports_orphan_snapshots_and_large_untracked_paths() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(warnings.contains("huge-untracked.bin"), "{warnings}");
-    assert!(
-        warnings.contains("1 orphan dsh workspace snapshot dir"),
-        "{warnings}"
-    );
+    if cfg!(unix) {
+        assert!(
+            warnings.contains("1 orphan dsh workspace snapshot dir"),
+            "{warnings}"
+        );
+    }
 }

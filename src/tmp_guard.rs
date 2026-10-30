@@ -594,7 +594,7 @@ mod tests {
     // The pid of a process that already exited: a reliable "dead owner".
     #[cfg(unix)]
     fn dead_pid() -> u32 {
-        let child = std::process::Command::new("/bin/true").spawn().unwrap();
+        let child = std::process::Command::new("true").spawn().unwrap();
         let pid = child.id();
         child.wait_with_output().unwrap();
         pid
