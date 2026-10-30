@@ -5,6 +5,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `@deepseek-ai/dsh-workspace-changes` がセッション異常終了時に TMPDIR へ残すスナップショット（1個あたり数百MB）に対するガードを追加しました。委譲する `dsh` ごとに専用の `TMPDIR`（`<temp>/rdsh-tmp-<pid>-<乱数>`）を与えて分離し、次回の委譲前に「所有プロセスが不在」または「24時間以上無更新で誰も開いていない」ディレクトリだけを回収します。対象は自分の uid 所有・実ディレクトリ（symlink は辿らない）・`dsh-workspace-changes-*`/`rdsh-tmp-*` 接頭辞のみで、生きているセッションのものは絶対に消しません。`rdsh doctor` が回収可能な残骸と 100MB 超の未追跡パスを読み取り専用で警告します。`RDSH_NO_TMP_GUARD=1` で従来の挙動に戻せます。
+
 ## [0.14.1] - 2026-10-29
 
 ### Added

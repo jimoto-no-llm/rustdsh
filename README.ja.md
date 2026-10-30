@@ -636,6 +636,7 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 3. **明示的な認証管理**: 他アプリの認証情報を無断で同期・送信せず、利用者が明示的に指定したものだけを取り込みます。
 4. **サンドボックス隔離**（オプトイン）: Linux 環境では、`--share-file` で共有したファイルだけを読み取り専用・ネットワークなしで `rdsh_inspect` に渡します。その他の DSH ツールは upstream の権限と承認に従います。
 5. **プライバシーの既定設定**: セッション telemetry・Discord Rich Presence・更新確認は明示的に有効化するまで off です。委譲する `dsh` には `DSH_TELEMETRY_DISABLED=1` を渡します。詳細は [docs/PRIVACY.md](docs/PRIVACY.md)。
+6. **一時ディレクトリガード**: 委譲する `dsh` ごとに専用の `TMPDIR`（`<temp>/rdsh-tmp-<pid>-<乱数>`）を与え、クラッシュしたセッションが孤立させるのは自分のスナップショットだけにします。次回の委譲前には、所有プロセスが消えたもの、または24時間以上更新がなく誰も開いていないものだけを回収します（自分の uid 所有・実ディレクトリ・既知の接頭辞のみが対象。symlink は辿りません）。`rdsh doctor` は回収可能な残骸と100MB超の未追跡パスを読み取り専用で報告します。`RDSH_NO_TMP_GUARD=1` で無効化できます。
 
 ## よくある質問
 
@@ -653,6 +654,9 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 
 - **Q. プロファイルを指定しない `rdsh boot` が失敗する場合は？**
   `general.default_profile` または `RDSH_DEFAULT_PROFILE` を設定するか、`--profile <name>` を付けてください。
+
+- **Q. テンポラリに `dsh-workspace-changes-*` が溜まるのはなぜ？**
+  upstream のスナップショットプラグインは、セッションが異常終了するとディレクトリを破棄しません（upstream の既知の制限）。rdsh は委譲ごとに専用の一時ディレクトリで分離し、次回の委譲前に死んだセッションの残骸だけを回収します（`RDSH_NO_TMP_GUARD=1` で無効化）。`rdsh doctor` で回収可能な量を確認できます。
 
 ## 資料
 
