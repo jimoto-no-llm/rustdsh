@@ -595,12 +595,14 @@ fn base_cmd(
         };
         // The rdsh settings card reports this without spawning a second binary.
         command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+        crate::tmp_guard::apply_to_command(&mut command);
         apply_privacy_default(&mut command);
         apply_web_search_provider(&mut command);
         return Ok(command);
     }
     let mut command = crate::tool_security::command(orig, &bin, locale)?;
     command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+    crate::tmp_guard::apply_to_command(&mut command);
     apply_privacy_default(&mut command);
     apply_web_search_provider(&mut command);
     Ok(command)
@@ -705,6 +707,9 @@ fn exec_or_spawn(
         );
         return Ok(());
     }
+    // Reclaim orphaned dsh-workspace-changes dirs once, before this process
+    // is replaced by dsh (exec) or waits for it (Windows spawn).
+    crate::tmp_guard::sweep_before_exec(locale);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -721,8 +726,11 @@ fn exec_or_spawn(
     #[cfg(not(unix))]
     {
         // No exec(3) on Windows: spawn, wait, and exit with the child status
-        // so callers/pipes observe the same code.
-        match cmd.status() {
+        // so callers/pipes observe the same code. The per-run temp dir is
+        // ours to remove once the wait returns.
+        let status = cmd.status();
+        crate::tmp_guard::cleanup_after_spawn();
+        match status {
             Ok(st) => std::process::exit(st.code().unwrap_or(1)),
             Err(e) => Err(anyhow::anyhow!(
                 "{}: {e}",

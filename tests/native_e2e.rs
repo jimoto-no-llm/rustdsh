@@ -21,6 +21,9 @@ impl Fixture {
         ));
         fs::create_dir(&p).unwrap();
         fs::create_dir(p.join("dsh")).unwrap();
+        // Per-fixture temp root: every spawned rdsh (and its delegated dsh)
+        // confines its temp files here, so tests never touch the host's.
+        fs::create_dir(p.join("tmp")).unwrap();
         Self(p)
     }
     fn command(&self, args: &[&str]) -> Command {
@@ -36,6 +39,7 @@ impl Fixture {
             .env("HOME", &self.0)
             .env("USERPROFILE", &self.0)
             .env("DSH_HOME", self.0.join("dsh"))
+            .env("TMPDIR", self.0.join("tmp"))
             .env("XDG_CACHE_HOME", self.0.join("cache"))
             .env("XDG_DATA_HOME", self.0.join("data"))
             .env("XDG_CONFIG_HOME", self.0.join("config"))
@@ -114,6 +118,8 @@ fn dsh_alias_preserves_language_argument_bytes_for_delegation() {
         .args(["--language", "ja", "tui", "--resume", "日本語"])
         .env("DSH_HOME", private_dsh)
         .env("RDSH_ORIG_BIN", &original)
+        // Pin the temp root so the tmp guard stays inside this fixture.
+        .env("TMPDIR", fixture.0.join("tmp"))
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(23), "{output:?}");
@@ -1295,4 +1301,166 @@ fn tokens_chars_counts_characters_not_bytes() {
     let batch = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate_batch\",\"texts\":[\"\u{65e5}\u{672c}\u{8a9e}\",\"\u{e9}\",\"abc\"]}\n";
     let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], batch.as_bytes())).unwrap();
     assert_eq!(v["chars"], serde_json::json!([3, 1, 3]));
+}
+
+/// The tmp guard: a delegated run gets its own TMPDIR, quiet orphans go on
+/// the next delegated start, and RDSH_NO_TMP_GUARD=1 keeps the old behavior.
+#[cfg(unix)]
+#[test]
+fn delegated_runs_get_a_scoped_tmpdir_and_orphans_are_reclaimed() {
+    use std::os::unix::fs::PermissionsExt;
+
+    fn age(path: &std::path::Path, hours: u64) {
+        fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(std::time::SystemTime::now() - Duration::from_secs(hours * 3600)),
+            )
+            .unwrap();
+    }
+
+    let fixture = Fixture::new();
+    let tmp_root = fixture.0.join("tmp");
+    // A legacy dsh-workspace-changes orphan, quiet for over 24 hours.
+    let orphan = tmp_root.join("dsh-workspace-changes-e2e");
+    fs::create_dir_all(&orphan).unwrap();
+    fs::write(orphan.join("snap.bin"), vec![0u8; 2048]).unwrap();
+    age(&orphan.join("snap.bin"), 25);
+
+    let original = fixture.0.join("original-dsh");
+    fs::write(
+        &original,
+        "#!/bin/sh\nprintf '%s' \"$TMPDIR\"\ntouch \"$TMPDIR/alive\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&original, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(
+        fixture.0.join("dsh/.credentials.yaml"),
+        "version: 1\nrefs:\n  TEST: 'yes'\n",
+    )
+    .unwrap();
+
+    let boot = |extra_env: &[(&str, &str)]| -> Output {
+        let mut command = fixture.command(&["boot", "--profile", "tui"]);
+        command.env("RDSH_ORIG_BIN", &original);
+        for (key, value) in extra_env {
+            command.env(key, value);
+        }
+        command.output().unwrap()
+    };
+
+    // 1. First delegated run: the quiet orphan is reclaimed with one stderr
+    //    line, and dsh runs inside a fresh rdsh-tmp-<pid> directory.
+    let first = boot(&[]);
+    assert!(first.status.success(), "{first:?}");
+    let first_dir = String::from_utf8(first.stdout).unwrap();
+    assert!(
+        first_dir.starts_with(tmp_root.join("rdsh-tmp-").to_str().unwrap()),
+        "child TMPDIR must live under the temp root, got {first_dir}"
+    );
+    assert!(std::path::Path::new(&first_dir).is_dir());
+    assert!(std::path::Path::new(&first_dir).join("alive").is_file());
+    let stderr = String::from_utf8_lossy(&first.stderr);
+    assert!(
+        stderr.contains("tmp guard: removed 1 orphan snapshot dir"),
+        "expected the reclaim line, got: {stderr}"
+    );
+    assert!(!orphan.exists(), "the quiet orphan must be gone");
+
+    // 2. On unix, delegation is exec: the first run's dir survives its own
+    //    process, and the next delegated start reclaims it (dead owner pid).
+    let second = boot(&[]);
+    assert!(second.status.success(), "{second:?}");
+    let second_dir = String::from_utf8(second.stdout).unwrap();
+    assert_ne!(second_dir, first_dir);
+    assert!(
+        !std::path::Path::new(&first_dir).exists(),
+        "the dead-owner dir must be reclaimed by the next start"
+    );
+    assert!(std::path::Path::new(&second_dir).is_dir());
+
+    // 3. Opt-out: the environment is handed over untouched and nothing is
+    //    reclaimed while RDSH_NO_TMP_GUARD=1 is set.
+    let quiet = tmp_root.join("dsh-workspace-changes-quiet");
+    fs::create_dir_all(&quiet).unwrap();
+    fs::write(quiet.join("snap.bin"), vec![0u8; 128]).unwrap();
+    age(&quiet.join("snap.bin"), 25);
+    let opted_out = boot(&[("RDSH_NO_TMP_GUARD", "1")]);
+    assert!(opted_out.status.success(), "{opted_out:?}");
+    assert_eq!(
+        String::from_utf8(opted_out.stdout).unwrap(),
+        tmp_root.to_str().unwrap(),
+        "the child must see the caller's TMPDIR verbatim"
+    );
+    let stderr = String::from_utf8_lossy(&opted_out.stderr);
+    assert!(!stderr.contains("tmp guard"), "got: {stderr}");
+    assert!(quiet.is_dir(), "the orphan must stay while opted out");
+}
+
+/// `rdsh doctor` reports snapshot bloat sources and leftover orphans
+/// read-only: it never deletes anything.
+#[test]
+fn doctor_reports_orphan_snapshots_and_large_untracked_paths() {
+    let fixture = Fixture::new();
+    // Make the fixture a working tree so the untracked-path check has one.
+    let init = Command::new("git")
+        .arg("-C")
+        .arg(&fixture.0)
+        .args(["init", "-q"])
+        .output()
+        .unwrap();
+    assert!(init.status.success(), "{init:?}");
+    // A sparse untracked file over the 100 MB warning threshold.
+    fs::File::create(fixture.0.join("huge-untracked.bin"))
+        .unwrap()
+        .set_len(120 * 1024 * 1024)
+        .unwrap();
+    // A quiet orphan under the fixture temp root.
+    let orphan = fixture.0.join("tmp/dsh-workspace-changes-doctor");
+    fs::create_dir_all(&orphan).unwrap();
+    fs::write(orphan.join("snap.bin"), vec![0u8; 4096]).unwrap();
+    fs::File::options()
+        .write(true)
+        .open(orphan.join("snap.bin"))
+        .unwrap()
+        .set_times(
+            std::fs::FileTimes::new()
+                .set_modified(std::time::SystemTime::now() - Duration::from_secs(25 * 3600)),
+        )
+        .unwrap();
+
+    let report = fixture.run(&["doctor"], b"");
+    let text = String::from_utf8_lossy(&report.stdout);
+    assert!(
+        text.contains("tmp guard: untracked 'huge-untracked.bin'"),
+        "expected the untracked-path warning, got: {text}"
+    );
+    // Orphan reclaim and its doctor warning are Linux/macOS only.
+    if cfg!(unix) {
+        assert!(
+            text.contains("tmp guard: 1 orphan dsh workspace snapshot dir"),
+            "expected the orphan warning, got: {text}"
+        );
+    }
+    assert!(orphan.is_dir(), "doctor must not delete anything");
+
+    let json = fixture.run(&["doctor", "--json"], b"");
+    let v: Value = serde_json::from_slice(&json.stdout).unwrap();
+    let warnings = v["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|w| w.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(warnings.contains("huge-untracked.bin"), "{warnings}");
+    if cfg!(unix) {
+        assert!(
+            warnings.contains("1 orphan dsh workspace snapshot dir"),
+            "{warnings}"
+        );
+    }
 }

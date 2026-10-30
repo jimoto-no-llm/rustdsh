@@ -787,6 +787,7 @@ For startup, run `rdsh bench --n 5`. See
 3. **Explicit Auth**: Credentials are never sent externally or synced automatically; only user-approved items are imported.
 4. **Tool Sandboxing** (opt-in): On Linux, `--share-file` mounts only the files you share, read-only and without network, for the `rdsh_inspect` tool. Other DSH tools follow upstream permissions and approvals.
 5. **Privacy Defaults**: Session telemetry, Discord Rich Presence and update probing stay off unless you opt in; every delegated `dsh` receives `DSH_TELEMETRY_DISABLED=1`. See [docs/PRIVACY.md](docs/PRIVACY.md).
+6. **Temp-Dir Guard**: every delegated `dsh` gets its own `TMPDIR` (`<temp>/rdsh-tmp-<pid>-<random>`), so a crashed session can only orphan its own workspace snapshot. Before each delegation rdsh reclaims leftovers conservatively: only this user's real directories named `dsh-workspace-changes-*`/`rdsh-tmp-*` whose owner process is gone, or quiet for 24 hours with nothing held open. `rdsh doctor` reports reclaimable orphans and untracked paths over 100 MB, read-only. Opt out with `RDSH_NO_TMP_GUARD=1`. Orphan reclaim and the doctor orphan warning are Linux/macOS only (macOS has no `/proc`, so only the dead-owner and 24-hour quiet rules apply); on Windows only the per-run `TMPDIR` is removed at exit.
 
 ## FAQ
 
@@ -804,6 +805,9 @@ For startup, run `rdsh bench --n 5`. See
 
 - **Q. Does a profile-less `rdsh boot` fail?**
   Set `general.default_profile` or `RDSH_DEFAULT_PROFILE`, or pass `--profile <name>`.
+
+- **Q. Why do `dsh-workspace-changes-*` directories pile up in my temp dir?**
+  Upstream's snapshot plugin never disposes them when a session dies — a documented upstream limitation. rdsh scopes every delegated run to its own temp dir and reclaims dead sessions' leftovers on the next delegated start (`RDSH_NO_TMP_GUARD=1` opts out). `rdsh doctor` shows what is reclaimable.
 
 ## Documentation
 
