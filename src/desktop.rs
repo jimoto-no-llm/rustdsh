@@ -401,7 +401,7 @@ pub fn read_profile(dir: &Path) -> ProfileState {
 
 /// A directory that directly contains the bundled plugin packages. The probe
 /// reads the manifest so a stray or broken file is not mistaken for a checkout.
-fn is_plugins_dir(dir: &Path) -> bool {
+pub(crate) fn is_plugins_dir(dir: &Path) -> bool {
     let manifest = dir.join("rdsh-settings").join("package.json");
     let Ok(text) = std::fs::read_to_string(&manifest) else {
         return false;
@@ -455,6 +455,14 @@ pub fn resolve_plugins_dir(
             return Ok(nested);
         }
         tried.push(candidate);
+    }
+    // No checkout: the copy rdsh fetched from the release is the last source.
+    // A path the user named (--plugins-dir, RDSH_PLUGINS_DIR) is theirs to get
+    // right, so it never falls back to a tree rdsh manages.
+    if explicit.is_none() && env.plugins_dir.is_none() {
+        if let Some(dir) = crate::plugins_release::managed_plugins_dir(env) {
+            return Ok(dir);
+        }
     }
     let tried = tried
         .iter()
