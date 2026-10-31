@@ -15,6 +15,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   rustxng は触りません。`RUSTXNG_SKIP_UPDATE=1` で自動更新だけを止められます。
 - `rdsh rustxng update [--check] [--json]` を追加しました。`rdsh rustxng status` は導入版・最新版・
   最終確認・自動更新の有効/無効を表示し、`rdsh doctor` は古い場合に警告します。
+- `@deepseek-ai/dsh-workspace-changes` がセッション異常終了時に TMPDIR へ残すスナップショット（1個あたり数百MB）に対するガードを追加しました。委譲する `dsh` ごとに専用の `TMPDIR`（`<temp>/rdsh-tmp-<pid>-<乱数>`）を与えて分離し、次回の委譲前に「所有プロセスが不在」または「24時間以上無更新で誰も開いていない」ディレクトリだけを回収します。対象は自分の uid 所有・実ディレクトリ（symlink は辿らない）・`dsh-workspace-changes-*`/`rdsh-tmp-*` 接頭辞のみで、生きているセッションのものは絶対に消しません。`rdsh doctor` が回収可能な残骸と 100MB 超の未追跡パスを読み取り専用で警告します。`RDSH_NO_TMP_GUARD=1` で従来の挙動に戻せます。孤児の回収と doctor の孤児警告は Linux/macOS のみで（macOS は `/proc` が無く、所有プロセス不在と24時間無更新の判定のみ）、Windows は実行ごとの `TMPDIR` の終了時削除のみです。
 
 ## [0.14.1] - 2026-10-29
 

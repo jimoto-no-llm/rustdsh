@@ -21,6 +21,8 @@ impl Fixture {
         fs::create_dir(&root).unwrap();
         fs::create_dir(root.join("home")).unwrap();
         fs::create_dir(root.join("state")).unwrap();
+        // Per-fixture temp root: the tmp guard must stay inside the fixture.
+        fs::create_dir(root.join("tmp")).unwrap();
         fs::write(
             root.join("state/.credentials.yaml"),
             "version: 1\nrefs:\n  TEST: 'yes'\n",
@@ -49,6 +51,7 @@ impl Fixture {
             )
             .env("HOME", self.0.join("home"))
             .env("DSH_HOME", self.0.join("state"))
+            .env("TMPDIR", self.0.join("tmp"))
             .env("XDG_CACHE_HOME", self.0.join("cache"))
             .env("XDG_CONFIG_HOME", self.0.join("config"))
             .env("XDG_DATA_HOME", self.0.join("data"))
@@ -66,12 +69,16 @@ impl Drop for Fixture {
 #[test]
 fn alias_forwards_every_argument_byte_in_both_environment_modes() {
     use std::os::unix::ffi::OsStrExt;
-    let fixture = Fixture::new();
     for passthrough in ["0", "1"] {
         for first in [
             OsString::from("--profile=web"),
             OsString::from_vec(b"raw-\xff".to_vec()),
         ] {
+            // A fresh fixture per iteration: a normal-mode delegation leaves
+            // its per-run temp dir behind (exec hands the process over), and
+            // the next start would legitimately reclaim it with a stderr
+            // line — which this byte-exact test must not mix in.
+            let fixture = Fixture::new();
             let args = [
                 first,
                 "日本語".into(),
