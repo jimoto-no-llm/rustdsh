@@ -28,14 +28,26 @@ rdsh plugins install                     # attach what the profile is missing
 rdsh plugins install --profile web       # web/desktop defaults also add the starter set
 rdsh plugins install --recommended=all   # every recommended plugin
 rdsh plugins install --recommended=none  # essential tier only
-rdsh plugins install --no-bundled        # no checkout: the upstream tools only
+rdsh plugins install --no-bundled        # skip the bundled rdsh-* plugins (upstream tools only)
 rdsh plugins install --plugins-dir <checkout>  # or set RDSH_PLUGINS_DIR
+rdsh plugins update [--check] [--json]   # release copy of the bundled plugins -> latest
 ```
 
 Attaching goes through the same `dsh plugin --profile <name> add <spec>` the
 installer uses (`RDSH_DSH_BIN` overrides the CLI), so the result is identical.
-Bundled plugins are resolved from the checkout and an absent checkout is
-reported rather than skipped quietly. `rdsh doctor` prints one line per profile
+Bundled plugins come from the checkout when there is one. With no checkout,
+`rdsh plugins install` fetches the release's `rdsh-plugins.tar.gz` (sha256
+verified, unpacked safely, swapped in atomically) into
+`$DSH_HOME/rdsh-plugins/current/plugins` and attaches from that stable path; it
+uses the running rdsh's tag, or the latest release with `--latest`. Profiles that
+link there are kept on the latest release automatically, in the background, every
+24 hours (`RDSH_PLUGINS_UPDATE_INTERVAL_HOURS`; stop with
+`RDSH_PLUGINS_SKIP_UPDATE=1`). Only the contents of `current/` change: no profile
+manifest is rewritten and no plugin is added, and the two previous trees stay
+under `previous/`. Restart the DSH session to load an update. A checkout named by
+`--plugins-dir` or `RDSH_PLUGINS_DIR` is yours and is never fetched for or
+updated, and the upstream `@deepseek-ai/*` tools and the third-party plugins
+(sound, gitview) are not part of this update. `rdsh doctor` prints one line per profile
 whose essential tier is incomplete, `--profile desktop` forwards to
 `rdsh desktop install`, and `tests/plugin-catalog.test.mjs` fails whenever this
 catalog and `plugins/install.sh` disagree.

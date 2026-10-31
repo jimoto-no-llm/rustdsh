@@ -83,6 +83,8 @@ mod native_harness;
 mod opencode_header;
 mod passthrough;
 mod plugins;
+mod plugins_release;
+mod plugins_tar;
 mod provider_detect;
 mod providers;
 mod question_contracts;
@@ -618,8 +620,23 @@ enum PluginsAction {
         /// Skip the bundled rdsh plugins: a release-only install has no checkout
         #[arg(long = "no-bundled")]
         no_bundled: bool,
+        /// Without a checkout, take the plugins of the latest release instead
+        /// of the running rdsh's tag
+        #[arg(long = "latest")]
+        latest: bool,
         #[arg(long = "json")]
         json: bool,
+    },
+    /// Bring the release copy of the bundled plugins to the latest release
+    Update {
+        /// Only report installed / latest / update available; change nothing
+        #[arg(long = "check")]
+        check: bool,
+        #[arg(long = "json")]
+        json: bool,
+        /// Worker for the automatic update (started by rdsh itself)
+        #[arg(long = "background", hide = true)]
+        background: bool,
     },
 }
 
@@ -1712,6 +1729,7 @@ fn main() {
                         plugins_dir,
                         recommended,
                         no_bundled,
+                        latest,
                         json: inner,
                     }) => plugins::cmd_install(
                         plugins::InstallRequest {
@@ -1719,9 +1737,21 @@ fn main() {
                             plugins_dir,
                             recommended,
                             no_bundled,
+                            latest,
                             dry_run,
                             json: json || inner,
                         },
+                        locale,
+                    ),
+                    Some(PluginsAction::Update {
+                        check,
+                        json: inner,
+                        background,
+                    }) => plugins_release::cmd_update(
+                        &profile,
+                        check,
+                        json || inner,
+                        background,
                         locale,
                     ),
                 },
@@ -2038,6 +2068,11 @@ fn main() {
                 } => {
                     let mut all = cli.patch;
                     all.extend(patches);
+                    if !dry {
+                        // Decides from local files only; the check itself runs
+                        // in a detached worker, so the boot never waits.
+                        plugins_release::auto_tick();
+                    }
                     passthrough::exec_boot(
                         &profile,
                         from_default.as_deref(),
@@ -2795,6 +2830,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "check" => (
             "只报告已安装/最新/有可用更新，不下载也不替换",
             "導入済み/最新/更新ありの確認だけを行い、取得も置換もしない",
+        ),
+        "latest" => (
+            "没有检出目录时，使用最新 release 的插件，而不是当前 rdsh 的标签",
+            "チェックアウトが無いとき、実行中の rdsh のタグではなく最新 release のプラグインを使う",
         ),
         "background" => (
             "自动更新的后台工作进程（由 rdsh 自行启动）",
