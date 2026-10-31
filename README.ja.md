@@ -248,14 +248,24 @@ rdsh plugins status --profile web --json # スクリプト向け（schema 1）
 rdsh plugins install                     # 不足しているプラグインを追加
 rdsh plugins install --profile web       # web/desktop はスターターセットも追加
 rdsh plugins install --recommended=none  # 必須ティアのみ
-rdsh plugins install --no-bundled        # チェックアウト無しで上流パッケージのみ
+rdsh plugins install --no-bundled        # 同梱の rdsh-* を省く（上流パッケージのみ）
 rdsh plugins install --plugins-dir <checkout>  # または RDSH_PLUGINS_DIR を設定
+rdsh plugins update [--check]            # release 版の同梱プラグインを最新にする
 ```
 
 追加にはチェックアウト側のインストーラと同じ
 `dsh plugin --profile <name> add <spec>` を使います（CLI は `RDSH_DSH_BIN` で
-差し替え可）。同梱プラグインはチェックアウトから解決し、見つからない場合は
-黙って省略せず報告します。`rdsh doctor` は必須ティアが不足している
+差し替え可）。同梱プラグインはチェックアウトがあればそこから取ります。
+チェックアウトが無い場合、`rdsh plugins install` は release の
+`rdsh-plugins.tar.gz` を取得（sha256 検証）して `$DSH_HOME/rdsh-plugins/current`
+に展開し、そこから追加します（実行中の rdsh と同じタグ。`--latest` で最新）。
+プロファイルがこのコピーを使っていれば、rdsh はバックグラウンドで 24 時間ごと
+（`RDSH_PLUGINS_UPDATE_INTERVAL_HOURS` で変更、`RDSH_PLUGINS_SKIP_UPDATE=1` で停止）
+に最新 release へ追従させます。入れ替えるのは `current/` の中身だけで、
+プロファイルの package.json は書き換えず、プラグインも勝手に足しません。
+`--plugins-dir` / `RDSH_PLUGINS_DIR` で指定したチェックアウトは取得も更新もしません。
+`rdsh plugins status` は出所・版・最新を表示し、`rdsh doctor` は古い場合に警告します。
+`rdsh doctor` は必須ティアが不足している
 プロファイルごとに1行表示し、`--profile desktop` は
 `rdsh desktop install` に転送します。ティアと id の一覧は
 [plugins/recommended.md](plugins/recommended.md) を参照してください。
