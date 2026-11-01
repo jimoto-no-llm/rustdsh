@@ -260,9 +260,6 @@ fn lock_path() -> PathBuf {
 /// growing its own surface.
 const BANNER_KIND: &str = "rustxng";
 
-#[cfg(test)]
-static BANNER_TEST_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-
 /// The production location. Tests point the writer at their own temporary
 /// directory through the direct entry below, so the environment stays untouched
 /// and parallel tests never share a write target.
@@ -1227,13 +1224,6 @@ mod tests {
         parse_version(text).unwrap()
     }
 
-    /// Where the banner writer puts its state inside this process. The env
-    /// variables that other tests mutate (HOME) stay off the hook: the seam
-    /// is one OnceLock, set once at the first banner test, and the parallel
-    /// non-banner tests never consult it.
-    fn set_banner_root(dir: &Path) {
-        let _ = BANNER_TEST_ROOT.set(dir.to_path_buf());
-    }
 
     fn temp_dir(label: &str) -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
