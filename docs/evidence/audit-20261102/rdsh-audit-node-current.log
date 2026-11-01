@@ -1,0 +1,77 @@
+✔ status reports installed applications and an uninitialized private profile (25.564128ms)
+✔ status reports the Desktop command and enabled plugins (14.513189ms)
+✔ an extracted AppImage is detected through APPDIR (12.509997ms)
+✔ install --dry-run prints the forwarded command and changes nothing (13.165641ms)
+✔ install forwards to the Desktop command and verify then passes (112.202552ms)
+✔ Unix plugin source paths preserve literal backslashes (35.122428ms)
+✔ install --compute also attaches the compute bridge (111.300223ms)
+✔ install --no-sound --no-gitview --no-intelligent-ui skips the default third-party plugins (10.664852ms)
+✔ install --no-sound keeps gitview and vice versa (19.2187ms)
+✔ install attaches the starter plugins the checkout carries, in order (12.549411ms)
+✔ install and verify refuse an uninitialized Desktop profile (17.553644ms)
+✔ a --plugins-dir without the plugins is skipped for a real checkout (10.394693ms)
+✔ the packaged app layout is discovered without DSH_DESKTOP_CLI (89.73198ms)
+✔ the stub launcher matches the host platform (1.924705ms)
+✔ Desktop install honors saved sound and gitview feature vetoes (47.111543ms)
+✔ the Desktop installer script carries each saved feature veto into its package list (162.827281ms)
+✔ a relative extracted runtime survives the plugin working directory (84.199581ms)
+✔ a PATH symlink discovers a Desktop runtime outside standard app locations (92.704597ms)
+✔ the plugin installer defaults browser packages only for web and desktop (377.028853ms)
+✔ custom-route provider builder attaches the OpenCode header by endpoint (0.781482ms)
+✔ patching is idempotent (0.172706ms)
+✔ unexpected source shapes are left untouched (0.135956ms)
+✔ translation preview suite has its own isolated plugin host (40.73187ms)
+✔ settings plugin resolves the rdsh binary like the compute bridge (0.67459ms)
+▶ plugin security boundary and settings preservation
+  ✔ all twelve routes reject before body consumption or side effects (3.347464ms)
+  ✔ authenticated reads, saves and updater remain usable (7.122612ms)
+  ✔ the authenticated icon serves the supplied PNG exactly and supports HEAD (2.93152ms)
+  ✔ round-trip and partial saves preserve keys outside the form (3.6593ms)
+  ✔ cleared working files stay empty alongside legacy aliases (2.730542ms)
+  ✔ unrelated partial saves leave missing context unset (2.705544ms)
+  ✔ unrelated partial saves leave null context unset (1.579414ms)
+  ✔ form round-trip migrates active legacy context before unrelated edits (2.255828ms)
+  ✔ a context edit preserves other legacy values while honoring explicit clears (1.950593ms)
+  ✔ form round-trip remains saveable with long legacy paths (5.107017ms)
+  ✔ form round-trip remains saveable with large unmodeled section (24.769432ms)
+  ✔ all supported form fields fit within the bounded save body (33.081174ms)
+  ✔ saves replace symlinks without overwriting their targets and tighten existing file permissions (3.918639ms)
+  ✔ unreadable settings are never replaced with defaults (2.330348ms)
+  ✔ reads report corrupt settings instead of displaying defaults (1.639808ms)
+  ✔ language validation rejects invalid stored and submitted values without changing the file (8.628437ms)
+  ✔ missing settings use the current Rust dashboard port (1.600063ms)
+✔ plugin security boundary and settings preservation (118.926514ms)
+﹣ audited preload accepts registered versions and the legacy unset rc2 adapter (1.220148ms) # official audited runtime paths are supplied by the Linux security matrix
+﹣ audited preload rejects unknown, modified and cross-version runtimes with localized codes (0.204846ms) # official audited runtime paths are supplied by the Linux security matrix
+﹣ audited preload rejects a different known runtime swapped in during loading (0.157787ms) # official audited runtime paths are supplied by the Linux security matrix
+﹣ preload refuses a nested tool runtime selected by another importer (0.204585ms) # the official alpha3 runtime path is supplied by the Linux security matrix
+✔ deny hook never supplies an affirmative approval on a miss (10.638653ms)
+✔ anchored deny cannot be bypassed by hook metadata (10.533104ms)
+✔ shell quoting, variable assembly and path traversal cannot bypass deny patterns (68.961228ms)
+✔ harmless argument text is still not an anchored deny hit (9.033921ms)
+✔ malformed or oversized hook input fails closed (21.336708ms)
+✔ unsupported runtime is refused without copying external login credentials (51.430466ms)
+﹣ the 0.2.2 tool service installs the boundary from its constructor (0.198454ms) # the official 0.2.2-alpha.2 runtime path is supplied by the Linux security matrix
+﹣ forged tool exports fail before delegated code runs (0.216908ms) # the official alpha3 runtime path is supplied by the Linux security matrix
+✔ agent tools default to normal file access (174.786801ms)
+✔ context working files cannot read credentials outside the current repository (26.683085ms)
+✔ native search does not read hard links or symlinks to outside files (14.171485ms)
+✔ context working files reject in-tree symlinks and hard links to outside files (53.015621ms)
+✔ context rejects a FIFO without blocking while opening it (28.744948ms)
+✔ context does not retrieve other projects sessions by default (52.943425ms)
+✔ automatic updater verifies against the pinned registry, not a same-origin sidecar (106.134456ms)
+✔ imports require an explicit provider or ref and copy only the selected source (23.412567ms)
+✔ kernel isolation blocks credentials, network, writes and inherited environment (209.156431ms)
+✔ unavailable enforcement fails closed and never runs the requested command (1.402871ms)
+✔ isolated inspection tool registers without globally denying DSH tools (0.25498ms)
+✔ missing registration API fails closed before exposing anything (0.204645ms)
+✔ explicit sharing rejects hard links and hidden credentials (2.547146ms)
+✔ rdsh_inspect declares an OpenAI-compatible function parameter schema (0.814203ms)
+ℹ tests 68
+ℹ suites 0
+ℹ pass 62
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 1304.23196
