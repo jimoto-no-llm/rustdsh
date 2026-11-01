@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-# rdsh — `dsh` を速く・安全に起動する Rust 製ランチャー
+# rdsh — LLMローカルエージェントの推論プロセスを高効率に管理・プロセス隔離する Rust マイクロオーケストレータ
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -17,8 +17,8 @@
 
 独立したコミュニティプロジェクトです。DeepSeek や DeepSeek Harness の公式ではありません。
 
-`rdsh` は、[DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) を高速かつ安全に利用するための Rust 製ランチャーです。
-日常的によく使う処理（トークン計算、検索、セッション管理など）をネイティブ化し、エージェントの会話やモデル実行は本家の `dsh` へそのまま委譲します。現在お使いの引数やオプションもそのまま動作します。
+`rdsh` は、LLMローカルエージェントの実行を高効率に管理する Rust マイクロオーケストレータです。検索・セッション管理・推論プロセスの隔離・割当調整・認証情報・更新の監視を Rust のネイティブ実装としてまとめます。
+委任先の harness は差し替え可能なアダプター層で、同梱の [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) アダプターは本家の `dsh` へそのまま委譲します。割当先のモデルは OpenAI API など他のLLM基盤、ローカル推論（Ollama / llama.cpp）でも `rdsh provider` とローカル検索を通じて選べます。アダプター層の詳細は [docs/HARNESS-ADAPTER.md](docs/HARNESS-ADAPTER.md) を参照してください。
 
 本書のクイックスタートは、いま `dsh` や OpenCode・Codex CLI などの別のハーネスをお使いの方に向けて、本家 `dsh` と `rdsh` を導入する順序を案内します。すでに `dsh` を入れている方は、手順 A を飛ばして構いません。
 

@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — a fast, safe Rust launcher for `dsh`
+# rdsh — a Rust micro-orchestrator that manages and isolates the inference processes of local LLM agents
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -15,8 +15,9 @@
 
 An independent community project; not an official DeepSeek or DeepSeek Harness project.
 
-`rdsh` is a fast, safe launcher for [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness).
-It ports frequently used CLI operations (token calculation, code search, session management) to native Rust, while delegating conversation workflows and model execution transparently to upstream `dsh`. All existing arguments and options continue to work as-is.
+`rdsh` is a Rust micro-orchestrator for local LLM agents: it bundles the operational surface — web search, session management, tool/process isolation, model assignment guardrails, credential handling and update surveillance — as fast native Rust code.
+
+The delegated harness sits behind a swappable adapter layer; the bundled [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness) adapter delegates transparently to upstream `dsh`, and model routing via `rdsh provider` already speaks OpenAI-compatible endpoints and local inference (Ollama / llama.cpp). See [docs/HARNESS-ADAPTER.md](docs/HARNESS-ADAPTER.md) for the adapter seam. All existing arguments and options continue to work as-is.
 
 ## For AI agents
 

@@ -3,12 +3,12 @@ name = "rdsh"
 version = "0.15.0"
 edition = "2021"
 rust-version = "1.85"
-description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"
+description = "Rust micro-orchestrator for local LLM agents: process isolation, session management and native tooling with a swappable harness adapter (bundled: DeepSeek Harness)"
 license = "MIT"
 repository = "https://github.com/jimoto-no-llm/rustdsh"
 homepage = "https://github.com/jimoto-no-llm/rustdsh"
 readme = "README.md"
-keywords = ["dsh", "cli", "launcher", "dashboard", "deepseek"]
+keywords = ["llm", "agents", "micro-orchestrator", "process-isolation", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 documentation = "https://docs.rs/rdsh"
 
