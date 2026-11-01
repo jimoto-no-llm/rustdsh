@@ -243,7 +243,7 @@ fn install_attaches_only_the_missing_packages_through_dsh() {
         String::from_utf8_lossy(&output.stderr)
     );
     let calls = fixture.calls();
-    assert_eq!(calls.len(), 13, "{calls:?}");
+    assert_eq!(calls.len(), 14, "{calls:?}");
     assert!(
         !calls.iter().any(|line| line.contains("rdsh-settings")),
         "an attached package must not be added twice: {calls:?}"
@@ -301,8 +301,8 @@ fn install_defaults_to_the_starter_set_on_web_and_essential_only_on_headless() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // 7 upstream + 6 bundled, no recommended plugin.
-    assert_eq!(specs(&output).len(), 13);
+    // 7 upstream + 7 bundled, no recommended plugin.
+    assert_eq!(specs(&output).len(), 14);
 }
 
 #[test]
