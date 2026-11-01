@@ -342,7 +342,7 @@ rdsh settings get extras.enable
 | 機能 | コマンド | 備考 |
 | --- | --- | --- |
 | `serve` | `rdsh serve`（既定 :38080） | 手元の状態ページです。localhost のみ、起動ごとの鍵が必要です。 |
-| `search-web` | `rdsh search-web "調べたい語" --limit 5` | 既定は SearXNG。`--provider ollama` は `OLLAMA_API_KEY` を使い、`--auto-start` は同梱のローカル compose サービスを起動します。[Web検索](docs/WEB-SEARCH.md)を参照。 |
+| `search-web` | `rdsh search-web "調べたい語" --limit 5` | 既定は SearXNG。`--provider ollama` は `OLLAMA_API_KEY` を使い、`--auto-start` は同梱のローカル compose サービスを起動します。rdsh が導入したローカル rustxng サイドカーは、RustXNG の最新リリースへ自動で追従します（バックグラウンド、sha256 検証、旧版を1世代保持。`rdsh rustxng update [--check]`、`RUSTXNG_SKIP_UPDATE=1` で停止）。[Web検索](docs/WEB-SEARCH.md)を参照。 |
 
 `rdsh serve` は dsh の Web GUI（:3080）と競合しません。`--port 0` で空きポートを利用できます。
 API とダッシュボードの詳細については [Web UI](#web-ui) を参照してください。
