@@ -537,6 +537,113 @@ fn apply_web_assets(cmd: &mut std::process::Command, orig: &str, profile: &str) 
     cmd.env("RDSH_WEB_ASSETS", cache);
 }
 
+/// The plugin package the delegated web search rides on, the provider id it
+/// registers, and the env carrying the health-checked endpoint to it.
+const SEARCH_BRIDGE_PLUGIN: &str = "rdsh-web-search-searxng";
+const SEARCH_BRIDGE_PROVIDER_ID: &str = "rdsh-rustxng";
+const SEARCH_BRIDGE_BASE_ENV: &str = "RDSH_SEARXNG_URL";
+
+/// Resolve the endpoint the web search bridge may hand the delegated profile,
+/// or `None` to leave DSH's own provider (deepseek-official) untouched.
+///
+/// The order mirrors the `--engine auto` walk in `websearch`, but every step
+/// is health-gated and `ensure()` never runs without an installed binary: the
+/// first-run sidecar download belongs to `rdsh search-web` and
+/// `rdsh rustxng install`, not to every `rdsh tui`.
+pub(crate) fn resolve_search_bridge_base(
+    env_url: impl Fn(&str) -> Option<String>,
+    binary_present: bool,
+    ensure: impl Fn() -> Option<String>,
+    health: impl Fn(&str) -> bool,
+) -> Option<String> {
+    for name in ["SEARXNG_URL", "RUSTXNG_URL"] {
+        if let Some(url) = env_url(name) {
+            if health(&url) {
+                return Some(url);
+            }
+        }
+    }
+    let host = if binary_present {
+        ensure().filter(|base| health(base))
+    } else {
+        None
+    };
+    host.or_else(|| {
+        const DEFAULT: &str = "http://127.0.0.1:8888";
+        health(DEFAULT).then(|| DEFAULT.to_string())
+    })
+}
+
+/// True when the profile actually carries the bridge plugin, so the injected
+/// provider id names a seam that exists. Without the profile check a stale
+/// settings file would fail every `web_search` with
+/// `WEB_PROVIDER_CONFIGURED_MISSING` instead of falling back to DSH defaults.
+fn search_bridge_attached(profile: &str) -> bool {
+    let path = std::path::Path::new(&crate::inspect::dsh_home())
+        .join("profiles")
+        .join(profile)
+        .join("package.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    // serde parses the same shape every `dsh plugin add` writes; a profile
+    // dependency map is small enough that a read + parse stays off the boot
+    // path's hot costs.
+    serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("dependencies")
+                .and_then(|deps| deps.as_object())
+                .map(|deps| deps.contains_key(SEARCH_BRIDGE_PLUGIN))
+        })
+        .unwrap_or(false)
+}
+
+/// Point the delegated profile's `ctx.web` at the local engine: without this
+/// pin the harness searches through DeepSeek's native server-side search,
+/// where one search costs one full model turn. Everything here is best-effort,
+/// exactly like the web-assets overlay: a disabled feature, a missing plugin
+/// or an unreachable engine simply leaves both variables unset and DSH keeps
+/// its default provider.
+fn apply_search_bridge(cmd: &mut std::process::Command, profile: &str, dry: bool) {
+    // RDSH_WEB_SEARCH_BRIDGE=0 is the env off switch beside the feature.
+    if std::env::var("RDSH_WEB_SEARCH_BRIDGE").ok().as_deref() == Some("0") {
+        return;
+    }
+    if dry {
+        // A dry run must not start engines or download anything; the printed
+        // command intentionally shows how a real boot would resolve this.
+        return;
+    }
+    // An operator who pinned a provider through their own environment wins.
+    if std::env::var_os("DSH_WEB_SEARCH_PROVIDER").is_some() {
+        return;
+    }
+    let cfg = crate::rdsh_config::load();
+    if !crate::rdsh_config::feature_enabled(&cfg, "web_search_bridge") {
+        return;
+    }
+    if !search_bridge_attached(profile) {
+        return;
+    }
+    let Some(base) = resolve_search_bridge_base(
+        |name| {
+            std::env::var(name)
+                .ok()
+                .map(|value| value.trim().trim_end_matches('/').to_string())
+                .filter(|value| !value.is_empty())
+        },
+        crate::rustxng::binary().is_some(),
+        || crate::rustxng::ensure().ok(),
+        crate::rustxng::health,
+    ) else {
+        return;
+    };
+    cmd.env("DSH_WEB_SEARCH_PROVIDER", SEARCH_BRIDGE_PROVIDER_ID);
+    cmd.env(SEARCH_BRIDGE_BASE_ENV, base);
+}
+
 fn apply_gzip_overlay(cmd: &mut std::process::Command, orig: &str, profile: &str) -> bool {
     let Some(path) = gzip_overlay(orig, profile) else {
         return false;
@@ -772,6 +879,7 @@ pub fn exec_boot(
     cmd.args(app_args);
     apply_slim(&mut cmd, slim, locale);
     apply_web_assets(&mut cmd, &orig, profile);
+    apply_search_bridge(&mut cmd, profile, dry);
     if slim {
         eprintln!(
             "[rdsh] {} '{profile}' {} {orig} ({}: {})",
@@ -854,6 +962,7 @@ pub fn exec_raw(args: &[OsString], dry: bool, slim: bool) -> anyhow::Result<()> 
     if let Some(profile) = profile_of(args) {
         let profile = profile.to_string();
         apply_web_assets(&mut cmd, &orig, &profile);
+        apply_search_bridge(&mut cmd, &profile, dry);
     }
     exec_or_spawn(cmd, dry, crate::locale::Locale::English)
 }
@@ -889,6 +998,50 @@ fn original_dsh_not_found(locale: crate::locale::Locale) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bridge_resolution_prefers_a_healthy_pinned_endpoint() {
+        let base = resolve_search_bridge_base(
+            |name| (name == "SEARXNG_URL").then(|| "http://127.0.0.1:8890".to_string()),
+            true,
+            || Some("http://127.0.0.1:9001".to_string()),
+            |base| base.ends_with(":8890"),
+        );
+        assert_eq!(base.as_deref(), Some("http://127.0.0.1:8890"));
+    }
+
+    #[test]
+    fn bridge_resolution_starts_the_installed_engine_before_the_default() {
+        let base = resolve_search_bridge_base(
+            |_| None,
+            true,
+            || Some("http://127.0.0.1:9001".to_string()),
+            |base| base == "http://127.0.0.1:9001",
+        );
+        assert_eq!(base.as_deref(), Some("http://127.0.0.1:9001"));
+    }
+
+    #[test]
+    fn bridge_resolution_falls_back_to_the_default_port_only_when_it_answers() {
+        let base = resolve_search_bridge_base(
+            |_| None,
+            false,
+            || panic!("ensure must not run without an installed binary"),
+            |base| base.ends_with(":8888"),
+        );
+        assert_eq!(base.as_deref(), Some("http://127.0.0.1:8888"));
+    }
+
+    #[test]
+    fn bridge_resolution_is_none_when_nothing_answers() {
+        let base = resolve_search_bridge_base(
+            |name| (name == "RUSTXNG_URL").then(|| "http://127.0.0.1:9000".to_string()),
+            false,
+            || Some("http://127.0.0.1:9001".to_string()),
+            |_| false,
+        );
+        assert_eq!(base, None);
+    }
 
     fn sv(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()

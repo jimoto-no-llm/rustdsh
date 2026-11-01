@@ -55,6 +55,11 @@
       "why": "restate reasoning-only replies as text"
     },
     {
+      "package": "rdsh-web-search-searxng",
+      "bundled": true,
+      "why": "pin the delegated dsh web_search to the local rustxng/SearXNG engine"
+    },
+    {
       "package": "rdsh-update-banner",
       "bundled": true,
       "profiles": [

@@ -9,6 +9,22 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- 委譲した dsh エージェントの `web_search` を、rustxng / `SEARXNG_URL` が実際に
+  応答するときに限りローカルの SearXNG 互換エンジンへ切替えます。rdsh 起動時に
+  エンジンの応答（`rustxng health` と `--engine auto` と同じ順序、未導入なら
+  ダウンロードしない）を確認して `DSH_WEB_SEARCH_PROVIDER=rdsh-rustxng` を注入し、
+  必須ティアで入る同梱プラグイン `rdsh-web-search-searxng` が provider を登録します。
+  DeepSeek のサーバーサイド検索（検索1回 = モデルturn1回）の代わりに無課金で
+  検索できるようになり、rustxng が届かないときは今までどおり dsh 既定の
+  `deepseek-official` のままです。`rdsh features off web_search_bridge` と
+  `RDSH_WEB_SEARCH_BRIDGE=0` で停止します。
+  See [docs/WEB-SEARCH.md](docs/WEB-SEARCH.md).
+- rustxng サイドカーの更新を Web UI バナーでも扱うようにしました。チェック・更新の
+  成功時に `~/.local/share/rdsh/update-state.json` へ `kind: rustxng` の記録を書き、
+  `rdsh-update-banner` バナーが「rustxng sidecar update」カードを出します。カードの
+  update ボタンは認証つき `/api/rdsh-update/rustxng/run` 経由で `rdsh rustxng update`
+  を実行します（実行する rdsh バイナリは PATH から現在ユーザー所有の通常ファイル
+  のみを採用します）。
 - チェックアウト無しでも同梱の `rdsh-*` プラグインが入るようにしました。`rdsh plugins install` は
   チェックアウトが見つからないとき、release の `rdsh-plugins.tar.gz` を取得（sha256 を API の
   `digest`・`.sha256`・固定台帳 `release-plugins-digests.tsv` で照合）し、パストラバーサル・

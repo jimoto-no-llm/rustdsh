@@ -366,7 +366,7 @@ test('feature switches gate every update route and keep polling when notificatio
   await writeFile(path.join(home, 'rdsh.json'), '{not json');
   const broken = server();
   const disposeBroken = apply(broken.ctx, { demo: true });
-  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/events', '/api/rdsh-update/run']);
+  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/events', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
   const demo = await get(broken.routes);
   assert.equal(demo.status, 200); assert.equal(demo.data.updated, true);
   disposeBroken?.();
@@ -374,7 +374,7 @@ test('feature switches gate every update route and keep polling when notificatio
   await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_notifications: false } }));
   const polling = server();
   const disposePolling = apply(polling.ctx, { demo: true });
-  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/run']);
+  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
   const state = await get(polling.routes);
   assert.equal(state.status, 200); assert.equal(state.data.updated, true);
   disposePolling?.();

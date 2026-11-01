@@ -1,0 +1,22 @@
+{
+  "name": "rdsh-web-search-searxng",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Pin the delegated DSH web_search to the local rustxng/SearXNG engine (rdsh web_search_bridge)",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "exports": {
+    ".": "./index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "rdsh ローカル検索ブリッジ",
+    "description": "RDSH_SEARXNG_URL が指せる SearXNG/rustxng を dsh エージェントの web_search 既定先にします。rdsh 起動時に RDSH_SEARXNG_URL と DSH_WEB_SEARCH_PROVIDER を注入するので、rustxng が使える手元環境では DeepSeek の web_search を置き換えます。"
+  }
+}

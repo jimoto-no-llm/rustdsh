@@ -71,6 +71,7 @@ Essential plugins (always installed, listed first)
   rdsh-settings                             rdsh section in DSH settings
   rdsh-mobile-ui                            phone-width Web layout
   rdsh-answer-guard                         restate reasoning-only replies as text
+  rdsh-web-search-searxng                   pin dsh web_search to the local rustxng/SearXNG
   rdsh-update-banner                        Web release banner (PROFILE=web only)
   rdsh-no-feedback                          disable the DSH Like/Dislike and /feedback
   rdsh-no-feedback-client                   hide the sidebar Feedback row (browser half of the above)
@@ -272,7 +273,7 @@ PKGS="
 @deepseek-ai/dsh-tool-bash-persistent
 @deepseek-ai/dsh-mcp-client
 "
-ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui dsh-mobile-maxxing rdsh-answer-guard"
+ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui dsh-mobile-maxxing rdsh-answer-guard rdsh-web-search-searxng"
 if [ "$PROFILE" = "web" ]; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-update-banner"
 fi

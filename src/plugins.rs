@@ -1183,22 +1183,22 @@ mod tests {
     fn catalog_carries_the_essential_tier_the_installer_ships() {
         let catalog = Catalog::load().unwrap();
         let web = packages(&catalog.essential_for("web"));
-        // The tier is the eleven unconditional entries plus the two Web-only
+        // The tier is the twelve unconditional entries plus the two Web-only
         // bundles plus the two feature-gated feedback packages; the gate itself
         // is asserted in feedback_bundle_is_provisioned_only_when_the_switch_is_off.
-        // asserted in feedback_bundle_is_provisioned_only_when_the_switch_is_off.
-        assert_eq!(web.len(), 15);
+        assert_eq!(web.len(), 16);
         assert_eq!(web[0], "@deepseek-ai/dsh-tool-present");
         assert_eq!(web[6], "@deepseek-ai/dsh-mcp-client");
         assert_eq!(web[7], "rdsh-settings");
         assert_eq!(web[8], "rdsh-mobile-ui");
         assert_eq!(web[9], "dsh-mobile-maxxing");
-        assert_eq!(web[11], "rdsh-update-banner");
-        assert_eq!(web[12], "rdsh-web-cache");
-        assert_eq!(web[13], "rdsh-no-feedback");
+        assert_eq!(web[11], "rdsh-web-search-searxng");
+        assert_eq!(web[12], "rdsh-update-banner");
+        assert_eq!(web[13], "rdsh-web-cache");
+        assert_eq!(web[14], "rdsh-no-feedback");
         // The Web banner and the asset server are essential for web only.
         let headless = packages(&catalog.essential_for("headless"));
-        assert_eq!(headless.len(), 13);
+        assert_eq!(headless.len(), 14);
         assert!(!headless.iter().any(|name| name == "rdsh-update-banner"));
         assert!(!headless.iter().any(|name| name == "rdsh-web-cache"));
     }
@@ -1224,7 +1224,7 @@ mod tests {
         let headless = catalog
             .selection("headless", None, &RdshSettings::default())
             .unwrap();
-        assert_eq!(headless.len(), 13);
+        assert_eq!(headless.len(), 14);
         assert!(headless.iter().all(|entry| entry.essential));
     }
 
@@ -1429,6 +1429,7 @@ mod tests {
                 "rdsh-mobile-ui",
                 "dsh-mobile-maxxing",
                 "rdsh-answer-guard",
+                "rdsh-web-search-searxng",
                 "rdsh-no-feedback",
                 "rdsh-no-feedback-client",
             ]

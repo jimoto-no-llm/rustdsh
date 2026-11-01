@@ -4,6 +4,28 @@
 検索先は `--provider searxng|ollama` で選択します。既定は `searxng` です。
 これはネイティブCLIの検索先の指定です。DSH本体の検索ツールやモデルのルート設定は変更しません。
 
+## dsh エージェントの `web_search` をローカル検索へ（`web_search_bridge`、既定ON）
+
+委譲した DSH エージェントが使う `web_search` ツールの既定は DeepSeek の
+サーバーサイド検索（検索1回につきモデルturn1回）です。rdsh は起動時に rustxng /
+`SEARXNG_URL` が実際に応答するかを確かめ、使えるときだけ委譲先へ
+`DSH_WEB_SEARCH_PROVIDER=rdsh-rustxng` と `RDSH_SEARXNG_URL` を注入して
+同梱プラグイン `rdsh-web-search-searxng` に切替えます。つまり手元に
+検索先が確保できれば DeepSeek のweb_searchの代わりにローカル検索（無料・
+レート制限なし）で回答します。
+
+- 切替対象は `rdsh plugins install` が必須ティアで入れる同梱の
+  `rdsh-web-search-searxng` です。プロファイルに入っていなければ注入して
+  いないので、既定の DeepSeek 検索のまま動きます。
+- rustxng が未導入のときは ダウンロードは起動しません。
+  `rdsh search-web`・`rdsh rustxng install` が導入するのを待つか、
+  手動で `rdsh rustxng install` を流してください。
+- 接続断のときは検索はエラーとして明示し、途中で DeepSeek に黙って
+  フォールバックしません（dsh-web-search-deepseek と同一の方針）。
+- オフにするとき: `rdsh features off web_search_bridge` または起動環境
+  `RDSH_WEB_SEARCH_BRIDGE=0`。ユーザー自身が `DSH_WEB_SEARCH_PROVIDER` を
+  設定している場合はそれが優先されます。
+
 ## Web Search APIサービスの案内
 
 Web検索用APIを探している場合は [Tavily](https://www.tavily.com/) を案内しています。
@@ -49,6 +71,10 @@ rdsh が導入した `~/.local/bin/rustxng` だけが更新の対象です。`RU
   「導入済み / 最新 / 更新あり」だけ確認できます（`--json` 対応）。
   `rdsh rustxng status` は導入版・確認済みの最新版・最終確認・自動更新の有効/無効を、
   `rdsh doctor` は古い場合の警告を（ネットワークなしで）示します。
+- Web UI の更新バナーでも追従を通知します。チェックまたは更新が成功するたびに、
+  `~/.local/share/rdsh/update-state.json` へ `kind: rustxng` の記録が入るので、
+  `rdsh-update-banner` バナーが「rustxng sidecar update」カードを出します。カードの
+  **update** ボタンは `rdsh rustxng update` を実行して、新しい版をインストールします。
 - 自動更新だけを止めるには `RUSTXNG_SKIP_UPDATE=1`。`RUSTXNG_SKIP_INSTALL=1` のときも
   更新は止まります。
 
