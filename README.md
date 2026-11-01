@@ -268,15 +268,23 @@ rdsh plugins status --profile web --json # schema 1 for scripts and dashboards
 rdsh plugins install                     # attach what the profile is missing
 rdsh plugins install --profile web       # web/desktop defaults also add the starter set
 rdsh plugins install --recommended=none  # the essential tier only
-rdsh plugins install --no-bundled        # no checkout: the upstream tools only
+rdsh plugins install --no-bundled        # skip the bundled rdsh-* plugins (upstream tools only)
 rdsh plugins install --plugins-dir <checkout>  # or export RDSH_PLUGINS_DIR
+rdsh plugins update [--check]            # bring the release copy of the bundled plugins up to date
 ```
 
 Packages go through `dsh plugin --profile <name> add <spec>` (`RDSH_DSH_BIN`
 overrides the CLI), exactly as the checkout installer does. Bundled plugins are
-resolved from the checkout, and an absent checkout is reported instead of being
-skipped quietly. `rdsh doctor` prints the same gap for every initialized
-profile, and `--profile desktop` forwards to `rdsh desktop install`. See
+taken from a checkout when there is one. Without a checkout, `rdsh plugins
+install` fetches the release's `rdsh-plugins.tar.gz` (sha256-verified) into
+`$DSH_HOME/rdsh-plugins/current` and attaches from there; it uses the tag of the
+running rdsh (`--latest` takes the newest release). Once profiles use that copy,
+rdsh keeps it on the latest release in the background (every 24 hours, set
+`RDSH_PLUGINS_UPDATE_INTERVAL_HOURS`; off with `RDSH_PLUGINS_SKIP_UPDATE=1`):
+only the contents of `current/` are replaced, so no profile manifest is rewritten
+and no plugin is added. A checkout you name (`--plugins-dir`, `RDSH_PLUGINS_DIR`)
+is never fetched for or updated. `rdsh plugins status` shows the origin, version
+and latest; `rdsh doctor` warns when the copy is old. See
 [plugins/recommended.md](plugins/recommended.md) for the tiers and the ids.
 
 ### Credential sharing with rdsh auth

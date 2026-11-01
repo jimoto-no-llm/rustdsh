@@ -265,7 +265,7 @@ pub(crate) fn save_state(path: &Path, state: &UpdateState) -> std::io::Result<()
     std::fs::rename(&tmp, path)
 }
 
-fn now_secs() -> u64 {
+pub(crate) fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -274,7 +274,13 @@ fn now_secs() -> u64 {
 
 /// Seconds between checks from RUSTXNG_UPDATE_INTERVAL_HOURS (0 = every time).
 fn base_interval_secs(lookup: &dyn Fn(&str) -> Option<String>) -> u64 {
-    lookup("RUSTXNG_UPDATE_INTERVAL_HOURS")
+    interval_secs(lookup, "RUSTXNG_UPDATE_INTERVAL_HOURS")
+}
+
+/// Hours in the named variable as seconds (default 24h, 0 = every time). The
+/// bundled-plugins updater reads its own variable through the same rule.
+pub(crate) fn interval_secs(lookup: &dyn Fn(&str) -> Option<String>, name: &str) -> u64 {
+    lookup(name)
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(DEFAULT_INTERVAL_HOURS)
         .saturating_mul(3600)
@@ -295,7 +301,7 @@ fn effective_interval(base_secs: u64, failures: u32) -> u64 {
     step.min(DAY_SECS).min(base_secs)
 }
 
-fn is_due(now: u64, state: &UpdateState, base_secs: u64) -> bool {
+pub(crate) fn is_due(now: u64, state: &UpdateState, base_secs: u64) -> bool {
     // A clock that moved backwards must not postpone the check indefinitely.
     if state.last_check > now {
         return true;
@@ -303,20 +309,20 @@ fn is_due(now: u64, state: &UpdateState, base_secs: u64) -> bool {
     now - state.last_check >= effective_interval(base_secs, state.failures)
 }
 
-fn record_success(state: &mut UpdateState, tag: &str, now: u64) {
+pub(crate) fn record_success(state: &mut UpdateState, tag: &str, now: u64) {
     state.last_check = now;
     state.latest_tag = Some(tag.to_string());
     state.failures = 0;
 }
 
-fn record_failure(state: &mut UpdateState, now: u64) {
+pub(crate) fn record_failure(state: &mut UpdateState, now: u64) {
     state.last_check = now;
     state.failures = state.failures.saturating_add(1);
 }
 
 // ---------------------------------------------------------------- decision
 
-fn truthy_one(lookup: &dyn Fn(&str) -> Option<String>, name: &str) -> bool {
+pub(crate) fn truthy_one(lookup: &dyn Fn(&str) -> Option<String>, name: &str) -> bool {
     lookup(name).is_some_and(|value| value == "1")
 }
 
@@ -435,7 +441,12 @@ pub(crate) fn allowed_url(url: &str) -> bool {
 
 /// A release asset URL must be a download of INSTALL_REPO's own releases.
 pub(crate) fn allowed_asset_url(url: &str) -> bool {
-    let prefix = format!("https://github.com/{INSTALL_REPO}/releases/download/");
+    allowed_asset_url_for(INSTALL_REPO, url)
+}
+
+/// The same rule for another repository (the bundled plugins archive).
+pub(crate) fn allowed_asset_url_for(repo: &str, url: &str) -> bool {
+    let prefix = format!("https://github.com/{repo}/releases/download/");
     allowed_url(url) && url.starts_with(&prefix) && !url.contains("..")
 }
 
@@ -443,7 +454,7 @@ fn latest_api_url() -> String {
     format!("https://api.github.com/repos/{INSTALL_REPO}/releases/latest")
 }
 
-struct HttpsFetch;
+pub(crate) struct HttpsFetch;
 
 impl Fetch for HttpsFetch {
     fn get(&self, url: &str, limit: usize, timeout: Duration) -> Result<Vec<u8>> {
@@ -537,18 +548,23 @@ pub(crate) fn parse_release(json: &str) -> Result<Release> {
 }
 
 fn fetch_release(fetch: &dyn Fetch) -> Result<Release> {
-    let body = fetch.get(&latest_api_url(), MAX_TEXT_BYTES, API_TIMEOUT)?;
+    fetch_release_from(fetch, &latest_api_url())
+}
+
+/// Fetch and parse a release JSON (`/releases/latest` or `/releases/tags/<tag>`).
+pub(crate) fn fetch_release_from(fetch: &dyn Fetch, url: &str) -> Result<Release> {
+    let body = fetch.get(url, MAX_TEXT_BYTES, API_TIMEOUT)?;
     parse_release(&String::from_utf8_lossy(&body))
 }
 
 /// A 64-digit hex string, lowercased; anything else is not a sha256.
-fn normalize_hex(text: &str) -> Option<String> {
+pub(crate) fn normalize_hex(text: &str) -> Option<String> {
     let text = text.trim();
     (text.len() == 64 && text.chars().all(|c| c.is_ascii_hexdigit()))
         .then(|| text.to_ascii_lowercase())
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
@@ -556,7 +572,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// `<hex>  <file>` (sha256sum) or a bare hex digest.
-fn parse_sha256_file(text: &str) -> Option<String> {
+pub(crate) fn parse_sha256_file(text: &str) -> Option<String> {
     text.split_whitespace().next().and_then(normalize_hex)
 }
 
@@ -568,8 +584,14 @@ pub(crate) fn verify_digests(
     api_digest: Option<&str>,
     sidecar_digest: Option<&str>,
 ) -> Result<()> {
+    verify_sources(bytes, &[api_digest, sidecar_digest])
+}
+
+/// [verify_digests] for any number of sources (the plugins archive adds the
+/// pinned ledger as a third one).
+pub(crate) fn verify_sources(bytes: &[u8], sources: &[Option<&str>]) -> Result<()> {
     let actual = sha256_hex(bytes);
-    let expected: Vec<&str> = [api_digest, sidecar_digest].into_iter().flatten().collect();
+    let expected: Vec<&str> = sources.iter().copied().flatten().collect();
     ensure!(
         !expected.is_empty(),
         "no sha256 digest is available for the download"
@@ -761,10 +783,10 @@ pub(crate) fn run_update(
 
 /// Exclusive right to run an update; released on drop. A stale lock left by a
 /// crashed worker is taken over.
-struct UpdateLock(PathBuf);
+pub(crate) struct UpdateLock(PathBuf);
 
 impl UpdateLock {
-    fn acquire(path: &Path) -> Option<Self> {
+    pub(crate) fn acquire(path: &Path) -> Option<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok()?;
         }
@@ -802,7 +824,7 @@ fn lock_is_stale(path: &Path) -> bool {
         .is_some_and(|age| age > LOCK_STALE)
 }
 
-fn lock_is_fresh(path: &Path) -> bool {
+pub(crate) fn lock_is_fresh(path: &Path) -> bool {
     path.exists() && !lock_is_stale(path)
 }
 
@@ -838,12 +860,19 @@ pub(super) fn auto_tick() {
 
 #[cfg(not(test))]
 fn spawn_worker() {
+    spawn_detached(&["rustxng", "update", "--background"]);
+}
+
+/// Start `rdsh <args>` detached from this process and its terminal; the bundled
+/// plugins updater starts its worker through the same code.
+#[cfg(not(test))]
+pub(crate) fn spawn_detached(args: &[&str]) {
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
     let mut command = Command::new(exe);
     command
-        .args(["rustxng", "update", "--background"])
+        .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());

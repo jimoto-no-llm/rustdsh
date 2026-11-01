@@ -7,6 +7,20 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- チェックアウト無しでも同梱の `rdsh-*` プラグインが入るようにしました。`rdsh plugins install` は
+  チェックアウトが見つからないとき、release の `rdsh-plugins.tar.gz` を取得（sha256 を API の
+  `digest`・`.sha256`・固定台帳 `release-plugins-digests.tsv` で照合）し、パストラバーサル・
+  リンク・デバイスを拒否する安全な展開のうえ `$DSH_HOME/rdsh-plugins/current` へ atomic に
+  配置して、そこから追加します。取得する版は実行中の rdsh と同じタグで、`--latest` で最新 release
+  を使えます。旧版は直近 2 世代だけ `previous/` に残します。`--plugins-dir` / `RDSH_PLUGINS_DIR`
+  で指定したチェックアウトは取得も更新もしません。
+- プロファイルが上記の release 版プラグインを使っている場合だけ、24 時間ごと
+  （`RDSH_PLUGINS_UPDATE_INTERVAL_HOURS` で変更）にバックグラウンドで最新 release へ追従します
+  （失敗時はバックオフ、起動は待たせません）。`current/` の中身だけを入れ替えるので、プロファイルの
+  package.json は書き換えず、プラグインも勝手に足しません。`RDSH_PLUGINS_SKIP_UPDATE=1` で停止できます。
+- `rdsh plugins update [--check] [--json]` を追加しました。`rdsh plugins status` は同梱プラグインの
+  出所（checkout / release / none）・版・最新・最終確認・自動更新の有効/無効を `bundled` キーで
+  表示し（JSON は後方互換の追加）、`rdsh doctor` は古い場合と未導入の場合に警告します。
 - rdsh が導入した RustXNG サイドカー（`~/.local/bin/rustxng`）を、GitHub の最新リリースへ
   自動で追従させるようにしました。`rdsh search-web` / `rdsh rustxng start` の前に、24 時間ごと
   （`RUSTXNG_UPDATE_INTERVAL_HOURS` で変更）にバックグラウンドで確認し、検索を待たせません。
