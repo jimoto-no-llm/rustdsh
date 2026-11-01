@@ -1224,7 +1224,6 @@ mod tests {
         parse_version(text).unwrap()
     }
 
-
     fn temp_dir(label: &str) -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
