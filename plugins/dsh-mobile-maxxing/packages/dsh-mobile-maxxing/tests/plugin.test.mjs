@@ -375,7 +375,7 @@ test("one shared document answers per browser, so no response varies by user age
 	// What the service worker caches and what every client downloads is the
 	// same string; the decision happens in the browser, on that string.
 	const document = decorateIndex(INDEX, {});
-	const script = /<script>([\s\S]*?)<\/script>/.exec(document);
+	const script = /<script>([\s\S]*?)<\/script>/i.exec(document);
 	assert.ok(script !== null && script[1].includes(`globalThis.${MODE_GLOBAL}=`),
 		"the first script in the document decides the mode");
 	const decide = (navigator) => {
