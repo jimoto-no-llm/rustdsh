@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { accessSync, constants, existsSync, readFileSync, realpathSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, realpathSync, lstatSync } from "node:fs";
 import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -270,6 +270,19 @@ export function apply(ctx, config) {
         }
       },
     });
+    const offRustxng = ctx.webServer.register({
+      kind: "exact",
+      path: "/api/rdsh-update/rustxng/run",
+      handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (req.method !== "POST") return json(res, 405, { ok: false, error: "method-not-allowed" });
+        try {
+          json(res, 200, await runRustxngUpdate(findRdshBinary()));
+        } catch (error) {
+          json(res, 500, { ok: false });
+        }
+      },
+    });
     const off3 = ctx.webServer.register({
       kind: "exact",
       path: "/api/rdsh-update/dismiss",
@@ -326,6 +339,7 @@ export function apply(ctx, config) {
         if (typeof off2 === "function") off2();
       } catch (e) {}
       try { if (typeof offDsh === "function") offDsh(); } catch (e) {}
+      try { if (typeof offRustxng === "function") offRustxng(); } catch (e) {}
       try { if (typeof off3 === "function") off3(); } catch (e) {}
       try { if (typeof off4 === "function") off4(); } catch (e) {}
     };
@@ -509,4 +523,44 @@ async function readState() {
   } catch (e) {
     return e.code === "ENOENT" ? { ok: true, updated: false } : { ok: false };
   }
+}
+
+// ---- rustxng sidecar update ----------------------------------------------
+// rdsh writes a banner record into update-state.json whenever its sidecar
+// update check/apply succeeds; the runner below is that record's action
+// button: one accounted-for rdsh rustxng update execution.
+
+function findRdshBinary(env) {
+  const platform = process.platform;
+  const names = platform === 'win32' ? ['rdsh.exe', 'rdsh.cmd', 'rdsh.bat'] : ['rdsh', 'rdsh.exe'];
+  const directories = String((env ?? process.env).PATH ?? '').split(platform === 'win32' ? ';' : ':');
+  for (const directory of directories) {
+    if (!directory) continue;
+    for (const name of names) {
+      try {
+        const candidate = join(directory, name);
+        const file = lstatSync(candidate);
+        if (!(file.isFile() || (platform === 'win32' && file.isSymbolicLink() === false))) continue;
+        if (typeof process.getuid === 'function' && file.uid !== process.getuid()) continue;
+        return realpathSync(candidate);
+      } catch (error) {}
+    }
+  }
+  return null;
+}
+
+function runRustxngUpdate(binary) {
+  if (!binary) {
+    return Promise.resolve({ ok: false, message: 'rdsh not found in PATH; run: rdsh rustxng update' });
+  }
+  return new Promise((resolvePromise) => {
+    execFile(binary, ['rustxng', 'update'], { timeout: RUN_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      const tail = String(stderr || stdout || '').trim().split('\n').slice(-4).join(' ');
+      if (error) {
+        resolvePromise({ ok: false, message: tail || String(error.message || 'rdsh rustxng update failed') });
+        return;
+      }
+      resolvePromise({ ok: true, message: tail || 'rdsh finished; the next search uses the new sidecar' });
+    });
+  });
 }

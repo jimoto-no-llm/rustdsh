@@ -14,6 +14,12 @@ and update time), so time passing, polling, project remounts and full page reloa
 do not bring it back. An actual new update — a different target or a different
 update time — appears again. Minimizing keeps the notification.
 
+The same stream carries the rustxng sidecar: rdsh's auto-update writes
+`kind: "rustxng"` records into the shared state file and the card's update
+button runs one accountable `rdsh rustxng update` through the authenticated
+`/api/rdsh-update/rustxng/run` endpoint (the resolved binary must be a regular
+file owned by the current user, like every other command this banner runs).
+
 A successful **update** / **update again** check closes the update that started
 the request, like Dismiss. Failed checks remain visible and retryable. A newer
 update arriving during the request remains visible.

@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-web-search-searxng
+      name: "rdsh-web-search-searxng"
+      config: {}

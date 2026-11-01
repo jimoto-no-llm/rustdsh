@@ -148,6 +148,12 @@ pub const FEATURES: &[FeatureDef] = &[
             "SearXNG / rustxng web search (rdsh search-web; the sidecar auto-installs on first use)",
     },
     FeatureDef {
+        id: "web_search_bridge",
+        default: true,
+        summary:
+            "pin the delegated dsh web_search to the local rustxng/SearXNG engine when it is usable",
+    },
+    FeatureDef {
         id: "context_engine",
         default: false,
         summary: "experimental per-turn context engine (rdsh context)",

@@ -249,6 +249,72 @@ fn lock_path() -> PathBuf {
     state_file().with_file_name("rustxng-update.lock")
 }
 
+// ------------------------------------------------------- webui update notice
+
+/// The banner file the update banner plugin streams to the Web UI
+/// (~/.local/share/rdsh/update-state.json). The plugin already watches it, so
+/// the sidecar rides the same channel as the rdsh and dsh banners instead of
+/// growing its own surface.
+const BANNER_KIND: &str = "rustxng";
+
+fn banner_state_path() -> Option<PathBuf> {
+    crate::inspect::home_dir().map(|home| {
+        std::path::Path::new(&home)
+            .join(".local")
+            .join("share")
+            .join("rdsh")
+            .join("update-state.json")
+    })
+}
+
+/// Publish one sidecar update event for the Web UI banner. The file belongs to
+/// the banner plugin, so the write follows the same contract sync-dsh.sh uses:
+/// atomic-or-absent, mode 0600, and only fields a client is allowed to render.
+pub(crate) fn record_banner_report(from: Option<&str>, to: &str) {
+    use serde_json::Value;
+
+    let Some(path) = banner_state_path() else {
+        return;
+    };
+    let mut document = serde_json::Map::new();
+    document.insert("updated".into(), Value::Bool(true));
+    document.insert("kind".into(), Value::String(BANNER_KIND.into()));
+    if let Some(value) = from {
+        document.insert("from".into(), Value::String(value.to_string()));
+    }
+    document.insert("to".into(), Value::String(to.to_string()));
+    document.insert(
+        "at".into(),
+        Value::Number(serde_json::Number::from(now_secs().saturating_mul(1000))),
+    );
+    let body = serde_json::Value::Object(document).to_string();
+    if let Some(parent) = path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return;
+        }
+    }
+    let tmp = path.with_extension("json.tmp");
+    if std::fs::write(&tmp, body).is_err() {
+        return;
+    }
+    let replaced = std::fs::rename(&tmp, &path);
+    if replaced.is_err() && path.exists() {
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::rename(&tmp, &path);
+    }
+    let _ = std::fs::remove_file(&tmp);
+}
+
+/// Publish the report of one succeeded check, unless the engine is current.
+/// The Available shape is what a --check run sees; the Updated shape replaces
+/// it so the banner never advertises a superseded tag.
+fn record_banner_report_for(state: &UpdateState, report: &Report) {
+    if matches!(report.action, Action::UpToDate) {
+        return;
+    }
+    record_banner_report(state.installed_tag.as_deref(), &report.latest_tag);
+}
+
 pub(crate) fn load_state(path: &Path) -> UpdateState {
     std::fs::read_to_string(path)
         .ok()
@@ -761,7 +827,9 @@ pub(crate) fn run_update(
         return Ok(report(Action::UpToDate));
     }
     if check_only {
-        return Ok(report(Action::Available));
+        let report = report(Action::Available);
+        record_banner_report_for(state, &report);
+        return Ok(report);
     }
     let outcome = download_verified(fetch, &release).and_then(|bytes| {
         install_verified(dest, &bytes, probe)?;
@@ -772,7 +840,9 @@ pub(crate) fn run_update(
             state.installed_tag = Some(release.tag.clone());
             state.installed_len = len;
             state.restart_pending = true;
-            Ok(report(Action::Updated))
+            let report = report(Action::Updated);
+            record_banner_report_for(state, &report);
+            Ok(report)
         }
         Err(e) => {
             record_failure(state, now);
@@ -1859,6 +1929,33 @@ mod tests {
         assert!(!state.restart_pending);
         assert_eq!(state.failures, 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn banner_report_is_written_and_superseded() {
+        let _lock = crate::test_support::env_lock();
+        let home = temp_dir("banner");
+        let previous = std::env::var("HOME").ok();
+        std::env::set_var("HOME", &home);
+        record_banner_report(None, "v0.15.1");
+        let path = home.join(".local/share/rdsh/update-state.json");
+        let first: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(first["updated"], serde_json::json!(true));
+        assert_eq!(first["kind"], serde_json::json!("rustxng"));
+        assert_eq!(first["to"], serde_json::json!("v0.15.1"));
+        assert!(first.get("from").is_none());
+        record_banner_report(Some("v0.14.2"), "v0.15.1");
+        let second: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(second["from"], serde_json::json!("v0.14.2"));
+        // No tmp leftovers: only the atomic result remains.
+        let mut entries = std::fs::read_dir(path.parent().unwrap()).unwrap();
+        assert!(entries.all(|entry| entry.unwrap().file_name() != "update-state.json.tmp"));
+        match previous {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]

@@ -228,7 +228,8 @@ window.__ModuleLoader__.load({
         setRunning("busy");
         setResult("");
         try {
-          const endpoint = current && current.kind === "dsh" ? ENDPOINT + "/dsh/run" : ENDPOINT + "/run";
+          const endpoint = current && current.kind === "rustxng" ? ENDPOINT + "/rustxng/run"
+            : current && current.kind === "dsh" ? ENDPOINT + "/dsh/run" : ENDPOINT + "/run";
           const r = await fetch(endpoint, { method: "POST", cache: "no-store" });
           const j = await r.json();
           if (sameOccurrence()) {
@@ -292,7 +293,8 @@ window.__ModuleLoader__.load({
                 } }, "details"),
                 h("button", { className: "rub-tbtn dim", onClick: dismissDsh }, "dismiss")))));
       }
-      const label = data.kind === "dsh" ? "dsh update available" : "rdsh updated!";
+      const label = data.kind === "rustxng" ? "rustxng sidecar update"
+        : data.kind === "dsh" ? "dsh update available" : "rdsh updated!";
       const inner = expanded ? h("div", { className: "rub-card" },
         h("button", { className: "rub-x", onClick: () => { dismiss(); dismissDsh(); }, "aria-label": "close" }, "x"),
         h("div", { className: "rub-row1", onClick: () => setExpanded(false) },
