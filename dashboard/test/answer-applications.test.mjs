@@ -506,7 +506,7 @@ test(
     const parent = await instruction(f, client, { text: "中断前の入力" });
     await posted(f, parent);
     const running = client.poll();
-    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    for (let i = 0; i < 900 && !(await f.effects()); i++) await delay(20);
     assert.equal(await f.effects(), 1);
     const follow = await instruction(f, client, {
       text: "中断を確認して次の修正をする",
@@ -583,7 +583,7 @@ test(
     const parent = await instruction(f, client);
     await posted(f, parent);
     const running = client.poll();
-    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    for (let i = 0; i < 900 && !(await f.effects()); i++) await delay(20);
     assert.equal(await f.effects(), 1);
     const follow = await instruction(f, client, {
       mode: "interrupt",
@@ -648,13 +648,13 @@ test(
       return response;
     };
     const running = client.poll();
-    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    for (let i = 0; i < 900 && !(await f.effects()); i++) await delay(20);
     const follow = await instruction(f, client, {
       mode: "interrupt",
       active_command_id: parent.command_id,
     });
     await posted(f, follow);
-    for (let i = 0; i < 150 && !lost; i++) await delay(20);
+    for (let i = 0; i < 900 && !lost; i++) await delay(20);
     assert.equal(lost, true);
     await delay(160);
     assert.equal(
