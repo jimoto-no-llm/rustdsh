@@ -631,7 +631,7 @@ fn apply_search_bridge(cmd: &mut std::process::Command, profile: &str, dry: bool
         },
         crate::rustxng::binary().is_some(),
         || crate::rustxng::ensure().ok(),
-        |base| crate::rustxng::health(base),
+        crate::rustxng::health,
     ) else {
         return;
     };
