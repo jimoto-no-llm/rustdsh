@@ -155,15 +155,15 @@ fn status_reports_installed_enabled_and_missing_essential_packages() {
         row(&report, "essential", "rdsh-answer-guard")["state"],
         "missing"
     );
-    // 15 essentials on web, 2 already attached.
-    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 13);
+    // 16 essentials on web, 2 already attached.
+    assert_eq!(report["missing_essential"].as_array().unwrap().len(), 14);
 }
 
 #[test]
 fn status_keeps_the_web_only_banner_out_of_other_profiles() {
     let fixture = Fixture::new("headless", Some("{}"));
     let report = status_json(&fixture, "headless");
-    assert_eq!(report["essential"].as_array().unwrap().len(), 13);
+    assert_eq!(report["essential"].as_array().unwrap().len(), 14);
     assert!(!report["essential"]
         .as_array()
         .unwrap()
