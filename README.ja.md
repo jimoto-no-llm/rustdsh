@@ -20,6 +20,8 @@
 `rdsh` は、[DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) を高速かつ安全に利用するための Rust 製ランチャーです。
 日常的によく使う処理（トークン計算、検索、セッション管理など）をネイティブ化し、エージェントの会話やモデル実行は本家の `dsh` へそのまま委譲します。現在お使いの引数やオプションもそのまま動作します。
 
+本書のクイックスタートは、いま `dsh` や OpenCode・Codex CLI などの別のハーネスをお使いの方に向けて、本家 `dsh` と `rdsh` を導入する順序を案内します。すでに `dsh` を入れている方は、手順 A を飛ばして構いません。
+
 ## AI エージェント向け
 
 このリポジトリでエージェントに作業させる前に、次を貼ってください。
@@ -68,20 +70,26 @@
 
 ## クイックスタート
 
-**Claude Code／Codex／Cursor／VS Code Copilot／OpenCode／Gemini CLI を利用中の方へ**
-現在お使いのエージェントを利用しながら、
-[MCP でダッシュボードを追加](docs/MCP-CLIENTS.md)できます。
-タスク・質問・構造化 UI の共有には Node.js 22 以上が必要です。DSH 本体と Rust の導入は任意です。
+前提: 本家 DeepSeek Harness（`dsh`）が、エージェントとの会話・モデル実行に必要です。すでに `dsh` を入れている方は手順 A を飛ばし、手順 B から始めてください。
 
-### 1. インストール（ビルド済みバイナリ）
+### 手順 A. 本家 `dsh` の導入（未導入の方）
 
-#### Linux / macOS / WSL
+Node.js と npm を用意し、npm registry の `@deepseek-ai/dsh`（bin 名: `dsh`、2026-10-29 時点の latest は 0.2.1-rc.2）をグローバルに導入します。
+
+```sh
+npm install -g @deepseek-ai/dsh
+npm install -g @deepseek-ai/dsh@<version>   # バージョンを固定する場合
+```
+
+### 手順 B. `rdsh` の導入
+
+**Linux / macOS / WSL**: インストールスクリプトを流すだけです。
 
 ```sh
 curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
-#### Windows (PowerShell)
+**Windows (PowerShell)**: ホームの `%TEMP%` にスクリプトを置いてから実行します。
 
 ```powershell
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
@@ -98,16 +106,23 @@ cargo install rdsh
 `cargo install` はソースからビルドし、リリースアーカイブと同じバイナリをインストールします。
 Debian / Ubuntu や Fedora / RHEL では、リリースの [`.deb` / `.rpm`](#ネイティブパッケージdeb--rpm) を `apt` / `dnf` で導入することもできます。
 
-### 2. 環境確認 & 初期セットアップ
+※ Claude Code／Codex／Cursor／VS Code Copilot／OpenCode／Gemini CLI をお使いの方は、そのまま [MCP でダッシュボードを追加](docs/MCP-CLIENTS.md)できます（タスク・質問・構造化 UI の共有には Node.js 22 以上が必要。DSH 本体と Rust 以外の導入は任意です）。
+
+### 手順 C. 動作確認
 
 ```sh
-rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
+dsh --version && rdsh --version && rdsh doctor   # 本家 dsh と rdsh の双方を確認
+```
+
+※ `rdsh tokens` のような独立ツールは、本家 `dsh` がなくても単体で動作します。
+
+### 手順 D. 初期セットアップと会話開始
+
+```sh
 rdsh setup                      # 対話式セットアップ（または rdsh setup --web でブラウザから設定）
 ```
 
-※ Codex CLI（ChatGPT OAuth）や opencode のログイン情報がある場合、`rdsh auth --import --provider openai-codex` で簡単に取り込めます。
-
-### 3. 会話を開始する
+※ OpenCode や Codex CLI（ChatGPT OAuth）などにログイン済みの場合、`rdsh auth --import --provider openai-codex` で認証情報を取り込めます。認証情報は明示的に指定したものだけを取り込み、無断で外部送信しません。
 
 ```sh
 rdsh tui                        # TUI プロファイルで起動
@@ -120,7 +135,8 @@ rdsh --profile web              # Web プロファイルで起動
 | 項目 | 内容 |
 | --- | --- |
 | OS | Linux、macOS、WSL、Windows（ネイティブ） |
-| DSH 本体 | エージェントとの会話実行に必要です（トークン計算や検索などの独立ツールは単体で動作します） |
+| DSH 本体 | エージェントとの会話実行に必要です（クイックスタート手順 A。トークン計算や検索などの独立ツールは単体で動作します） |
+| Node.js / npm | 本家 `dsh` の導入時のみ必要です（手順 A） |
 | Rust | ビルド済みバイナリを利用する場合は不要。ソースからビルドする場合のみ 1.85 以上 |
 | 任意 | [Node.js ダッシュボード](dashboard/README.md) には Node.js 22 以上、`search-web` には SearXNG または Ollama API キーが必要 |
 
