@@ -860,9 +860,34 @@ pub fn exec_boot(
     slim: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
-    let orig =
-        find_original_dsh().ok_or_else(|| anyhow::anyhow!(original_dsh_not_found(locale)))?;
-    let mut cmd = base_cmd(&orig, dry, false, locale)?;
+    use crate::harness_adapter::{DshAdapter, HarnessAdapter, LaunchOptions};
+    let options = LaunchOptions {
+        profile: profile.to_string(),
+        from_default: from_default.map(ToString::to_string),
+        patches: patches.to_vec(),
+        app_args: app_args.to_vec(),
+        dry,
+        slim,
+        locale,
+    };
+    DshAdapter.launch(&options, locale)
+}
+
+/// Assemble one delegated launch from an already-resolved origin.
+/// The notices stay ordered exactly as the former exec_boot printed them.
+pub(crate) fn assemble_boot(
+    origin: &str,
+    options: &crate::harness_adapter::LaunchOptions,
+) -> anyhow::Result<crate::harness_adapter::BootedCommand> {
+    let profile = options.profile.as_str();
+    let from_default = options.from_default.as_deref();
+    let patches = &options.patches;
+    let app_args = &options.app_args;
+    let dry = options.dry;
+    let slim = options.slim;
+    let locale = options.locale;
+    let mut notices = Vec::new();
+    let mut cmd = base_cmd(origin, dry, false, locale)?;
     if !dry {
         // Status is read-only and runs only after enforcement validation.
         crate::auth::pre_boot(true, locale);
@@ -872,39 +897,49 @@ pub fn exec_boot(
         cmd.arg("--from-default-profile").arg(f);
     }
     // Generated layer first so every caller-supplied --patch stays authoritative.
-    let overlay = !dry && apply_gzip_overlay(&mut cmd, &orig, profile);
+    let overlay = !dry && apply_gzip_overlay(&mut cmd, origin, profile);
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
     cmd.args(app_args);
     apply_slim(&mut cmd, slim, locale);
-    apply_web_assets(&mut cmd, &orig, profile);
+    apply_web_assets(&mut cmd, origin, profile);
     apply_search_bridge(&mut cmd, profile, dry);
     if slim {
-        eprintln!(
-            "[rdsh] {} '{profile}' {} {orig} ({}: {})",
-            match locale {
-                crate::locale::Locale::English => "boot",
-                crate::locale::Locale::Chinese => "启动",
-                crate::locale::Locale::Japanese => "起動",
-            },
-            match locale {
-                crate::locale::Locale::English => "via",
-                crate::locale::Locale::Chinese => "通过",
-                crate::locale::Locale::Japanese => "経由",
-            },
-            match locale {
-                crate::locale::Locale::English => "slim ON",
-                crate::locale::Locale::Chinese => "精简环境开启",
-                crate::locale::Locale::Japanese => "slim 環境オン",
-            },
+        let (boot_term, via_term, slim_term) = match locale {
+            crate::locale::Locale::English => ("boot", "via", "slim ON"),
+            crate::locale::Locale::Chinese => ("启动", "通过", "精简环境开启"),
+            crate::locale::Locale::Japanese => ("起動", "経由", "slim 環境オン"),
+        };
+        notices.push(format!(
+            "[rdsh] {} '{}' {} {} ({}: {})",
+            boot_term,
+            profile,
+            via_term,
+            origin,
+            slim_term,
             crate::slim::describe()
-        );
+        ));
     }
     if overlay {
-        eprintln!("[rdsh] web ui: gzip overlay applied");
+        notices.push("[rdsh] web ui: gzip overlay applied".to_string());
     }
-    exec_or_spawn(cmd, dry, locale)
+    Ok(crate::harness_adapter::BootedCommand {
+        command: cmd,
+        notices,
+    })
+}
+
+/// Shared tail for every adapter launch: print notices, then exec or spawn.
+pub(crate) fn finish_launch(
+    booted: crate::harness_adapter::BootedCommand,
+    dry: bool,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
+    for notice in booted.notices {
+        eprintln!("{notice}");
+    }
+    exec_or_spawn(booted.command, dry, locale)
 }
 
 pub fn exec_dump_config(
@@ -916,8 +951,8 @@ pub fn exec_dump_config(
     slim: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
-    let orig =
-        find_original_dsh().ok_or_else(|| anyhow::anyhow!(original_dsh_not_found(locale)))?;
+    let orig = find_original_dsh()
+        .ok_or_else(|| anyhow::anyhow!(original_dsh_not_found_message(locale)))?;
     let mut cmd = base_cmd(&orig, dry, false, locale)?;
     if !dry {
         crate::auth::pre_boot(false, locale);
@@ -974,8 +1009,8 @@ pub fn exec_plugin(
     slim: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
-    let orig =
-        find_original_dsh().ok_or_else(|| anyhow::anyhow!(original_dsh_not_found(locale)))?;
+    let orig = find_original_dsh()
+        .ok_or_else(|| anyhow::anyhow!(original_dsh_not_found_message(locale)))?;
     let mut cmd = base_cmd(&orig, dry, false, locale)?;
     if !dry {
         crate::auth::pre_boot(false, locale);
@@ -986,7 +1021,7 @@ pub fn exec_plugin(
     exec_or_spawn(cmd, dry, locale)
 }
 
-fn original_dsh_not_found(locale: crate::locale::Locale) -> &'static str {
+pub(crate) fn original_dsh_not_found_message(locale: crate::locale::Locale) -> &'static str {
     match locale {
         crate::locale::Locale::English => "original dsh not found in PATH (set DSH_ORIG_BIN)",
         crate::locale::Locale::Chinese => "未在 PATH 中找到原始 dsh（请设置 DSH_ORIG_BIN）",
