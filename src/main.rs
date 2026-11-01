@@ -71,6 +71,7 @@ mod file_lock;
 mod file_security;
 mod files;
 mod guard;
+mod harness_adapter;
 mod inspect;
 mod instruction_queue;
 mod js_json;
