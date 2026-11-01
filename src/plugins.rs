@@ -358,6 +358,8 @@ pub struct Report {
     pub error: Option<String>,
     pub plugins_dir: Option<PathBuf>,
     pub plugins_dir_error: Option<String>,
+    /// Where the bundled plugins come from and how current they are.
+    pub bundled: crate::plugins_release::Info,
     pub essentials: Vec<Row>,
     pub recommended: Vec<Row>,
     pub missing_essential: Vec<String>,
@@ -405,11 +407,13 @@ pub fn report(
             Ok(dir) => (Some(dir), None),
             Err(error) => (None, Some(error.to_string())),
         };
+    let bundled = crate::plugins_release::info(env, plugins_dir.as_deref());
     Report {
         profile: profile.to_string(),
         dir: profile_dir(env, profile),
         initialized: state.initialized,
         error: state.error,
+        bundled,
         plugins_dir,
         plugins_dir_error,
         essentials,
@@ -442,6 +446,7 @@ fn report_json(report: &Report) -> Value {
         "error": report.error,
         "plugins_dir": report.plugins_dir.as_ref().map(|dir| dir.display().to_string()),
         "plugins_dir_error": report.plugins_dir_error,
+        "bundled": crate::plugins_release::info_json(&report.bundled),
         "essential": report.essentials.iter().map(row_json).collect::<Vec<_>>(),
         "recommended": report.recommended.iter().map(row_json).collect::<Vec<_>>(),
         "missing_essential": report.missing_essential,
@@ -497,6 +502,9 @@ pub fn cmd_status(
             text(locale, "sources", "来源", "取得元")
         ),
         _ => {}
+    }
+    if let Some(line) = crate::plugins_release::info_line(&report.bundled, locale) {
+        out!("[rdsh] plugins: {line}");
     }
     for (tier, rows) in [
         (
@@ -574,8 +582,70 @@ pub struct InstallRequest {
     pub recommended: Option<String>,
     /// Skip the bundled plugins; a release-only install has no checkout.
     pub no_bundled: bool,
+    /// With no checkout: take the latest release's plugins, not the running
+    /// rdsh's tag.
+    pub latest: bool,
     pub dry_run: bool,
     pub json: bool,
+}
+
+/// No checkout resolved: fetch the release copy (never for a path the user
+/// named, never in a dry run). Unit tests never reach the network.
+fn fetch_release_copy(env: &OsEnv, latest: bool, locale: Locale) -> Result<()> {
+    #[cfg(not(test))]
+    {
+        use crate::plugins_release::{provision, Want};
+        err!(
+            "[rdsh] plugins: {}",
+            text(
+                locale,
+                "fetching the bundled plugins from the release",
+                "正在从 release 获取内置插件",
+                "同梱プラグインを release から取得しています"
+            )
+        );
+        let want = if latest { Want::Latest } else { Want::Binary };
+        provision(
+            env,
+            &crate::rustxng::update::HttpsFetch,
+            want,
+            crate::rustxng::update::now_secs(),
+        )
+        .map(|_| ())
+    }
+    #[cfg(test)]
+    {
+        let _ = (env, latest, locale);
+        bail!("the network is disabled in unit tests")
+    }
+}
+
+/// The plugins directory for bundled packages: a checkout when there is one,
+/// else the release copy, fetched (or, with --latest, refreshed) when allowed.
+fn resolve_bundled_dir(env: &OsEnv, request: &InstallRequest, locale: Locale) -> Result<PathBuf> {
+    let resolved = desktop::resolve_plugins_dir(request.plugins_dir.as_deref(), env, locale);
+    let user_named = request.plugins_dir.is_some() || env.plugins_dir.is_some();
+    if user_named || request.dry_run {
+        return resolved;
+    }
+    let release_copy = match &resolved {
+        Ok(dir) => dir.starts_with(crate::plugins_release::root(env)),
+        Err(_) => true,
+    };
+    if !release_copy || (resolved.is_ok() && !request.latest) {
+        return resolved;
+    }
+    match fetch_release_copy(env, request.latest, locale) {
+        Ok(()) => desktop::resolve_plugins_dir(None, env, locale),
+        // A refresh that failed still leaves the copy that was already there.
+        Err(_) if resolved.is_ok() => resolved,
+        Err(error) => Err(error.context(text(
+            locale,
+            "could not fetch the bundled plugins from the release",
+            "无法从 release 获取内置插件",
+            "同梱プラグインを release から取得できませんでした",
+        ))),
+    }
 }
 
 /// The dsh CLI that owns plugin --profile <name> add; plugins/install.sh uses
@@ -628,9 +698,9 @@ fn targets_for(
     }
     let needs_bundled = missing.iter().any(|entry| entry.bundled);
     let (root, root_error) = if needs_bundled {
-        match desktop::resolve_plugins_dir(request.plugins_dir.as_deref(), env, locale) {
+        match resolve_bundled_dir(env, request, locale) {
             Ok(dir) => (Some(dir), None),
-            Err(error) => (None, Some(error.to_string())),
+            Err(error) => (None, Some(format!("{error:#}"))),
         }
     } else {
         (None, None)
@@ -1030,9 +1100,30 @@ pub fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
         return Vec::new();
     };
     let cfg = crate::rdsh_config::load();
-    essential_gaps(env, &catalog, &cfg)
-        .into_iter()
-        .map(|(profile, missing)| match locale {
+    let gaps = essential_gaps(env, &catalog, &cfg);
+    // Without a checkout or a release copy the bundled packages cannot be
+    // attached at all; say where they would come from. Local check only.
+    let no_source = !gaps.is_empty()
+        && gaps.iter().any(|(_, missing)| {
+            catalog
+                .essential
+                .iter()
+                .any(|entry| entry.bundled && missing.contains(&entry.package))
+        })
+        && desktop::resolve_plugins_dir(None, env, locale).is_err();
+    let mut lines: Vec<String> = crate::plugins_release::doctor_lines(env, locale);
+    if no_source {
+        lines.push(
+            text(
+                locale,
+                "[rdsh] plugins: the bundled plugins are not installed and there is no checkout; run: rdsh plugins install (fetches them from the release)",
+                "[rdsh] plugins: 未安装内置插件且没有检出目录；请运行：rdsh plugins install（从 release 获取）",
+                "[rdsh] plugins: 同梱プラグインが未導入で、チェックアウトもありません。rdsh plugins install で release から取得してください",
+            )
+            .to_string(),
+        );
+    }
+    lines.extend(gaps.into_iter().map(|(profile, missing)| match locale {
             Locale::English => format!(
                 "[rdsh] plugins: {profile} is missing {} essential plugin(s) (fix: rdsh plugins install --profile {profile})",
                 missing.len()
@@ -1045,8 +1136,8 @@ pub fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
                 "[rdsh] plugins: {profile} は必須プラグインが {} 件不足（修正: rdsh plugins install --profile {profile}）",
                 missing.len()
             ),
-        })
-        .collect()
+        }));
+    lines
 }
 
 #[cfg(test)]
@@ -1266,6 +1357,7 @@ mod tests {
             plugins_dir: Some(checkout().display().to_string()),
             recommended: Some("none".to_string()),
             no_bundled: false,
+            latest: false,
             dry_run: true,
             json: false,
         };
@@ -1312,6 +1404,7 @@ mod tests {
             plugins_dir: Some(partial.display().to_string()),
             recommended: Some("none".to_string()),
             no_bundled: false,
+            latest: false,
             dry_run: true,
             json: false,
         };

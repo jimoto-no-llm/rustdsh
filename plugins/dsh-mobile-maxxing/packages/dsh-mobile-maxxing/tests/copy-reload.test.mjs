@@ -42,7 +42,7 @@ async function cloneHost(name) {
 
 /** The document without its inline scripts: the markup a desktop must keep seeing. */
 function withoutScripts(html) {
-	return html.replace(/<script>[\s\S]*?<\/script>/g, "");
+	return html.replace(/<script>[\s\S]*?<\/script>/gi, "");
 }
 
 /** Every injected payload assignment in a document, for counting. */

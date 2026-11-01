@@ -83,6 +83,8 @@ mod native_harness;
 mod opencode_header;
 mod passthrough;
 mod plugins;
+mod plugins_release;
+mod plugins_tar;
 mod provider_detect;
 mod providers;
 mod question_contracts;
@@ -619,8 +621,23 @@ enum PluginsAction {
         /// Skip the bundled rdsh plugins: a release-only install has no checkout
         #[arg(long = "no-bundled")]
         no_bundled: bool,
+        /// Without a checkout, take the plugins of the latest release instead
+        /// of the running rdsh's tag
+        #[arg(long = "latest")]
+        latest: bool,
         #[arg(long = "json")]
         json: bool,
+    },
+    /// Bring the release copy of the bundled plugins to the latest release
+    Update {
+        /// Only report installed / latest / update available; change nothing
+        #[arg(long = "check")]
+        check: bool,
+        #[arg(long = "json")]
+        json: bool,
+        /// Worker for the automatic update (started by rdsh itself)
+        #[arg(long = "background", hide = true)]
+        background: bool,
     },
 }
 
@@ -706,6 +723,17 @@ enum RustxngAction {
     Stop,
     /// Install the sidecar binary from the latest RustXNG release
     Install,
+    /// Update the rdsh-installed sidecar to the latest RustXNG release
+    Update {
+        /// Only report installed / latest / update available; change nothing
+        #[arg(long = "check")]
+        check: bool,
+        #[arg(long = "json")]
+        json: bool,
+        /// Worker for the automatic update (started by rdsh itself)
+        #[arg(long = "background", hide = true)]
+        background: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1358,6 +1386,11 @@ fn main() {
             RustxngAction::Start => rustxng::cmd_start(locale),
             RustxngAction::Stop => rustxng::cmd_stop(locale),
             RustxngAction::Install => rustxng::cmd_install(locale),
+            RustxngAction::Update {
+                check,
+                json,
+                background,
+            } => rustxng::update::cmd_update(check, json, background, locale),
         },
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n), locale),
         Some(Commands::Compute { once }) => compute::cmd_compute(once, locale),
@@ -1697,6 +1730,7 @@ fn main() {
                         plugins_dir,
                         recommended,
                         no_bundled,
+                        latest,
                         json: inner,
                     }) => plugins::cmd_install(
                         plugins::InstallRequest {
@@ -1704,9 +1738,21 @@ fn main() {
                             plugins_dir,
                             recommended,
                             no_bundled,
+                            latest,
                             dry_run,
                             json: json || inner,
                         },
+                        locale,
+                    ),
+                    Some(PluginsAction::Update {
+                        check,
+                        json: inner,
+                        background,
+                    }) => plugins_release::cmd_update(
+                        &profile,
+                        check,
+                        json || inner,
+                        background,
                         locale,
                     ),
                 },
@@ -2023,6 +2069,11 @@ fn main() {
                 } => {
                     let mut all = cli.patch;
                     all.extend(patches);
+                    if !dry {
+                        // Decides from local files only; the check itself runs
+                        // in a detached worker, so the boot never waits.
+                        plugins_release::auto_tick();
+                    }
                     passthrough::exec_boot(
                         &profile,
                         from_default.as_deref(),
@@ -2777,6 +2828,18 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "max" => ("最大命中数", "最大ヒット数"),
         "limit" => ("结果上限", "結果上限"),
         "json" => ("输出机器可读 JSON", "機械可読JSONを出力"),
+        "check" => (
+            "只报告已安装/最新/有可用更新，不下载也不替换",
+            "導入済み/最新/更新ありの確認だけを行い、取得も置換もしない",
+        ),
+        "latest" => (
+            "没有检出目录时，使用最新 release 的插件，而不是当前 rdsh 的标签",
+            "チェックアウトが無いとき、実行中の rdsh のタグではなく最新 release のプラグインを使う",
+        ),
+        "background" => (
+            "自动更新的后台工作进程（由 rdsh 自行启动）",
+            "自動更新のバックグラウンドワーカー（rdsh が自分で起動）",
+        ),
         "auto_start" => (
             "SearXNG 未启动时启动同梱的本地 compose 服务（仅回环地址）",
             "SearXNG が停止していれば同梱のローカル compose サービスを起動（ループバック限定）",
@@ -3436,6 +3499,9 @@ fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
             text("not reachable", "无法连接", "未接続")
         }
     ));
+    if let Some(line) = rustxng::update::doctor_line(locale) {
+        say(format!("[rdsh] {line}"));
+    }
     let runtimes = searxng::runtime_names();
     say(format!(
         "[rdsh] {}: {}",

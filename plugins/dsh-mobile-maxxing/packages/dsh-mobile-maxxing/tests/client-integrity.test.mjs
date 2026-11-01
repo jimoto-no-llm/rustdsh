@@ -85,7 +85,7 @@ function declaredNames(code) {
 	// Arrow parameters, parenthesised and single.
 	// One level of nesting covers a default parameter that is itself a call:
 	// `function f(a = read(), b = read2())`.
-	for (const match of code.matchAll(/function\s*[A-Za-z_$\w]*\s*\(((?:[^()]|\([^()]*\))*)\)/g)) addParameters(match[1]);
+	for (const match of code.matchAll(/function\s*[\w$]*\s*\(((?:[^()]|\([^()]*\))*)\)/g)) addParameters(match[1]);
 	for (const match of code.matchAll(/\(((?:[^()]|\([^()]*\))*)\)\s*=>/g)) addParameters(match[1]);
 	for (const match of code.matchAll(/([A-Za-z_$][\w$]*)\s*=>/g)) add(match[1]);
 	return declared;

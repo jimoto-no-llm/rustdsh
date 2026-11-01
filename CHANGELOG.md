@@ -9,6 +9,28 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- チェックアウト無しでも同梱の `rdsh-*` プラグインが入るようにしました。`rdsh plugins install` は
+  チェックアウトが見つからないとき、release の `rdsh-plugins.tar.gz` を取得（sha256 を API の
+  `digest`・`.sha256`・固定台帳 `release-plugins-digests.tsv` で照合）し、パストラバーサル・
+  リンク・デバイスを拒否する安全な展開のうえ `$DSH_HOME/rdsh-plugins/current` へ atomic に
+  配置して、そこから追加します。取得する版は実行中の rdsh と同じタグで、`--latest` で最新 release
+  を使えます。旧版は直近 2 世代だけ `previous/` に残します。`--plugins-dir` / `RDSH_PLUGINS_DIR`
+  で指定したチェックアウトは取得も更新もしません。
+- プロファイルが上記の release 版プラグインを使っている場合だけ、24 時間ごと
+  （`RDSH_PLUGINS_UPDATE_INTERVAL_HOURS` で変更）にバックグラウンドで最新 release へ追従します
+  （失敗時はバックオフ、起動は待たせません）。`current/` の中身だけを入れ替えるので、プロファイルの
+  package.json は書き換えず、プラグインも勝手に足しません。`RDSH_PLUGINS_SKIP_UPDATE=1` で停止できます。
+- `rdsh plugins update [--check] [--json]` を追加しました。`rdsh plugins status` は同梱プラグインの
+  出所（checkout / release / none）・版・最新・最終確認・自動更新の有効/無効を `bundled` キーで
+  表示し（JSON は後方互換の追加）、`rdsh doctor` は古い場合と未導入の場合に警告します。
+- rdsh が導入した RustXNG サイドカー（`~/.local/bin/rustxng`）を、GitHub の最新リリースへ
+  自動で追従させるようにしました。`rdsh search-web` / `rdsh rustxng start` の前に、24 時間ごと
+  （`RUSTXNG_UPDATE_INTERVAL_HOURS` で変更）にバックグラウンドで確認し、検索を待たせません。
+  sha256（API の `digest` と `.sha256`）を照合し、起動確認つきで atomic に置き換え、
+  失敗時は直前の版（`rustxng.prev`）へ戻します。`RUSTXNG_BIN` / `RUSTXNG_URL` / PATH 上の別の
+  rustxng は触りません。`RUSTXNG_SKIP_UPDATE=1` で自動更新だけを止められます。
+- `rdsh rustxng update [--check] [--json]` を追加しました。`rdsh rustxng status` は導入版・最新版・
+  最終確認・自動更新の有効/無効を表示し、`rdsh doctor` は古い場合に警告します。
 - `@deepseek-ai/dsh-workspace-changes` がセッション異常終了時に TMPDIR へ残すスナップショット（1個あたり数百MB）に対するガードを追加しました。委譲する `dsh` ごとに専用の `TMPDIR`（`<temp>/rdsh-tmp-<pid>-<乱数>`）を与えて分離し、次回の委譲前に「所有プロセスが不在」または「24時間以上無更新で誰も開いていない」ディレクトリだけを回収します。対象は自分の uid 所有・実ディレクトリ（symlink は辿らない）・`dsh-workspace-changes-*`/`rdsh-tmp-*` 接頭辞のみで、生きているセッションのものは絶対に消しません。`rdsh doctor` が回収可能な残骸と 100MB 超の未追跡パスを読み取り専用で警告します。`RDSH_NO_TMP_GUARD=1` で従来の挙動に戻せます。孤児の回収と doctor の孤児警告は Linux/macOS のみで（macOS は `/proc` が無く、所有プロセス不在と24時間無更新の判定のみ）、Windows は実行ごとの `TMPDIR` の終了時削除のみです。
 
 ## [0.14.1] - 2026-10-29

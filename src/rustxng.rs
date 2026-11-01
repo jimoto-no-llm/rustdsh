@@ -12,6 +12,10 @@
 //!   RUSTXNG_PORT      port for the sidecar this module starts
 //!   RUSTXNG_SETTINGS  settings file passed as --config when it is a real file
 //!   RUSTXNG_SKIP_INSTALL  set to 1 to stop ensure() auto-installing the sidecar
+//!   RUSTXNG_SKIP_UPDATE   set to 1 to stop the automatic update of the sidecar
+//!   RUSTXNG_UPDATE_INTERVAL_HOURS  hours between update checks (default 24)
+//!
+//! Updates of the rdsh-installed binary live in [update].
 //!
 //! State lives in $DSH_HOME (see [state_file](state_file)); nothing outside
 //! $DSH_HOME, ~/.config or /tmp is written.
@@ -22,6 +26,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+
+#[path = "rustxng_update.rs"]
+pub mod update;
 
 /// Loopback address the sidecar binds; never a public interface.
 pub const BIND: &str = "127.0.0.1";
@@ -323,13 +330,18 @@ pub fn ensure() -> Result<String, Error> {
         }
         return Err(Error::Unresponsive(url));
     }
+    // Decide (cheaply, without waiting) whether a background update check is
+    // due; the work itself happens in a detached process.
+    update::auto_tick();
 
     // An instance already running on the configured or recorded port is reused
     // instead of starting a second one.
     let known = configured_port().or_else(|| recorded_state().map(|(port, _)| port));
     if let Some(port) = known {
         let url = url_for(port);
-        if port_in_use(port) && health(&url) {
+        // An instance rdsh started from a binary that has since been replaced
+        // is stopped here so the new version starts below.
+        if port_in_use(port) && health(&url) && !update::restart_if_stale(port) {
             return Ok(url);
         }
     }
@@ -368,7 +380,10 @@ pub fn ensure() -> Result<String, Error> {
             )));
         }
         match start_engine(&binary, port, &state_path) {
-            Ok(url) => return Ok(url),
+            Ok(url) => {
+                update::clear_restart_pending();
+                return Ok(url);
+            }
             // A process that never answered is retried on another port, but
             // the failure is still reported when every attempt missed.
             Err(e) => last = e,
@@ -586,7 +601,7 @@ pub fn status() -> serde_json::Value {
         .or_else(|| configured_port().map(url_for))
         .or_else(|| recorded.map(|(port, _)| url_for(port)));
     let running = url.as_deref().is_some_and(health);
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "binary": binary.as_ref().map(|path| path.display().to_string()),
         "url": url,
         "running": running,
@@ -599,7 +614,15 @@ pub fn status() -> serde_json::Value {
         } else {
             None
         },
-    })
+    });
+    // Additive keys: installed/latest version, ownership and auto-update.
+    if let (Some(map), Some(extra)) = (
+        value.as_object_mut(),
+        update::status_fields(binary.as_deref()).as_object(),
+    ) {
+        map.extend(extra.clone());
+    }
+    value
 }
 
 /// `rdsh rustxng status`: the same snapshot as [status], either as JSON or as
@@ -632,6 +655,36 @@ pub fn cmd_status(json_out: bool, locale: crate::locale::Locale) -> Result<()> {
             }
         ),
         None => println!("{}", missing_binary_hint(locale)),
+    }
+    if binary.is_some() {
+        let text = |key: &str| value.get(key).and_then(|v| v.as_str()).map(str::to_string);
+        let installed = text("version").unwrap_or_else(|| "?".to_string());
+        let latest = text("latest_version").unwrap_or_else(|| "?".to_string());
+        let checked = match value.get("last_update_check").and_then(|v| v.as_u64()) {
+            Some(secs) => format!("unix {secs}"),
+            None => "-".to_string(),
+        };
+        let auto = value
+            .get("auto_update")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        println!(
+            "{}",
+            match locale {
+                crate::locale::Locale::English => format!(
+                    "version: {installed} (latest seen: {latest}, last check: {checked}, auto-update: {})",
+                    if auto { "on" } else { "off" }
+                ),
+                crate::locale::Locale::Chinese => format!(
+                    "版本：{installed}（已知最新：{latest}，上次检查：{checked}，自动更新：{}）",
+                    if auto { "开" } else { "关" }
+                ),
+                crate::locale::Locale::Japanese => format!(
+                    "版: {installed}（確認済みの最新: {latest}、最終確認: {checked}、自動更新: {}）",
+                    if auto { "有効" } else { "無効" }
+                ),
+            }
+        );
     }
     if let Some(url) = url {
         let state = if running {
@@ -921,11 +974,21 @@ pub fn cmd_install(locale: crate::locale::Locale) -> Result<()> {
         println!(
             "{}",
             match locale {
-                crate::locale::Locale::English =>
-                    format!("rustxng is already installed at {}", path.display()),
-                crate::locale::Locale::Chinese => format!("rustxng 已安装：{}", path.display()),
-                crate::locale::Locale::Japanese =>
-                    format!("rustxng は導入済みです: {}", path.display()),
+                crate::locale::Locale::English => format!(
+                    "rustxng is already installed at {} ({})",
+                    path.display(),
+                    update::update_hint(locale)
+                ),
+                crate::locale::Locale::Chinese => format!(
+                    "rustxng 已安装：{}（{}）",
+                    path.display(),
+                    update::update_hint(locale)
+                ),
+                crate::locale::Locale::Japanese => format!(
+                    "rustxng は導入済みです: {}（{}）",
+                    path.display(),
+                    update::update_hint(locale)
+                ),
             }
         );
         return Ok(());
