@@ -1,5 +1,8 @@
 //! Keeps the rdsh-managed rustxng sidecar on the latest GitHub release.
 //!
+//! The Web UI banner seam used by the update tests is a process-wide
+//! OnceLock so tests never race the HOME environment against parallel tests.
+//!
 //! License boundary (unchanged, see the parent module): rustxng is AGPL and is
 //! only ever downloaded as a release asset and run as a separate process.
 //!
@@ -257,6 +260,12 @@ fn lock_path() -> PathBuf {
 /// growing its own surface.
 const BANNER_KIND: &str = "rustxng";
 
+#[cfg(test)]
+static BANNER_TEST_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// The production location. Tests point the writer at their own temporary
+/// directory through the direct entry below, so the environment stays untouched
+/// and parallel tests never share a write target.
 fn banner_state_path() -> Option<PathBuf> {
     crate::inspect::home_dir().map(|home| {
         std::path::Path::new(&home)
@@ -271,11 +280,18 @@ fn banner_state_path() -> Option<PathBuf> {
 /// the banner plugin, so the write follows the same contract sync-dsh.sh uses:
 /// atomic-or-absent, mode 0600, and only fields a client is allowed to render.
 pub(crate) fn record_banner_report(from: Option<&str>, to: &str) {
-    use serde_json::Value;
-
     let Some(path) = banner_state_path() else {
         return;
     };
+    write_banner_report(&path, from, to);
+}
+
+/// The writer proper: one directory target plus the two content fields, so a
+/// test can point the record at its own temporary directory.
+#[cfg_attr(not(test), allow(dead_code))]
+fn write_banner_report(path: &Path, from: Option<&str>, to: &str) {
+    use serde_json::Value;
+
     let mut document = serde_json::Map::new();
     document.insert("updated".into(), Value::Bool(true));
     document.insert("kind".into(), Value::String(BANNER_KIND.into()));
@@ -297,10 +313,10 @@ pub(crate) fn record_banner_report(from: Option<&str>, to: &str) {
     if std::fs::write(&tmp, body).is_err() {
         return;
     }
-    let replaced = std::fs::rename(&tmp, &path);
+    let replaced = std::fs::rename(&tmp, path);
     if replaced.is_err() && path.exists() {
-        let _ = std::fs::remove_file(&path);
-        let _ = std::fs::rename(&tmp, &path);
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::rename(&tmp, path);
     }
     let _ = std::fs::remove_file(&tmp);
 }
@@ -1211,6 +1227,14 @@ mod tests {
         parse_version(text).unwrap()
     }
 
+    /// Where the banner writer puts its state inside this process. The env
+    /// variables that other tests mutate (HOME) stay off the hook: the seam
+    /// is one OnceLock, set once at the first banner test, and the parallel
+    /// non-banner tests never consult it.
+    fn set_banner_root(dir: &Path) {
+        let _ = BANNER_TEST_ROOT.set(dir.to_path_buf());
+    }
+
     fn temp_dir(label: &str) -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
@@ -1933,29 +1957,22 @@ mod tests {
 
     #[test]
     fn banner_report_is_written_and_superseded() {
-        let _lock = crate::test_support::env_lock();
         let home = temp_dir("banner");
-        let previous = std::env::var("HOME").ok();
-        std::env::set_var("HOME", &home);
-        record_banner_report(None, "v0.15.1");
-        let path = home.join(".local/share/rdsh/update-state.json");
+        let path = home.join("update-state.json");
+        write_banner_report(&path, None, "v0.15.1");
         let first: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(first["updated"], serde_json::json!(true));
         assert_eq!(first["kind"], serde_json::json!("rustxng"));
         assert_eq!(first["to"], serde_json::json!("v0.15.1"));
         assert!(first.get("from").is_none());
-        record_banner_report(Some("v0.14.2"), "v0.15.1");
+        write_banner_report(&path, Some("v0.14.2"), "v0.15.1");
         let second: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(second["from"], serde_json::json!("v0.14.2"));
         // No tmp leftovers: only the atomic result remains.
         let mut entries = std::fs::read_dir(path.parent().unwrap()).unwrap();
         assert!(entries.all(|entry| entry.unwrap().file_name() != "update-state.json.tmp"));
-        match previous {
-            Some(value) => std::env::set_var("HOME", value),
-            None => std::env::remove_var("HOME"),
-        }
         std::fs::remove_dir_all(&home).unwrap();
     }
 
