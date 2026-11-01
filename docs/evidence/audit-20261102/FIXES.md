@@ -52,3 +52,24 @@ Job Object による子孫終了はこの変更に含まない。Windows/macOS �
 - `DISPLAY=:99 WAYLAND_DISPLAY=wayland-test` でのページ起動ポリシーテスト: 成功。
 - 変更した Markdown の lint と `git diff --check`: 成功。
 - `BIN=./target/debug/rdsh sh tests/regress.sh`: 117 checks と末尾の pipe 終了チェックが成功。
+
+## GitHub の依存アラートへの追加対応
+
+push 時に取得した [未解決アラート4件](dependabot-before-fixes.json) は、初回監査の
+Rust / dashboard 依存監査の対象外にあった。初回のゼロ件を全 npm ディレクトリの
+結果とは扱わない。
+
+- `rdsh-direct-models` の Zod を許容範囲内の 4.6.7 へ更新。
+- Muse SDK と動画用 Remotion が固定した Zod を override で 4.6.7 に更新。
+- desktop SDK が固定した MCP client を override で 2.3.0 に更新（core も追従）。
+- 動画用 React を既存の React DOM 19.3.1 の peer 条件に合わせ 19.3.1 に更新。
+  `--force` や `--legacy-peer-deps` は使っていない。
+- direct-models の runtime smoke は、DSH filesystem tools が要求する
+  workingDirectory サービスを固定ワークスペースで提供する。ユーザーの実環境の
+  インストールを変更せず、desktop SDK の DSH を参照する一時 HOME で検証した。
+
+各ディレクトリで `npm ci --ignore-scripts` に成功。direct-models 66 件、Muse 28 件、
+desktop SDK 11 件、desktop ソース 14 件が成功し、動画用 TypeScript の typecheck も成功。
+[更新後の npm audit](dependency-fixes.json) は対象4ディレクトリすべてゼロ件。
+依存関係の install scripts、モデル呼び出し、実認証は実行していない。
+GitHub のアラートは main へのマージと再検査まで未解決であり、dismiss していない。

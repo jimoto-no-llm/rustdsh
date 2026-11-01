@@ -1,0 +1,54 @@
+[
+  {
+    "directory": "plugins/rdsh-direct-models",
+    "exit_code": 0,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "directory": "plugins/rdsh-llm-muse-code-subscription",
+    "exit_code": 0,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "directory": "media/rdsh-intro",
+    "exit_code": 0,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "directory": "desktop/sdk",
+    "exit_code": 0,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "error": null
+  }
+]

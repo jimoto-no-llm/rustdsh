@@ -7,6 +7,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- GitHub が検出したプラグイン・動画用の Zod と desktop SDK の MCP client の
+  依存脆弱性を修正版へ更新しました。
+
 - 実行ファイル探索で symlink の設置先と解決先の全祖先を検査し、書き換え可能な
   ディレクトリ経由の候補を拒否します。Unix の診断プローブは期限後に読み取り
   スレッドや所有グループの子孫を残さないようにしました。
