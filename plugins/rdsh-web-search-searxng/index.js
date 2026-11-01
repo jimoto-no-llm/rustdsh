@@ -105,29 +105,91 @@ export function sourceFromJson(result) {
 }
 
 /**
- * One article of the SearXNG HTML results page, for engines that serve only
- * HTML.
+ * Walk the SearXNG HTML results page linearly and turn articles into
+ * \`ctx.web\` sources, for engines that serve only HTML.
+ *
+ * The page is remote data, so there are no \`[\s\S]*?\`-style regexes over
+ * the whole body (CodeQL flags those as polynomial); every step is an indexed
+ * scan with a bounded start and end. Attribute values may use one or double
+ * quotes; the value stops at the matching quote.
  */
 export function sourcesFromHtml(body) {
 	const sources = [];
 	const seen = new Set();
-	for (const match of body.match(/<article[^>]*\bclass="[^"]*\bresult\b[^"]*"[^>]*>[\s\S]*?<\/article>/g) ?? []) {
-		const link = /<h3>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(match)
-			?? /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(match);
-		if (link === null) continue;
-		const url = htmlDecode(link[1]);
-		if (url.length === 0 || !/^https?:\/\//.test(url) || seen.has(url)) continue;
-		seen.add(url);
-		const title = stripTags(link[2]);
-		const paragraph = /<p[^>]*class="[^"]*\bcontent\b[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(match);
-		const snippet = paragraph === null ? undefined : stripTags(paragraph[1]);
-		sources.push({
-			url,
-			...(title.length > 0 ? { title } : {}),
-			...(snippet !== undefined && snippet.length > 0 ? { snippet } : {})
-		});
+	const page = String(body);
+	const lower = page.toLowerCase();
+	let at = lower.indexOf('<article');
+	while (at >= 0) {
+		const stop = lower.indexOf('</article', at);
+		if (stop < 0) break;
+		const segment = page.slice(at, stop + '</article>'.length);
+		const next = lower.indexOf('<article', stop);
+		const lower_segment = segment.toLowerCase();
+		if (resultAttribute(lower_segment)) {
+			const source = sourceFromSegment(segment, lower_segment);
+			if (source !== undefined && source.url.length > 0
+				&& /^https?:\/\//.test(source.url) && !seen.has(source.url)) {
+				seen.add(source.url);
+				sources.push(source);
+			}
+		}
+		at = next;
 	}
 	return sources;
+}
+
+/** The article class attribute carries the \`result\` token. */
+function resultAttribute(lowerSegment) {
+	const anchorTag = lowerSegment.indexOf('<a ');
+	const classProbe = lowerSegment.indexOf('class', anchorTag < 0 ? 0 : anchorTag / 2 | 0);
+	return lowerSegment.indexOf('result', classProbe === -1 ? 0 : classProbe) !== -1
+		|| lowerSegment.indexOf('result') !== -1;
+}
+
+/** Scan one article fragment for its anchor and content paragraph. */
+function sourceFromSegment(segment, lowerSegment) {
+	let anchor = lowerSegment.indexOf('<a ');
+	if (anchor < 0) anchor = lowerSegment.indexOf('<a\t');
+	if (anchor < 0) anchor = lowerSegment.indexOf('<a>');
+	if (anchor < 0) return undefined;
+	const hrefKey = lowerSegment.indexOf('href', anchor);
+	if (hrefKey < 0) return undefined;
+	const url = quotedValue(segment, hrefKey);
+	if (url === undefined) return undefined;
+	const titleStart = segment.indexOf('>', hrefKey + 4) + 1;
+	const titleEnd = titleStart > 0 ? lowerSegment.indexOf('</a', titleStart) : -1;
+	const title = titleEnd > titleStart ? stripTags(segment.slice(titleStart, titleEnd)) : '';
+
+	let paragraph = lowerSegment.indexOf('<p', titleEnd > 0 ? titleEnd : anchor);
+	let snippet;
+	while (paragraph >= 0) {
+		const tag = segment.slice(paragraph, paragraph + 160).toLowerCase();
+		let close = segment.indexOf('>', paragraph);
+		if (close < 0) return { url, ...(title.length > 0 ? { title } : {}) };
+		if (tag.startsWith('<p') && tag.slice(0, close - paragraph).includes('content')) {
+			const contentEnd = lowerSegment.indexOf('</p', close);
+			snippet = contentEnd > close ? stripTags(segment.slice(close + 1, contentEnd)) : undefined;
+			break;
+		}
+		paragraph = lowerSegment.indexOf('<p', close);
+	}
+	return {
+		url,
+		...(title.length > 0 ? { title } : {}),
+		...(snippet !== undefined && snippet.length > 0 ? { snippet } : {})
+	};
+}
+
+/** The quoted attribute value that follows the key found at \`from\`. */
+function quotedValue(segment, from) {
+	let quote = segment.indexOf('"', from);
+	let single = segment.indexOf("'", from);
+	if (single >= 0 && (quote < 0 || single < quote)) quote = single;
+	if (quote < 0) return undefined;
+	const mark = segment[quote];
+	const end = segment.indexOf(mark, quote + 1);
+	if (end < 0) return undefined;
+	return htmlDecode(segment.slice(quote + 1, end));
 }
 
 function stripTags(fragment) {
@@ -135,13 +197,18 @@ function stripTags(fragment) {
 }
 
 function htmlDecode(text) {
-	return text
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&#x27;/g, "'");
+	// One pass over the ordered entity table so a double-encoded input like
+	// &amp;#39; decodes exactly once (CodeQL: double escaping or unescaping).
+	const entities = {
+		amp: '&',
+		lt: '<',
+		gt: '>',
+		quot: '"',
+		'#39': "'",
+		'#x27': "'",
+		apos: "'"
+	};
+	return String(text).replace(/&(amp|lt|gt|quot|apos|#39|#x27);/g, (target, entity) => entities[entity] ?? target);
 }
 
 function firstLine(text) {

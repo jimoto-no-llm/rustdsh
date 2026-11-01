@@ -165,6 +165,23 @@ test('apply keeps working when no web seam exists (old composition)', (t) => {
 	apply({}); // no inject, no web: must not throw
 });
 
+test('sourcesFromHtml stays linear on adversarial repeats', () => {
+	const hostile = '<article class="result">'.repeat(5000);
+	const startedAt = Date.now();
+	const sources = sourcesFromHtml(hostile + '<a href="https://end.example/">End</a></article>');
+	assert.equal(sources.length, 1, 'only the tail anchor becomes a source');
+	assert.equal(sources[0].url, 'https://end.example/');
+	assert.ok(Date.now() - startedAt < 2000, 'the scan does not backtrack over the repeats');
+});
+
+test('decoded attribute values never double-decode', () => {
+	const sources = sourcesFromHtml(
+		'<article class="result"><a href="https://ok.example/?q=1">A &amp;#39; B &amp;amp; C</a><p class="content">s</p></article>'
+	);
+	assert.equal(sources.length, 1);
+	assert.equal(sources[0].title, 'A &#39; B &amp; C');
+});
+
 /** Helper the tests above use: set the pin for base and claim the provider. */
 function registeredProviderForTest(base, t) {
 	const holder = { registered: [] };
