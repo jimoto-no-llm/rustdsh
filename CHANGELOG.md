@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-31
+
 ### Added
 
 - チェックアウト無しでも同梱の `rdsh-*` プラグインが入るようにしました。`rdsh plugins install` は
