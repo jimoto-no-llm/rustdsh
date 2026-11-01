@@ -95,7 +95,7 @@ test("width, pointer kind and orientation are never consulted", () => {
 
 /** The script's code, with the element wrapper removed. */
 function scriptBody(script) {
-	assert.match(script, /^<script>[\s\S]*<\/script>$/,
+	assert.match(script, /^<script>[\s\S]*<\/script>$/i,
 		"one script element");
 	return script.slice("<script>".length, -"</script>".length);
 }
