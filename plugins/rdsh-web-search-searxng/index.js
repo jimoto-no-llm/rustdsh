@@ -49,7 +49,10 @@ export function shouldBridge(env) {
 export function resolveBase(env, config = {}) {
 	const candidate = config.baseURL ?? env?.RDSH_SEARXNG_URL ?? env?.SEARXNG_URL ?? DEFAULT_BASE;
 	if (typeof candidate !== 'string') return undefined;
-	const value = candidate.trim().replace(/\/+$/, '');
+	// Trim the value once; the trailing-slash strip is a linear indexed walk
+	// instead of a regex (env input must not feed a polynomial pattern).
+	let value = candidate.trim().length === 0 ? '' : candidate.trim();
+	while (value.endsWith('/')) value = value.slice(0, -1);
 	if (
 		value.length === 0
 		|| !value.startsWith('http://')
