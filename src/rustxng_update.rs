@@ -1939,7 +1939,8 @@ mod tests {
         std::env::set_var("HOME", &home);
         record_banner_report(None, "v0.15.1");
         let path = home.join(".local/share/rdsh/update-state.json");
-        let first: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let first: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(first["updated"], serde_json::json!(true));
         assert_eq!(first["kind"], serde_json::json!("rustxng"));
         assert_eq!(first["to"], serde_json::json!("v0.15.1"));

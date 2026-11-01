@@ -591,7 +591,12 @@ fn search_bridge_attached(profile: &str) -> bool {
     // path's hot costs.
     serde_json::from_str::<serde_json::Value>(&text)
         .ok()
-        .and_then(|value| value.get("dependencies").and_then(|deps| deps.as_object()).map(|deps| deps.contains_key(SEARCH_BRIDGE_PLUGIN)))
+        .and_then(|value| {
+            value
+                .get("dependencies")
+                .and_then(|deps| deps.as_object())
+                .map(|deps| deps.contains_key(SEARCH_BRIDGE_PLUGIN))
+        })
         .unwrap_or(false)
 }
 
