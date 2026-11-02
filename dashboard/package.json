@@ -12,7 +12,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "2.0.1",
     "@deepseek-ai/dsh-win32-process": "0.2.0-rc.2",
-    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@modelcontextprotocol/server": "2.3.1",
     "ipaddr.js": "2.5.0",
