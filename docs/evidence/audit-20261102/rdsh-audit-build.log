@@ -1,0 +1,12 @@
+   Compiling tokio v1.54.1
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.6
+   Compiling tokio-util v0.7.20
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.21
+   Compiling hyper-rustls v0.27.10
+   Compiling axum v0.8.9
+   Compiling reqwest v0.12.28
+   Compiling rdsh v0.15.0 (/home/sahen/Projects/windows-migration/c1a2a17f4ca1-rustdsh)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.57s

@@ -1,0 +1,75 @@
+# 監査指摘の修正（2026-11-02）
+
+対象の初回監査は [README.md](README.md)。監査時点の結果・ログは履歴として保持する。
+
+## 実装
+
+- **実行ファイルの信頼判定**: 選択したパスと canonical な対象の両方について、全祖先の
+  所有者と mode を検査する。root または実行ユーザー以外が所有するディレクトリ、
+  書き込み可能で sticky による保護のない祖先を拒否する。symlink の設置場所と
+  解決先の両方を確認する。`/tmp` のような sticky ディレクトリは、次の構成要素が
+  root または実行ユーザー所有の場合に限り許可する。
+- **Unix の診断プローブ**: 専用プロセスグループと nonblocking な stdout 読み取りを
+  `src/dsh_env/probe.rs` に分離。期限・読み取りエラー・正常終了のいずれでも
+  所有グループを終了し直接の子を wait する。ブロックした読み取りスレッドを残さない。
+- **GUI 環境下のテスト**: ページを開く条件を純粋関数で検証し、DISPLAY、
+  WAYLAND_DISPLAY、RDSH_SETUP_OPEN を変更するテストを廃止。
+  端末・デスクトップ・明示的な無効化の組み合わせを検証する。
+- **アダプタ仕様**: 実際の trait シグネチャと構造体を文書に反映。
+  DSH を使わない最小アダプタ実装をコンパイルし、リテラル引数と通知を確認する。
+- **回帰テストの HTTP 待機**: setup サーバーをテストするときは
+  `RDSH_SETUP_OPEN=0` を明示し、外部ブラウザの起動にテストが依存することを避ける。
+  ポートは `--port 0` で割り当て、ログから実際の URL を取得する。
+
+## 変更前後の確認
+
+| 再現条件 | 監査時点 | 修正後 |
+| --- | --- | --- |
+| 0755 の親の上に 0777 の祖先を置く | 信頼判定 `None` | `Some("directory is group/world-writable")` |
+| 上記への安全な場所からの symlink | 信頼判定 `None` | 同じ理由で拒否 |
+| 1777 の共有祖先と自分所有の次の構成要素 | 許可 | 許可を維持 |
+| 子が終了し子孫が stdout を保持 | 期限後も読み取りスレッドが残る | 期限内に戻り子孫を終了。読み取りスレッドを作らない |
+| DISPLAY と WAYLAND_DISPLAY のある Linux | ページ起動のテストが失敗 | 成功 |
+| 文書のアダプタ定義 | 実装の型・メソッドと不一致 | 型に一致し最小実装のテストが成功 |
+
+## 制約
+
+Unix のプロセスグループはサンドボックスではない。子孫が自分でグループを離れる
+場合まで隔離を保証しない。Windows の診断プローブは従来の実装を維持しており、
+Job Object による子孫終了はこの変更に含まない。Windows/macOS の実機確認は CI に委ねる。
+信頼判定は path による起動前チェックであり、同じユーザーや root が検査後に
+実行ファイルを書き換える TOCTOU まで防ぐ実装ではない。
+
+バージョン、公開タグ、リリースアセットは変更しない。
+
+## 修正後の検証
+
+- `sh scripts/check.sh quick`: fmt、Clippy（全ターゲット・警告なし）、Rust テスト 1,222 件、競合チェックが成功。
+- `cargo test --locked --release`: 1,222 件成功。
+- release の `benchmark_extended` / `benchmark_models` example テスト: 3 件 / 12 件成功。
+- モデル境界・プラグインカタログの Node テスト: 成功。
+- セキュリティ系 Node: 62 件成功、6 件は公式ランタイム未指定などのためスキップ。
+- `DISPLAY=:99 WAYLAND_DISPLAY=wayland-test` でのページ起動ポリシーテスト: 成功。
+- 変更した Markdown の lint と `git diff --check`: 成功。
+- `BIN=./target/debug/rdsh sh tests/regress.sh`: 117 checks と末尾の pipe 終了チェックが成功。
+
+## GitHub の依存アラートへの追加対応
+
+push 時に取得した [未解決アラート4件](dependabot-before-fixes.json) は、初回監査の
+Rust / dashboard 依存監査の対象外にあった。初回のゼロ件を全 npm ディレクトリの
+結果とは扱わない。
+
+- `rdsh-direct-models` の Zod を許容範囲内の 4.6.7 へ更新。
+- Muse SDK と動画用 Remotion が固定した Zod を override で 4.6.7 に更新。
+- desktop SDK が固定した MCP client を override で 2.3.0 に更新（core も追従）。
+- 動画用 React を既存の React DOM 19.3.1 の peer 条件に合わせ 19.3.1 に更新。
+  `--force` や `--legacy-peer-deps` は使っていない。
+- direct-models の runtime smoke は、DSH filesystem tools が要求する
+  workingDirectory サービスを固定ワークスペースで提供する。ユーザーの実環境の
+  インストールを変更せず、desktop SDK の DSH を参照する一時 HOME で検証した。
+
+各ディレクトリで `npm ci --ignore-scripts` に成功。direct-models 66 件、Muse 28 件、
+desktop SDK 11 件、desktop ソース 14 件が成功し、動画用 TypeScript の typecheck も成功。
+[更新後の npm audit](dependency-fixes.json) は対象4ディレクトリすべてゼロ件。
+依存関係の install scripts、モデル呼び出し、実認証は実行していない。
+GitHub のアラートは main へのマージと再検査まで未解決であり、dismiss していない。

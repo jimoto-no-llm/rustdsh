@@ -12,6 +12,17 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   ChatGPT ログインツールの準備、進行状況・中止・再試行も画面で扱えます。
   詳細は [自動準備](docs/AUTO-PROVISION.md) を参照してください。
 
+### Fixed
+
+- GitHub が検出したプラグイン・動画用の Zod と desktop SDK の MCP client の
+  依存脆弱性を修正版へ更新しました。
+
+- 実行ファイル探索で symlink の設置先と解決先の全祖先を検査し、書き換え可能な
+  ディレクトリ経由の候補を拒否します。Unix の診断プローブは期限後に読み取り
+  スレッドや所有グループの子孫を残さないようにしました。
+- GUI 環境変数に依存するセットアップテストを隔離し、回帰テストのブラウザ起動と
+  固定ポートへの依存を解消しました。HarnessAdapter の文書を実装と一致させました。
+
 ## [0.15.0] - 2026-10-31
 
 ### Added

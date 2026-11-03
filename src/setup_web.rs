@@ -44,18 +44,19 @@ pub(crate) fn interactive_terminal() -> bool {
 /// first-time setup stalled. A machine with no display keeps the URL line only,
 /// and RDSH_SETUP_OPEN=0 forces that quiet behavior anywhere.
 fn should_open_page() -> bool {
-    if std::env::var_os("RDSH_SETUP_OPEN").is_some_and(|value| value == "0" || value == "false") {
+    use std::io::IsTerminal as _;
+    page_open_policy(
+        std::env::var_os("RDSH_SETUP_OPEN").as_deref(),
+        std::io::stdin().is_terminal(),
+        a_desktop_session_is_available(),
+    )
+}
+
+fn page_open_policy(setting: Option<&std::ffi::OsStr>, terminal: bool, desktop: bool) -> bool {
+    if setting.is_some_and(|value| value == "0" || value == "false") {
         return false;
     }
-    {
-        use std::io::IsTerminal as _;
-        if std::io::stdin().is_terminal() {
-            return true;
-        }
-    }
-    cfg!(any(target_os = "windows", target_os = "macos"))
-        || std::env::var_os("DISPLAY").is_some()
-        || std::env::var_os("WAYLAND_DISPLAY").is_some()
+    terminal || desktop
 }
 
 pub fn cmd_setup_web(
@@ -608,34 +609,20 @@ mod tests {
         }
         assert_eq!(post("/api/provision", "text/plain", "{}", true).0, 400);
     }
-    /// The platforms whose opener needs no display variable of its own.
-    fn spawns_a_browser_without_one() -> bool {
-        cfg!(any(target_os = "windows", target_os = "macos"))
-    }
-
     #[test]
     fn the_page_opens_off_a_terminal_but_never_in_a_headless_session() {
-        // The quiet switch wins over everything else.
-        std::env::set_var("RDSH_SETUP_OPEN", "0");
-        assert!(!should_open_page());
-        std::env::remove_var("RDSH_SETUP_OPEN");
-        // A desktop session opens the page even without a terminal on stdin,
-        // which is the case an agent or a double-clicked launcher hits.
-        // A terminal on stdin opens it on every platform.
-        let stdin_is_terminal = {
-            use std::io::IsTerminal as _;
-            std::io::stdin().is_terminal()
-        };
-        assert_eq!(
-            should_open_page(),
-            stdin_is_terminal || spawns_a_browser_without_one()
-        );
-        // ...and a desktop session covers the case with no terminal at all.
-        if !stdin_is_terminal {
-            std::env::set_var("DISPLAY", ":1");
-            let with_display = should_open_page();
-            std::env::remove_var("DISPLAY");
-            assert!(with_display);
+        for terminal in [false, true] {
+            for desktop in [false, true] {
+                for value in ["0", "false"] {
+                    assert!(!page_open_policy(Some(value.as_ref()), terminal, desktop));
+                }
+                for value in [None, Some(std::ffi::OsStr::new("1"))] {
+                    assert_eq!(
+                        page_open_policy(value, terminal, desktop),
+                        terminal || desktop
+                    );
+                }
+            }
         }
     }
 

@@ -1,0 +1,106 @@
+COMMAND LOG: quick-final
+
+
+==> check-conflicts vs origin/main
+check-conflicts: HEAD is 0 ahead / 0 behind origin/main
+check-conflicts: no conflicts with origin/main
+
+Summary:
+  ok    cargo fmt --check
+  ok    cargo clippy --all-targets -D warnings
+  ok    cargo test
+  ok    check-conflicts vs origin/main
+check: all selected checks passed
+
+COMMAND LOG: release
+test native_worker_scope_validation_keeps_role_specific_write_defaults ... ok
+test native_worker_scope_validation_returns_existing_policy_error_codes ... ok
+test native_worker_scope_validation_normalizes_paths_and_modules ... ok
+test native_worker_scope_validation_does_not_load_broken_user_settings ... ok
+test worker_scope_io_failures_keep_operating_system_reasons_under_localized_context ... ok
+test worker_scope_help_uses_selected_language_and_preserves_command_spellings ... ok
+test languages_preserve_worker_scope_json_and_ignore_unrelated_corrupt_settings ... ok
+test malformed_worker_scope_documents_have_localized_context_and_raw_parser_reasons ... ok
+test worker_scope_policy_structure_errors_localize_without_translating_codes_or_field_names ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+
+COMMAND LOG: example-extended
+   Compiling rdsh v0.15.0 (/home/sahen/Projects/windows-migration/c1a2a17f4ca1-rustdsh)
+    Finished `release` profile [optimized] target(s) in 5.48s
+     Running unittests examples/benchmark_extended.rs (target/release/examples/benchmark_extended-ec905211fafac8b2)
+
+running 3 tests
+test tests::p95_uses_nearest_rank_and_keeps_last_sample ... ok
+test tests::session_oracle_rejects_wrong_or_inexact_values ... ok
+test tests::http_benchmark_uses_the_protected_token_handoff ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+COMMAND LOG: example-models
+test tests::never_executes_arbitrary_generated_rust ... ok
+test tests::model_selection_is_explicit_and_preserves_defaults ... ok
+test tests::codex_sse_is_opt_in_and_preserves_other_provider_options ... ok
+test tests::only_selected_provider_is_required_and_unknown_models_never_fallback ... ok
+test tests::quantiles_use_nearest_rank_and_empty_results_stay_missing ... ok
+test tests::model_ids_cannot_escape_the_run_directory ... ok
+test tests::requires_completed_turn_exact_answer_and_successful_tool ... ok
+test tests::summaries_separate_providers_with_the_same_model_id_and_respect_selection ... ok
+test tests::tool_runs_require_a_nonempty_valid_catalog ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+COMMAND LOG: node
+✔ the recommended ids match plugins/install.sh (0.250582ms)
+✔ the starter set matches plugins/install.sh (0.177344ms)
+✔ every bundled entry ships the package it names (4.010234ms)
+✔ every catalog entry carries a reason a user can recognize (0.224163ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51.598091
+
+COMMAND LOG: security
+✔ isolated inspection tool registers without globally denying DSH tools (0.477519ms)
+✔ missing registration API fails closed before exposing anything (0.321476ms)
+✔ explicit sharing rejects hard links and hidden credentials (13.06301ms)
+✔ rdsh_inspect declares an OpenAI-compatible function parameter schema (1.778489ms)
+ℹ tests 68
+ℹ suites 0
+ℹ pass 62
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 5105.050215
+
+COMMAND LOG: display
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running unittests src/main.rs (target/debug/deps/rdsh-f5382b6dfff0efd2)
+
+running 1 test
+test setup_web::tests::the_page_opens_off_a_terminal_but_never_in_a_headless_session ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 867 filtered out; finished in 0.00s
+
+
+COMMAND LOG: regress-final
+ok: setup --web status
+ok: setup --web stores YAML string and preserves existing credentials
+ok: setup --web stores a profile-declared apiKeyEnv key
+ok: setup --web refuses an undeclared key name
+ok: search-web refused while explicitly off
+ok: search-web via fixture
+ok: install.sh documents --musl
+ok: sync-dsh release-first + sandboxed regress
+ok: regress sandboxed HOME
+ALL PASS (117 checks)
+ok: doctor survives a fully consumed report
+ok: doctor exits quietly when the pipe closes (exit 0)
