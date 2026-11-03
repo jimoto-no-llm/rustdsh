@@ -19,22 +19,24 @@ An independent community project; not an official DeepSeek or DeepSeek Harness p
 
 The delegated harness sits behind a swappable adapter layer; the bundled [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness) adapter delegates transparently to upstream `dsh`, and model routing via `rdsh provider` already speaks OpenAI-compatible endpoints and local inference (Ollama / llama.cpp). See [docs/HARNESS-ADAPTER.md](docs/HARNESS-ADAPTER.md) for the adapter seam. All existing arguments and options continue to work as-is.
 
-## For AI agents
+## Install with an AI agent
 
-Paste this before you ask an agent to work on this repository.
+Copy the prompt below into your AI agent to get help from installation through your first conversation.
 
 ```text
-You are working on rdsh, a Rust launcher for dsh (DeepSeek Harness).
-- Native subcommands run in Rust. Every other argument is passed to upstream dsh unchanged.
-- A booted profile still runs Node.js, so conversations start and cost memory like upstream. Do not claim rdsh makes them faster or lighter.
-- Read AGENTS.md before editing. Do not touch credentials, published release assets or published tags.
-- Verify with: cargo fmt --check, cargo clippy -- -D warnings, cargo test.
-- Report only commands you actually ran, with their exit codes.
+Install rustdsh (command name: rdsh) on this computer and help me start my first conversation.
+First, read this entire setup guide and follow its steps:
+https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
+
+- Check my OS, shell and existing installation; install only what is needed.
+- After installing and verifying rdsh, open rdsh setup --web first.
+- Help me choose and configure exactly one model connection.
+- Once connected, run rdsh plugins install --recommended=starter, then start a conversation with rdsh tui.
+- Never display API keys or login credentials in chat or logs, and preserve existing settings.
+- Proceed one step at a time and report only verified results. If a step fails, stop and explain the cause and next step.
 ```
 
-Setting up a person who has never used a CLI? Read [docs/SETUP.md](docs/SETUP.md) top to
-bottom first, follow its order, and answer questions from this README and `docs/` rather
-than guessing.
+To follow the instructions yourself, open the [setup guide](docs/SETUP.md).
 
 ## Why rdsh?
 
