@@ -96,6 +96,19 @@ fn decode(status: i32, bytes: &[u8]) -> Result<String> {
         .as_str()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow::anyhow!("CLAUDE_EMPTY_RESPONSE"))?;
+    // Claude may fence an otherwise valid JSON turn even when asked for raw
+    // JSON. Remove only a fence enclosing the entire reply. Rust's existing
+    // turn/schema/tool validation still runs; never extract JSON from prose.
+    let text = text.trim();
+    let text = [
+        ("```json\n", "\n```"),
+        ("```\n", "\n```"),
+        ("```json\r\n", "\r\n```"),
+        ("```\r\n", "\r\n```"),
+    ]
+    .into_iter()
+    .find_map(|(start, end)| text.strip_prefix(start).and_then(|s| s.strip_suffix(end)))
+    .unwrap_or(text);
     Ok(text.to_owned())
 }
 
@@ -160,6 +173,27 @@ mod tests {
             .unwrap()
             .to_string()
             .contains("secret"));
+    }
+    #[test]
+    fn whole_reply_fences_are_removed_but_rust_validation_remains_strict() {
+        let turn = r#"{"version":1,"text":"RDSH_LIVE_OK","toolCalls":[]}"#;
+        let wrap = |text: &str| {
+            serde_json::to_vec(&json!({"type":"result","subtype":"success","is_error":false,"result":text,"num_turns":1,"permission_denials":[]})).unwrap()
+        };
+        for reply in [
+            turn.to_string(),
+            format!("```json\n{turn}\n```"),
+            format!("```\n{turn}\n```"),
+            format!(" \n```json\r\n{turn}\r\n```\n "),
+        ] {
+            let decoded = decode(0, &wrap(&reply)).unwrap();
+            assert_eq!(decoded, turn);
+            assert!(super::super::engine::parse_turn(&decoded).is_ok());
+        }
+        for invalid in [format!("Here is JSON:\n```json\n{turn}\n```"), format!("```json\n{turn}\n```\nExtra prose"), format!("```json\n{turn}\n```\n```json\n{turn}\n```"), "```json\n{\"version\":1,\"text\":\"bad\",\"toolCalls\":[],\"extra\":true}\n```".into(), "```json\n{\"version\":1,\"text\":\"\",\"toolCalls\":[{\"id\":\"x\",\"name\":\"read\",\"arguments\":{\"path\":\"../secret\"}}]}\n```".into()] {
+            let decoded = decode(0, &wrap(&invalid)).unwrap();
+            assert!(super::super::engine::parse_turn(&decoded).is_err());
+        }
     }
     #[tokio::test]
     #[cfg(unix)]
