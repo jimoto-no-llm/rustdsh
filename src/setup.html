@@ -7,6 +7,7 @@
 <title>rdsh setup</title>
 <link rel="icon" type="image/png" href="/icon.png">
 <link rel="apple-touch-icon" href="/icon.png">
+<script src="/setup-provision.js" defer></script>
 <style>
 :root {
   color-scheme: light;
@@ -155,6 +156,21 @@ details[open] > summary::before { transform: rotate(90deg); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .done-mark svg { stroke-dashoffset: 0; }
 }
+
+.provision-panel, .provision-progress { border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-block: 18px; background: var(--card); }
+.provision-panel p { margin-block: 6px 16px; }
+.provision-progress { box-shadow: var(--shadow); }
+.provision-progress label { display: block; font-weight: 650; margin-block-end: 12px; }
+.provision-progress progress { display: block; width: 100%; height: 14px; accent-color: var(--accent); }
+.provision-progress button { margin-inline-end: 8px; }
+.model-sizes { border: 0; padding: 0; margin: 18px 0; display: grid; gap: 8px; }
+.model-sizes legend { margin-block-end: 8px; }
+.size-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; cursor: pointer; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.size-option:has(:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.size-option input { margin: 0; accent-color: var(--accent); }
+.cloud-choice select { display: block; width: 100%; margin: 8px 0 16px; min-height: 44px; }
+.cloud-choice label { display: block; margin-top: 16px; }
+@media (max-width: 480px) { .size-option { grid-template-columns: auto 1fr; } .size-option .small { grid-column: 2; } .local-choice .big, .cloud-choice .big, .provision-panel .big { width: 100%; justify-content: center; } }
 </style>
 </head>
 <body>
@@ -370,20 +386,14 @@ async function loadEnv() {
   var list = $("checks"); list.replaceChildren();
   list.append(checkRow(true, "rdsh", t("インストール済み（v", "Installed (v", "已安装（v") + ENV.rdsh + t("）", ")", "）")));
   var nodeOk = ENV.node.found && ENV.node.supported;
-  var nodeLink = el("a", "linkish", t("Node.js をダウンロード（公式サイト）", "Download Node.js (official site)", "下载 Node.js（官网）"));
-  nodeLink.href = JA ? "https://nodejs.org/ja/download" : "https://nodejs.org/en/download"; nodeLink.target = "_blank"; nodeLink.rel = "noopener noreferrer";
-  list.append(checkRow(nodeOk, "Node.js 22+",
-    nodeOk ? t("見つかりました（", "Found (", "已找到（") + ENV.node.version + t("）", ")", "）")
-      : (ENV.node.found ? t("バージョンが古いです（", "Too old (", "版本过旧（") + (ENV.node.version || "?") + t("）。新しい版を入れてください。", "). Please update.", "）。请更新。")
-        : t("DeepSeek Harness を動かすのに必要です。", "Needed to run DeepSeek Harness.", "运行 DeepSeek Harness 需要它。")),
-    nodeOk ? null : nodeLink));
-  list.append(checkRow(ENV.dsh.found, "DeepSeek Harness",
-    ENV.dsh.found ? t("見つかりました", "Found", "已找到") : t("AIとの会話に使います。下のコマンドで入れられます。", "Used for conversations. Install it with this command.", "用于与 AI 对话。可用下面的命令安装。"),
-    ENV.dsh.found ? null : cmdRow("npm install -g @deepseek-ai/dsh")));
-  var allOk = nodeOk && ENV.dsh.found;
-  $("ready-next").textContent = allOk ? t("次へ", "Next", "下一步") : t("このまま進む", "Continue anyway", "继续");
-  if (!allOk) $("ready-lead").textContent = t("足りないものがあります。あとから入れても大丈夫です。", "Something is missing. You can install it later.", "缺少一些组件，之后再安装也可以。");
-  else text("ready-lead", "必要なものはそろっています。", "Everything you need is installed.", "所需组件已就绪。");
+  list.append(checkRow(nodeOk && ENV.pnpm, t("AIの実行環境", "AI runtime", "AI 运行环境"),
+    nodeOk && ENV.pnpm ? t("準備できています", "Ready", "已就绪") : t("下のボタンで自動準備できます。追加コマンドは不要です。", "Prepare it below. No extra commands needed.", "点击下方按钮自动准备，无需额外命令。")));
+  list.append(checkRow(ENV.dsh.found, t("会話エンジン", "Conversation engine", "对话引擎"),
+    ENV.dsh.found ? t("準備できています", "Ready", "已就绪") : t("自動準備に含まれます", "Included in automatic setup", "将自动准备")));
+  var allOk = nodeOk && ENV.dsh.found && ENV.pnpm;
+  $("ready-next").disabled = !allOk;
+  $("ready-next").textContent = allOk ? t("モデルを準備する", "Set up your model", "准备模型") : t("準備が終わると進めます", "Prepare the runtime to continue", "准备完成后继续");
+  $("ready-lead").textContent = allOk ? t("必要な環境はそろっています。次は使うモデルを準備します。", "The runtime is ready. Next, prepare your model.", "运行环境已就绪，接下来准备模型。") : t("不足しているものを、この画面からまとめて準備できます。", "Prepare everything missing from this page.", "可在此页面自动准备所有缺少的组件。");
   if (STATUS) renderOptions();
 }
 
@@ -467,7 +477,7 @@ async function load() {
   renderDetails();
   renderKeyNames();
   renderDetected();
-  var connected = !STATUS.needed;
+  var connected = !STATUS.needed || (window.rdshProvisionReady && window.rdshProvisionReady());
   $("okbar").hidden = !connected;
   $("okbar").textContent = "✓ " + t("AIとつながりました。「次へ」で最初の会話へ進めます。", "Connected. Press Next to start your first conversation.", "已连接。点击“下一步”开始第一次对话。");
   if (connected && !wasConnected) $("step-connect").classList.add("is-connected");
@@ -551,8 +561,10 @@ function renderOptions() {
   } else if (env.codex) {
     gpt.actions.append(loginButton("codex", t("ChatGPT でログイン", "Log in with ChatGPT", "使用 ChatGPT 登录")));
   } else {
-    gpt.box.append(el("p", "small", t("ログインには Codex（OpenAI 公式ツール）を使います。先に入れてください：", "Logging in uses Codex, OpenAI's tool. Install it first:", "登录需要 OpenAI 的 Codex 工具，请先安装：")));
-    gpt.box.append(cmdRow("npm install -g @openai/codex"));
+    gpt.box.append(el("p", "small", t("ログインに必要な公式ツールを自動で準備できます。", "Prepare the official login tool automatically.", "可自动准备 OpenAI 官方登录工具。")));
+    var installLogin = el("button", "primary", t("ChatGPTログインを自動準備", "Prepare ChatGPT login", "自动准备 ChatGPT 登录"));
+    installLogin.onclick = function () { if (window.rdshPrepareLogin) window.rdshPrepareLogin(); };
+    gpt.box.append(installLogin);
   }
   root.append(gpt.box);
 
@@ -621,7 +633,7 @@ function startButton(kind, title, sub, primary) {
 }
 function renderFinish() {
   var env = ENV || {dsh: {}};
-  var connected = STATUS && !STATUS.needed;
+  var connected = (STATUS && !STATUS.needed) || (window.rdshProvisionReady && window.rdshProvisionReady());
   var missing = [];
   if (!connected) missing.push("ai");
   if (!env.dsh.found) missing.push("dsh");
@@ -639,18 +651,18 @@ function renderFinish() {
   }
   if (!env.dsh.found) {
     var box = el("div", "option");
-    box.append(el("h2", "", t("DeepSeek Harness を入れましょう", "Install DeepSeek Harness", "安装 DeepSeek Harness")));
-    box.append(el("p", "small", t("AIとの会話に使います。ターミナルで次のコマンドを実行してください。", "It runs your conversations. Run this in a terminal.", "它用于与 AI 对话。请在终端运行以下命令。")));
-    box.append(cmdRow("npm install -g @deepseek-ai/dsh"));
-    var again = el("button", connected ? "primary" : "", t("入れたので確認する", "I've installed it", "已安装，重新检查"));
-    again.onclick = function () { setupAction(async function () { await loadEnv(); renderFinish(); if (!ENV.dsh.found) toast(t("まだ見つかりません。ターミナルを開き直すと見つかることがあります。", "Not found yet. Reopening the terminal can help.", "仍未找到。重新打开终端可能会有帮助。")); }); };
-    var actions = el("div", "row-actions"); actions.append(again); box.append(actions);
+    box.append(el("h2", "", t("会話の実行環境を準備しましょう", "Prepare the conversation runtime", "准备对话运行环境")));
+    box.append(el("p", "small", t("準備画面から自動でインストールできます。", "Install it automatically from the preparation screen.", "可在准备页面自动安装。")));
+    var again = el("button", "primary", t("自動準備へ進む", "Open automatic setup", "进入自动准备"));
+    again.onclick = function () { go("ready"); };
+    box.append(again);
     starts.append(box);
   }
-  if (env.desktop) starts.append(startButton("desktop", t("DeepSeek Harness アプリを開く", "Open the DeepSeek Harness app", "打开 DeepSeek Harness 应用"), t("いちばん簡単です", "The easiest way", "最简单的方式"), true));
+  var chosenModel = window.rdshProvisionSelection && window.rdshProvisionSelection();
+  if (env.desktop && !chosenModel) starts.append(startButton("desktop", t("DeepSeek Harness アプリを開く", "Open the DeepSeek Harness app", "打开 DeepSeek Harness 应用"), t("いちばん簡単です", "The easiest way", "最简单的方式"), true));
   if (env.dsh.found) {
-    starts.append(startButton("tui", t("ターミナルで会話をはじめる", "Chat in a terminal", "在终端中对话"), t("Codex や Claude Code と同じ使い方です", "Works like Codex or Claude Code", "用法与 Codex、Claude Code 相同"), !env.desktop));
-    starts.append(startButton("web", t("ブラウザで使う", "Use it in your browser", "在浏览器中使用"), t("画面で操作したい方に", "If you prefer a visual interface", "适合喜欢图形界面的用户"), false));
+    if (!chosenModel || chosenModel.profiles.indexOf("tui") >= 0) starts.append(startButton("tui", t("ターミナルで会話をはじめる", "Chat in a terminal", "在终端中对话"), t("Codex や Claude Code と同じ使い方です", "Works like Codex or Claude Code", "用法与 Codex、Claude Code 相同"), !env.desktop || !!chosenModel));
+    if (!chosenModel || chosenModel.profiles.indexOf("web") >= 0) starts.append(startButton("web", t("ブラウザで使う", "Use it in your browser", "在浏览器中使用"), t("画面で操作したい方に", "If you prefer a visual interface", "适合喜欢图形界面的用户"), !!chosenModel && chosenModel.profiles.indexOf("tui") < 0));
   }
   var model = (STATUS && STATUS.defaults || []).filter(function (d) { return d.state === "ok"; })[0];
   $("model-line").textContent = model ? t("使うモデル：", "Model: ", "使用模型：") + model.provider + " / " + model.model : "";

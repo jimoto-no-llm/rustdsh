@@ -106,7 +106,7 @@ case "$mode" in
         plugins/*/*) d=${f#plugins/}; plugins=$(add_word "$plugins" "plugins/${d%%/*}"); node=1 m=1 ;;
       esac
       case "$f" in
-        install.sh|install-banner.sh|sync-dsh.sh|release-digests.tsv|tests/install-isolated*|tests/installer-*) installer=1 m=1 ;;
+        install.sh|install-banner.sh|sync-dsh.sh|release-digests.tsv|tests/install-isolated*|tests/runtime-bootstrap.sh|tests/installer-*) installer=1 m=1 ;;
         *.ps1) ps1=1 m=1 ;;
       esac
       case "$f" in
@@ -274,6 +274,7 @@ if [ "$shell" = 1 ]; then
 fi
 
 if [ "$installer" = 1 ]; then
+  step "private runtime bootstrap without pnpm" bash tests/runtime-bootstrap.sh
   step "syntax: bash -n install.sh, sh -n install-banner.sh sync-dsh.sh" \
     sh -c 'bash -n install.sh && sh -n install-banner.sh && sh -n sync-dsh.sh'
   if [ "$(uname -s)" = Linux ] && command -v docker >/dev/null 2>&1; then

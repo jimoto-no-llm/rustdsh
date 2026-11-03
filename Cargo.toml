@@ -31,7 +31,6 @@ exclude = [
   "/scripts/**",
   "/strix_runs/**",
   "/tests/**",
-  "/install.ps1",
   "/preview-*",
   "/sync-dsh.sh",
 ]
@@ -57,7 +56,7 @@ flate2 = "1.1.10"
 futures-util = "0.3"
 hyper = { version = "1.7", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["service", "tokio"] }
-reqwest = { version = "0.12.9", default-features = false, features = ["rustls-tls", "stream"] }
+reqwest = { version = "0.12.9", default-features = false, features = ["rustls-tls", "stream", "json"] }
 tokio = { version = "1.48", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tower = { version = "0.5", features = ["util"] }
 

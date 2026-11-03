@@ -289,6 +289,9 @@ pub fn latest_node_tree() -> Option<String> {
 // permission without spawning (`node --version` costs ~14ms per delegation),
 // else the newest matching tree under ~/.local/opt.
 pub fn find_node_bin() -> Option<String> {
+    if let Some(node) = crate::setup_models::managed_node() {
+        return Some(node.to_string_lossy().into_owned());
+    }
     #[cfg(target_os = "windows")]
     const NAMES: &[&str] = &["node.exe", "node.cmd", "node.bat", "node"];
     #[cfg(not(target_os = "windows"))]
@@ -658,6 +661,17 @@ fn base_cmd(
     metadata_only: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<std::process::Command> {
+    let mut command = base_cmd_inner(orig, dry, metadata_only, locale)?;
+    crate::setup_models::runtime_environment(&mut command)?;
+    Ok(command)
+}
+
+fn base_cmd_inner(
+    orig: &str,
+    dry: bool,
+    metadata_only: bool,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<std::process::Command> {
     if dry || metadata_only {
         let mut command = if is_node_entrypoint(orig) {
             let mut command = std::process::Command::new(
@@ -890,13 +904,14 @@ pub(crate) fn assemble_boot(
     let mut cmd = base_cmd(origin, dry, false, locale)?;
     if !dry {
         // Status is read-only and runs only after enforcement validation.
-        crate::auth::pre_boot(true, locale);
+        crate::auth::pre_boot(!crate::setup_models::selected_for(profile), locale);
     }
     cmd.arg("--profile").arg(profile);
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
     }
     // Generated layer first so every caller-supplied --patch stays authoritative.
+    crate::setup_models::apply_launch(&mut cmd, dry, profile)?;
     let overlay = !dry && apply_gzip_overlay(&mut cmd, origin, profile);
     for p in patches {
         cmd.arg("--patch").arg(p);
@@ -961,6 +976,7 @@ pub fn exec_dump_config(
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
     }
+    crate::setup_models::apply_launch(&mut cmd, true, profile)?;
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
@@ -987,7 +1003,15 @@ pub fn exec_raw(args: &[OsString], dry: bool, slim: bool) -> anyhow::Result<()> 
             .any(|flag| args[0] == OsStr::new(flag));
     let mut cmd = base_cmd(&orig, dry, metadata_only, crate::locale::Locale::English)?;
     if !dry {
-        crate::auth::pre_boot(true, crate::locale::Locale::English);
+        crate::auth::pre_boot(
+            !metadata_only && !profile_of(args).is_some_and(crate::setup_models::selected_for),
+            crate::locale::Locale::English,
+        );
+    }
+    if !metadata_only {
+        if let Some(profile) = profile_of(args) {
+            crate::setup_models::apply_launch(&mut cmd, dry, profile)?;
+        }
     }
     cmd.args(args);
     apply_slim(&mut cmd, slim, crate::locale::Locale::English);

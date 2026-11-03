@@ -44,6 +44,7 @@ REQUIRED_MEMBERS = (
     "docker-compose.searxng.yml",
     "docker/",
     "install.sh",
+    "install.ps1",
     "LICENSE",
     "README.md",
     "assets/",

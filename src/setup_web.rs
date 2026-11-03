@@ -147,6 +147,7 @@ pub fn cmd_setup_web(
         paste_hint(locale);
     }
     let done = Arc::new(AtomicBool::new(false));
+    let provision = Arc::new(crate::setup_models::Manager::default());
     let connections = Arc::new(AtomicUsize::new(0));
     loop {
         if done.load(Ordering::Relaxed) || crate::shutdown::requested() {
@@ -164,10 +165,11 @@ pub fn cmd_setup_web(
                     continue;
                 };
                 let d = done.clone();
+                let provision = provision.clone();
                 let token = token.clone();
                 std::thread::spawn(move || {
                     let _slot = slot;
-                    if let Err(e) = handle(s, &d, &token, port, locale) {
+                    if let Err(e) = handle(s, &d, &token, port, locale, &provision) {
                         eprintln!("[rdsh setup] {e:#}");
                     }
                 });
@@ -182,6 +184,7 @@ pub fn cmd_setup_web(
             }
         }
     }
+    provision.shutdown();
     Ok(())
 }
 
@@ -191,6 +194,7 @@ fn handle(
     token: &str,
     port: u16,
     locale: crate::locale::Locale,
+    provision: &Arc<crate::setup_models::Manager>,
 ) -> anyhow::Result<()> {
     use std::borrow::Cow;
     s.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
@@ -249,6 +253,11 @@ fn handle(
                         crate::locale::Locale::Japanese => "ja",
                     },
                 )),
+            ),
+            ("GET", "/setup-provision.js") => (
+                200,
+                "text/javascript; charset=utf-8",
+                Cow::Borrowed(include_str!("setup-provision.js")),
             ),
             ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
             ("GET", "/api/status") if !req.authorized(token) => (
@@ -357,6 +366,44 @@ fn handle(
                     Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
                 ),
             },
+            ("GET" | "POST", "/api/provision") if !req.authorized(token) => (
+                401,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"unauthorized\"}"),
+            ),
+            ("GET", "/api/provision") => (
+                200,
+                "application/json",
+                Cow::Owned(provision.status().to_string()),
+            ),
+            ("POST", "/api/provision")
+                if req.header("content-type") != Some("application/json") =>
+            {
+                (
+                    400,
+                    "application/json",
+                    Cow::Borrowed("{\"error\":\"JSON required\"}"),
+                )
+            }
+            ("POST", "/api/provision") => match provision.start(req.body.as_bytes()) {
+                Ok(()) => (
+                    202,
+                    "application/json",
+                    Cow::Owned(provision.status().to_string()),
+                ),
+                Err(error) => (
+                    if error.to_string() == "ALREADY_RUNNING" {
+                        409
+                    } else {
+                        400
+                    },
+                    "application/json",
+                    Cow::Owned(
+                        serde_json::json!({"error":"invalid or conflicting provisioning request"})
+                            .to_string(),
+                    ),
+                ),
+            },
             ("GET", "/api/env") if !req.authorized(token) => (
                 401,
                 "application/json",
@@ -396,6 +443,11 @@ fn handle(
                 "application/json",
                 Cow::Borrowed("{\"error\":\"unauthorized\"}"),
             ),
+            ("POST", "/api/done") if !provision.close_if_idle() => (
+                409,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"provisioning is running\"}"),
+            ),
             ("POST", "/api/done") => (200, "application/json", Cow::Borrowed("{\"ok\":true}")),
             _ => (
                 404,
@@ -406,7 +458,7 @@ fn handle(
     crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
     // The main thread can exit as soon as it observes done. Send the complete
     // acknowledgement first, and keep serving if writing the response fails.
-    if finish_after_response {
+    if finish_after_response && status == 200 {
         done.store(true, Ordering::Relaxed);
     }
     Ok(())
@@ -493,7 +545,15 @@ mod tests {
         let (server, _) = listener.accept().unwrap();
         let done = AtomicBool::new(false);
         client.write_all(request(port).as_bytes()).unwrap();
-        handle(server, &done, TOKEN, port, crate::locale::Locale::Japanese).unwrap();
+        handle(
+            server,
+            &done,
+            TOKEN,
+            port,
+            crate::locale::Locale::Japanese,
+            &Arc::new(crate::setup_models::Manager::default()),
+        )
+        .unwrap();
         let mut bytes = Vec::new();
         client.read_to_end(&mut bytes).unwrap();
         let raw = String::from_utf8_lossy(&bytes);
@@ -535,6 +595,19 @@ mod tests {
         })
     }
 
+    #[test]
+    fn provision_rejects_browser_supplied_programs_and_models() {
+        for body in [
+            r#"{"action":"shell","command":"id"}"#,
+            r#"{"action":"local-model","model":"../../sh"}"#,
+        ] {
+            assert_eq!(
+                post("/api/provision", "application/json", body, true).0,
+                400
+            );
+        }
+        assert_eq!(post("/api/provision", "text/plain", "{}", true).0, 400);
+    }
     /// The platforms whose opener needs no display variable of its own.
     fn spawns_a_browser_without_one() -> bool {
         cfg!(any(target_os = "windows", target_os = "macos"))
@@ -571,10 +644,17 @@ mod tests {
         let (status, page, _) = get("/", None);
         assert_eq!(status, 200);
         assert!(page.contains("<html lang=\"ja\" data-rdsh-locale=\"ja\">"));
-        for path in ["/api/status", "/api/env", "/api/extras", "/api/webui"] {
+        for path in [
+            "/api/status",
+            "/api/env",
+            "/api/extras",
+            "/api/webui",
+            "/api/provision",
+        ] {
             assert_eq!(get(path, None).0, 401, "{path}");
         }
         for path in [
+            "/api/provision",
             "/api/share",
             "/api/login",
             "/api/start",

@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- 初回セットアップから実行環境とローカルモデルを自動導入できるようにしました。
+  pnpm を先に用意する必要がなくなり、既存のクラウド接続からのモデル選択、
+  ChatGPT ログインツールの準備、進行状況・中止・再試行も画面で扱えます。
+  詳細は [自動準備](docs/AUTO-PROVISION.md) を参照してください。
+
 ## [0.15.0] - 2026-10-31
 
 ### Added

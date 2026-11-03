@@ -373,7 +373,7 @@ pick() {
   printf '#!/bin/sh\n%s\n' "$2" > "$MS/shim/ldd"
   chmod +x "$MS/shim/getconf" "$MS/shim/ldd"
   shift 2
-  PATH="$MS/shim:$PATH" HOME="$MS/home" DSH_HOME="$MS/dsh" RDSH_NO_CHECKSUM=0 RDSH_RELEASE_DIGESTS="$MS/release-digests.tsv" RDSH_RELEASE_BASE="file://$MS/rel" bash ./install.sh --from-release --prefix="$MS/prefix" "$@" > "$MS/install.log" 2>&1 || { echo "FAIL(exit): install.sh pick"; tail -n 8 "$MS/install.log"; exit 1; }
+  PATH="$MS/shim:$PATH" HOME="$MS/home" DSH_HOME="$MS/dsh" RDSH_SKIP_RUNTIME=1 RDSH_NO_CHECKSUM=0 RDSH_RELEASE_DIGESTS="$MS/release-digests.tsv" RDSH_RELEASE_BASE="file://$MS/rel" bash ./install.sh --from-release --prefix="$MS/prefix" "$@" > "$MS/install.log" 2>&1 || { echo "FAIL(exit): install.sh pick"; tail -n 8 "$MS/install.log"; exit 1; }
   "$MS/prefix/rdsh"
 }
 # install.sh checks native musl loaders before the getconf/ldd shims. Keep the

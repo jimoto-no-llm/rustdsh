@@ -16,7 +16,7 @@ spec.loader.exec_module(crate_release)
 
 def members_with(*extra):
     return ["Cargo.toml", "build.rs", "docker-compose.searxng.yml",
-            "docker/searxng/settings.yml", "install.sh", "LICENSE", "README.md",
+            "docker/searxng/settings.yml", "install.sh", "install.ps1", "LICENSE", "README.md",
             "assets/icon.ico", "security/preload.mjs", "src/main.rs", *extra]
 
 

@@ -3011,6 +3011,31 @@ pub(crate) fn sample_patch_for_tests(id: &str, default_model: &str) -> String {
     text
 }
 
+/// Private first-run overlay, separate from all existing profile documents.
+pub(crate) fn setup_local_overlay(model: &str) -> Result<String> {
+    anyhow::ensure!(crate::setup_models::model_allowed(model), "INVALID_MODEL");
+    let route = Route {
+        id: "rdsh-local".into(),
+        display_name: "Local model".into(),
+        base_url: "http://127.0.0.1:11534/v1".into(),
+        api_key_env: "RDSH_LOCAL_API_KEY".into(),
+        compat: Vec::new(),
+        models: vec![Model {
+            id: model.into(),
+            context_window: Some(4096),
+            max_tokens: Some(2048),
+            input: vec!["text".into()],
+            ..Model::default()
+        }],
+    };
+    let mut text = apply_route("", &route, false, crate::locale::Locale::English)?.text;
+    text.push_str(&format!(
+        "- id: agent-default-model\n  config:\n    provider: rdsh-local\n    model: {}\n",
+        yaml_scalar(model)
+    ));
+    Ok(text)
+}
+
 // --- command -------------------------------------------------------------------
 
 pub(crate) struct AddArgs {
