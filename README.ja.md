@@ -34,7 +34,7 @@ https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
 - OS とシェル、既存のインストールを確認し、必要なものだけを導入してください。
 - rdsh の導入・動作確認後、まず rdsh setup --web を開いてください。
 - モデルの接続先を私と相談して1つだけ設定してください。
-- 接続を確認したら rdsh plugins install --recommended=starter を実行し、最後に rdsh tui で会話を始めてください。
+- 接続を確認したら rdsh plugins install --recommended=starter を実行し、設定画面から会話を始めてください。新規導入では rdsh --profile web を使い、TUIプロファイルがある場合は rdsh tui も使えます。
 - API キーやログイン情報をチャットやログに表示せず、既存の設定は消さないでください。
 - 1ステップずつ進め、実際に確認した結果だけを報告してください。失敗したら止めて、原因と次の手順を伝えてください。
 ```
