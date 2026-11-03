@@ -1820,6 +1820,13 @@ fn prompt_yes(prompt: &str) -> bool {
 /// Names of the non-empty refs stored in `.credentials.yaml`, with their
 /// values. Used by `rdsh provider` to report key presence and to authenticate
 /// a model listing; callers must never print the values.
+/// Whether DSH owns an OAuth grant for this provider (not an external candidate).
+pub(crate) fn has_owned_provider(provider: &str) -> bool {
+    load_doc(&creds_path())
+        .grants
+        .contains_key(&format!("llm-pi-ai/{provider}"))
+}
+
 pub(crate) fn stored_refs() -> HashMap<String, String> {
     load_doc(&creds_path())
         .refs
@@ -2630,12 +2637,13 @@ pub(crate) fn login_command(tool: &str) -> Option<(&'static str, &'static [&'sta
         "opencode" => ("opencode", &["auth", "login"]),
         _ => return None,
     };
-    which_bin(command.0).then_some(command)
+    (which_bin(command.0) || (tool == "codex" && crate::setup_models::managed_login().is_some()))
+        .then_some(command)
 }
 
 /// True when `bin` resolves on PATH (setup wizard environment check).
 pub(crate) fn command_on_path(bin: &str) -> bool {
-    which_bin(bin)
+    which_bin(bin) || (bin == "codex" && crate::setup_models::managed_login().is_some())
 }
 
 /// Open a URL in the OS browser (best effort, used by `setup --web`).
