@@ -1,0 +1,26 @@
+    Blocking waiting for file lock on build directory
+    Checking libc v0.2.191
+    Checking webpki-roots v1.0.10
+    Checking crc32fast v1.5.3
+   Compiling rdsh v0.15.0 (/home/sahen/Projects/windows-migration/c1a2a17f4ca1-rustdsh)
+    Checking flate2 v1.1.10
+    Checking errno v0.3.14
+    Checking mio v1.2.4
+    Checking socket2 v0.6.5
+    Checking getrandom v0.2.17
+    Checking getrandom v0.4.3
+    Checking signal-hook-registry v1.4.8
+    Checking ring v0.17.14
+    Checking tokio v1.54.1
+    Checking rustls-webpki v0.103.16
+    Checking rustls v0.23.46
+    Checking hyper v1.12.0
+    Checking tower v0.5.3
+    Checking tokio-util v0.7.20
+    Checking tokio-rustls v0.26.6
+    Checking tower-http v0.6.11
+    Checking hyper-util v0.1.21
+    Checking hyper-rustls v0.27.10
+    Checking axum v0.8.9
+    Checking reqwest v0.12.28
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.15s

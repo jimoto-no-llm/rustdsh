@@ -63,6 +63,44 @@ impl HarnessAdapter for DshAdapter {
 
 #[cfg(test)]
 mod tests {
+    struct ExampleAdapter;
+    impl super::HarnessAdapter for ExampleAdapter {
+        fn resolve_binary(&self) -> Option<String> {
+            Some("example-harness".to_owned())
+        }
+        fn build_command(
+            &self,
+            options: &super::LaunchOptions,
+        ) -> anyhow::Result<super::BootedCommand> {
+            let mut command = std::process::Command::new(self.resolve_binary().unwrap());
+            command.args(&options.app_args);
+            Ok(super::BootedCommand {
+                command,
+                notices: vec!["example".to_owned()],
+            })
+        }
+    }
+    #[test]
+    fn independent_adapter_builds_without_dsh() {
+        let adapter: &dyn super::HarnessAdapter = &ExampleAdapter;
+        let options = super::LaunchOptions {
+            profile: "example".into(),
+            from_default: None,
+            patches: vec![],
+            app_args: vec!["literal argument".into()],
+            dry: true,
+            slim: false,
+            locale: crate::locale::Locale::English,
+        };
+        let booted = adapter.build_command(&options).unwrap();
+        assert_eq!(booted.command.get_program(), "example-harness");
+        assert_eq!(
+            booted.command.get_args().collect::<Vec<_>>(),
+            vec!["literal argument"]
+        );
+        assert_eq!(booted.notices, vec!["example"]);
+    }
+
     use super::*;
 
     #[test]
