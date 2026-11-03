@@ -27,6 +27,12 @@ export async function runRuntimeSmoke({ liveDevin = false, spawnImpl, workspace:
     new SystemPrompt(ctx, { includeHarnessIdentity: false });
     new ToolRuntime(ctx);
     new LocalFileSystem(ctx, { cwd: workspace, diffBasisMaxBytes: 1024 * 1024 });
+    // Newer filesystem tools resolve session cwd through this service. The
+    // isolated smoke has one fixed workspace, not a full session lifecycle.
+    ctx.provide('workingDirectory', { async ensure(agent) {
+      assert.equal(agent.session.header.cwd, workspace);
+      return workspace;
+    } });
     fsTools.apply(ctx, { readLimit: 100, readMaxLineLength: 1000, readMaxBytes: 4096, readStreamMinSize: 4096 });
     ctx.provide('approval', { async request(request) {
       approvalCount++;

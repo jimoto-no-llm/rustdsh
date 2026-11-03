@@ -1,8 +1,9 @@
 //! Shared trust checks for executables resolved from the environment.
 //!
 //! PATH-derived binaries must survive the same policy everywhere: a regular
-//! executable file whose own mode and whose parent directory are not
-//! group/world writable. Owner equality is additionally required for files
+//! executable file whose own mode and whose complete directory chains are trusted.
+//! Sticky shared directories are accepted only for protected child entries.
+//! Owner equality is additionally required for files
 //! under the user home tree because those locations are attacker-shapeable.
 use std::path::{Path, PathBuf};
 
@@ -19,11 +20,39 @@ pub(crate) fn untrusted_reason(path: &Path) -> Option<&'static str> {
     if metadata.mode() & 0o022 != 0 {
         return Some("group/world-writable");
     }
-    if let Some(parent) = path.parent() {
-        if let Ok(parent_metadata) = std::fs::metadata(parent) {
-            if parent_metadata.mode() & 0o022 != 0 {
-                return Some("directory is group/world-writable");
+    let Ok(resolved) = path.canonicalize() else {
+        return Some("cannot resolve executable");
+    };
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        let Ok(cwd) = std::env::current_dir() else {
+            return Some("cannot resolve executable");
+        };
+        cwd.join(path)
+    };
+    // Check both the selected path (including symlink placement) and its target.
+    for selected in [&absolute, &resolved] {
+        let mut child = selected.as_path();
+        while let Some(parent) = child.parent() {
+            let Ok(directory) = std::fs::metadata(parent) else {
+                return Some("cannot inspect executable directory");
+            };
+            let owner = directory.uid();
+            let uid = unsafe { libc::geteuid() };
+            if owner != 0 && owner != uid {
+                return Some("directory owned by another user");
             }
+            if directory.mode() & 0o022 != 0 {
+                // /tmp is safe only when sticky semantics protect the next
+                // component against replacement by other directory writers.
+                let protected_child =
+                    std::fs::symlink_metadata(child).is_ok_and(|m| m.uid() == 0 || m.uid() == uid);
+                if directory.mode() & 0o1000 == 0 || !protected_child {
+                    return Some("directory is group/world-writable");
+                }
+            }
+            child = parent;
         }
     }
     let home = std::env::var_os("HOME").map(PathBuf::from);
@@ -113,6 +142,35 @@ mod tests {
             untrusted_reason(&inside),
             Some("directory is group/world-writable")
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_writable_ancestors_and_symlink_target_directories() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let root = scratch("ancestors");
+        let shared = root.join("shared");
+        let bin = shared.join("nested/bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let tool = bin.join("tool");
+        std::fs::write(&tool, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(untrusted_reason(&tool), None);
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            untrusted_reason(&tool),
+            Some("directory is group/world-writable")
+        );
+        let link = root.join("linked-tool");
+        symlink(&tool, &link).unwrap();
+        assert_eq!(
+            untrusted_reason(&link),
+            Some("directory is group/world-writable")
+        );
+        // Sticky protection preserves private entries under /tmp-like roots.
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o1777)).unwrap();
+        assert_eq!(untrusted_reason(&tool), None);
         std::fs::remove_dir_all(root).unwrap();
     }
 

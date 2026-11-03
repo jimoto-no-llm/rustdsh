@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/main.rs (target/debug/deps/rdsh-f5382b6dfff0efd2)
+
+running 1 test
+test setup_web::tests::the_page_opens_off_a_terminal_but_never_in_a_headless_session ... FAILED
+
+failures:
+
+---- setup_web::tests::the_page_opens_off_a_terminal_but_never_in_a_headless_session stdout ----
+
+thread 'setup_web::tests::the_page_opens_off_a_terminal_but_never_in_a_headless_session' (78922) panicked at src/setup_web.rs:556:9:
+assertion `left == right` failed
+  left: true
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    setup_web::tests::the_page_opens_off_a_terminal_but_never_in_a_headless_session
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 863 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--bin rdsh`

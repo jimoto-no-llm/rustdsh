@@ -1,0 +1,59 @@
+test-direct-final
+✔ rejects duplicate IDs and empty response but permits final text (0.319622ms)
+✔ history keeps correlation IDs but excludes provider credentials and replay state (0.273445ms)
+✔ installed DSH runtime executes approved read and blocks rejected Devin before spawn (52.387456ms)
+✔ supplied workspace and its existing files survive fixture cleanup (8.415406ms)
+ℹ tests 66
+ℹ suites 0
+ℹ pass 66
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3048.973969
+
+test-muse-final
+✔ picker caches discovery once per mode and uses the CLI context/output/effort metadata (86.444585ms)
+✔ Muse picker metadata changes with saved language without changing provider, model, response or custom catalog data (289.242307ms)
+✔ an in-flight Muse catalog retains its requested locale when settings change (90.268937ms)
+✔ owned Muse failures retain codes and localize catalog and stream diagnostics (304.843356ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2177.940876
+
+test-sdk
+✔ a hung handshake times out and forced disposal leaves no live owned child (2107.867099ms)
+✔ RPC errors and individual request deadlines do not corrupt later traffic (78.245225ms)
+✔ abrupt runtime exit rejects both a pending request and a notification subscriber (24.074835ms)
+✔ close during a hung request is shared, reaps the child and rejects terminal reuse (226.288928ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2647.077114
+
+desktop-tests
+✔ first preparation refuses tracked edits and ignored generated destinations before writing (43.708273ms)
+✔ changed native binary, output hashes and marker inventories require a fresh checkout (55.658985ms)
+✔ dangling generated and marker symlinks cannot create files outside the checkout (88.230919ms)
+✔ a hard-linked source cannot modify its alias outside the checkout (33.065883ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 358.369288
+
+test-media-final
+npm notice run typecheck
+npm notice run tsc --noEmit

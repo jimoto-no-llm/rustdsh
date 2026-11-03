@@ -1,0 +1,159 @@
+ok: version string
+ok: doctor
+ok: tokens stdin
+ok: search
+ok: profiles
+ok: skills
+ok: logs
+ok: sessions
+ok: dump-native
+ok: launcher dump-config mode
+ok: launcher dump-default-config mode
+ok: launcher dump-config-schema mode
+ok: launcher dump preserves from-default profile
+ok: fixture dsh receives config dump
+ok: fixture dsh receives default dump
+ok: fixture dsh receives schema dump
+ok: fixture dsh receives from-default profile
+ok: boot dry-run
+ok: guard allow
+ok: guard block
+ok: reject desktop profile
+ok: desktop status
+ok: desktop status reports the profile
+ok: desktop status json
+ok: desktop install refuses an uninitialized profile
+ok: desktop verify fails without a profile
+ok: reject double profile
+ok: reject dump with args
+ok: reject plugin w/o args
+ok: plugin delegation dry-run
+ok: doctor reports smart-dsh
+ok: tokens numeric stdin
+ok: compact noop
+[rdsh] no model connection yet (first-run setup needed)
+[rdsh]   rdsh setup --web … connect in your browser (recommended; GPT subscription needs no API key)
+[rdsh]   subscriptions need no API key. See also rdsh auth / rdsh doctor
+[rdsh] tmp guard: removed 1 orphan snapshot dir(s) (0.0 MB) under /tmp/tmp.j4WsblgXAX/tmp
+ok: dsh-mode delegates
+ok: dsh-mode native
+[rdsh] no model connection yet (first-run setup needed)
+[rdsh]   rdsh setup --web … connect in your browser (recommended; GPT subscription needs no API key)
+[rdsh]   subscriptions need no API key. See also rdsh auth / rdsh doctor
+ok: RDSH_ORIG_BIN primary
+ok: no profile + no tui dir: guided error
+ok: dump-config without profile: guided error
+ok: RDSH_DEFAULT_PROFILE=web dry-run shows --profile web
+ok: local tui profile dir keeps tui as default
+ok: RDSH_DEFAULT_PROFILE beats local tui dir
+ok: general.default_profile beats local tui dir
+ok: RDSH_DEFAULT_PROFILE beats general.default_profile
+ok: explicit tui passes through verbatim
+ok: slim dry-run shows NODE_COMPILE_CACHE
+ok: passthrough adds no env
+ok: passthrough does not create the cache dir
+ok: RDSH_PASSTHROUGH=1 adds no cache env
+ok: RDSH_NODE_COMPILE_CACHE=0 opts out
+grep: warning: stray \ before "
+grep: warning: stray \ before "
+ok: RDSH_NODE_COMPILE_CACHE=<dir> relocates in dry-run
+ok: RDSH_NODE_COMPILE_CACHE=<dir> exec exports it and creates the dir
+ok: user NODE_COMPILE_CACHE respected (dry-run)
+ok: metadata exec passes the user's NODE_COMPILE_CACHE through
+ok: metadata exec exports NODE_COMPILE_CACHE and creates the dir
+ok: normal agent boot exports compile cache
+ok: strict agent boot refuses before creating a cache
+ok: doctor exits 1 when original dsh is missing
+ok: doctor resolves dsh under ~/.nvm outside PATH
+ok: doctor prints the pnpm build-script fix
+ok: doctor respects an approved pnpm policy
+ok: sessions --tokens exact from FCS (no ? marker)
+ok: sessions --tokens marks unknown size with ?
+ok: sessions --tokens probes the zstd CLI
+ok: one path-free zstd -dc call
+ok: zstd -dc streams only the frame without a content size
+ok: no zstd note when the CLI exists
+ok: zstd-missing note only when a fallback was needed
+ok: no zstd note when headers suffice
+ok: tokens cache: p/s2 is ? without zstd
+ok: tokens cache: zstd-less ? not cached (p)
+ok: tokens cache: p/s2 resolves once zstd exists
+ok: tokens cache: q/s2 is ? without zstd
+ok: tokens cache: zstd-less ? not cached (q)
+ok: tokens cache: q/s2 resolves once zstd exists
+ok: tokens cache: legacy null entry rechecked with zstd
+ok: doctor flags node-on-dsh wrapper
+ok: doctor flags broken dsh symlink
+ok: doctor flags wrapper with a removed node/dsh path
+ok: broken wrapper warnings keep doctor exit 0
+ok: doctor flags shadowed dsh without a backup
+ok: doctor accepts an existing dsh-orig backup
+ok: doctor flags a stale origin ledger
+ok: auth detects opencode login
+ok: auth import requires selection
+ok: auth sharing preview writes nothing
+ok: auth selected import writes record
+ok: auth import recognized
+ok: auth file mode 600
+ok: setup connected
+ok: setup needed on first run
+ok: agent tools default to normal file access
+ok: strict mode refuses unsupported runtime
+ok: checked-in digest registry validates and rejects unknown version
+ok: pinned latest release installs without a sidecar
+ok: pinned musl release installs
+ok: same-origin sidecar cannot replace the repository digest
+ok: checksum bypass refuses to run without a terminal
+ok: checksum bypass requires an exact YES response
+ok: confirmed interactive bypass works
+ok: archive traversal entry is refused before extraction
+ok: a remote release base cannot supply its own digest registry
+ok: a file:// release base honours the local digest registry (control)
+ok: a multi-line release version is refused before it reaches the URL
+ok: install.ps1 keeps the canonical Windows registry, refuses unpinned assets, and gates the bypass
+ok: the Unix ledger stays Unix-only and the Windows ledger is Windows-only
+ok: installer release integrity
+PASS: pinned rustup-init URL, arguments, checksum, and fail-closed behavior
+ok: rustup-init pinned checksum
+ok: install: getconf fallback glibc 2.41 picks gnu
+ok: install: getconf fallback glibc 2.31 picks musl
+ok: install: ldd glibc 2.36 below the release floor picks musl
+ok: install: ldd glibc 2.41 picks gnu
+ok: install: --musl forces musl
+ok: auth keeps api-key records
+ok: hostile same-origin archive with a self-computed sidecar is refused
+ok: pinned release archive installs (control)
+ok: plain http release base is refused before any fetch
+ok: RDSH_TEST_INSECURE_BASE=1 control installs from the same base
+ok: a release fetch redirected onto plain http is not followed
+ok: unreachable digest registry refuses the update
+ok: invalid digest registry refuses the update
+ok: release without a registry row refuses the update
+ok: automatic sync preserves 10.0.0 before archive download
+ok: automatic sync preserves 9.10.0-rc.1 before archive download
+ok: automatic sync preserves 9.9.10 before archive download
+ok: automatic sync allows stable target over 9.9.9
+ok: automatic sync allows stable target over 9.9.9-rc.1
+ok: automatic sync allows stable target over 9.9.9+fixture
+ok: automatic sync allows stable target over 9.9.8
+ok: automatic sync preserves unknown before archive download
+ok: an explicitly pinned older release remains an intentional rollback
+ok: the newest ~/.local/opt DSH tree is discovered without npm root -g
+ok: DSH_PKG_ROOT selects the tree to inspect
+ok: an npm-unmanaged DSH tree is refreshed in place through its prefix
+ok: a non-prefix DSH tree is reported and left alone
+ok: a missing DSH tree skips DSH and still installs the release
+ok: an outdated copy is replaced and re-executed once
+ok: RDSH_SYNC_SELF_UPDATE=0 keeps the installed copy
+ok: --check-only leaves the copy as it is
+ok: digest registry origin is a fixed literal and archives are version-pinned
+sync-release-integrity: ALL PASS
+ok: sync-dsh release integrity
+ok: sync-dsh release update with pinned digest
+ok: sync-dsh unchanged release preserves notification state
+ok: sync-dsh changed payload updates even with the same version label
+ok: sync-dsh refuses mismatched pinned digest
+ok: sync-dsh refuses a release without a pinned digest
+ok: sync-dsh refuses an invalid digest registry
+curl: (28) Operation timed out after 5002 milliseconds with 0 bytes received
+FAIL(output): setup --web unauthed status
