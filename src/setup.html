@@ -644,6 +644,7 @@ function renderFinish() {
   var starts = $("starts"); starts.replaceChildren();
   $("finish-cmd-hint").hidden = !env.dsh.found;
   $("finish-cmd").hidden = !env.dsh.found;
+  if ($("finish-cmd")) { var code = $("finish-cmd").querySelector("code"); if (code) code.textContent = env.tui ? "rdsh tui" : "rdsh --profile web"; }
   if (!connected) {
     var link = el("button", "primary", t("AIをつなぐ", "Connect an AI", "连接 AI"));
     link.onclick = function () { go("connect"); };
@@ -661,8 +662,8 @@ function renderFinish() {
   var chosenModel = window.rdshProvisionSelection && window.rdshProvisionSelection();
   if (env.desktop && !chosenModel) starts.append(startButton("desktop", t("DeepSeek Harness アプリを開く", "Open the DeepSeek Harness app", "打开 DeepSeek Harness 应用"), t("いちばん簡単です", "The easiest way", "最简单的方式"), true));
   if (env.dsh.found) {
-    if (!chosenModel || chosenModel.profiles.indexOf("tui") >= 0) starts.append(startButton("tui", t("ターミナルで会話をはじめる", "Chat in a terminal", "在终端中对话"), t("Codex や Claude Code と同じ使い方です", "Works like Codex or Claude Code", "用法与 Codex、Claude Code 相同"), !env.desktop || !!chosenModel));
-    if (!chosenModel || chosenModel.profiles.indexOf("web") >= 0) starts.append(startButton("web", t("ブラウザで使う", "Use it in your browser", "在浏览器中使用"), t("画面で操作したい方に", "If you prefer a visual interface", "适合喜欢图形界面的用户"), !!chosenModel && chosenModel.profiles.indexOf("tui") < 0));
+    if (env.tui && (!chosenModel || chosenModel.profiles.indexOf("tui") >= 0)) starts.append(startButton("tui", t("ターミナルで会話をはじめる", "Chat in a terminal", "在终端中对话"), t("Codex や Claude Code と同じ使い方です", "Works like Codex or Claude Code", "用法与 Codex、Claude Code 相同"), !env.desktop || !!chosenModel));
+    if (!chosenModel || chosenModel.profiles.indexOf("web") >= 0) starts.append(startButton("web", t("ブラウザで使う", "Use it in your browser", "在浏览器中使用"), t("画面で操作したい方に", "If you prefer a visual interface", "适合喜欢图形界面的用户"), !env.tui || (!!chosenModel && chosenModel.profiles.indexOf("tui") < 0)));
   }
   var model = (STATUS && STATUS.defaults || []).filter(function (d) { return d.state === "ok"; })[0];
   $("model-line").textContent = model ? t("使うモデル：", "Model: ", "使用模型：") + model.provider + " / " + model.model : "";

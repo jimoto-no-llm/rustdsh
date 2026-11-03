@@ -30,6 +30,7 @@ pub fn env_json() -> String {
             "supported": node_major.is_some_and(|m| m >= 22),
         },
         "npm": crate::auth::command_on_path("npm"),
+        "tui": std::path::Path::new(&crate::inspect::dsh_home()).join("profiles/tui").is_dir(),
         "pnpm": crate::auth::command_on_path("pnpm") || crate::setup_models::root().is_ok_and(|p|p.join("bin").join(if cfg!(windows){"pnpm.cmd"}else{"pnpm"}).is_file()),
         "codex": crate::auth::command_on_path("codex"),
         "opencode": crate::auth::command_on_path("opencode"),
@@ -87,6 +88,13 @@ pub fn start_chat(kind: &str) -> anyhow::Result<()> {
                 .map(|_| ())
         }
         "tui" | "web" => {
+            anyhow::ensure!(
+                kind != "tui"
+                    || std::path::Path::new(&crate::inspect::dsh_home())
+                        .join("profiles/tui")
+                        .is_dir(),
+                "terminal profile is not installed; choose the browser option"
+            );
             anyhow::ensure!(
                 crate::passthrough::find_original_dsh().is_some(),
                 "DeepSeek Harness (dsh) is not installed"

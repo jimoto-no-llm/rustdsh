@@ -1,6 +1,6 @@
 # 初回の自動準備の検証
 
-2026-11-04 に Linux x64 で検証しました。画面は日本語、1280px と 390px 幅です。
+2026-11-04 に Linux x64 で検証しました。画面は日本語、1280px と 390px 幅です。変更前の画面は main の b6aac05b を使っています。
 
 ## 実配布物の確認
 
@@ -19,15 +19,17 @@
 追加で専用 Ollama のチャット API に短い入力を送り、ローカルモデルから `OK` の完了応答を確認しました。
 クラウドへの推論リクエストは送っていません。
 
+DSH alpha.3 の新規環境では TUI プロファイルがないことも確認しました。未導入の TUI を起動ボタンで案内せず、Web を優先します。
+
 ## 自動テスト
 
-- `sh scripts/check.sh quick`：fmt / clippy 警告ゼロ / Rust 1229 tests。
+- `sh scripts/check.sh quick`：fmt / clippy 警告ゼロ / Rust 1233 tests。
 - `tests/regress.sh`：117 checks、および doctor のパイプ切断テスト。
 - リリース関連 Python：154 tests。テスト用 Git リポジトリのみ tag.gpgsign=false を指定。
 - `scripts/crate-release.py check`：Windows インストーラを含むコンパイル入力が梱包されています。
 - `tests/runtime-bootstrap.sh`：pnpm 未導入、空白・引用符を含む HOME、native-only、改ざん Node アーカイブの拒否。
 - Node のカタログ / セキュリティ境界テスト：16 pass、実ランタイム用の未指定 fixture は 6 skip。
-- `tests/e2e/setup-provision.mjs`：12 checks。二重開始防止、進行状況、中止・再試行、
+- `tests/e2e/setup-provision.mjs`：16 checks。二重開始防止、進行状況、中止・再試行、
   モデル選択、既存接続の自動選択、プロファイルに応じた起動ボタン、390px 幅の横あふれなし。
 
 ブラウザテストは実際の HTML / JavaScript と模擬 API 応答を使います。
