@@ -19,22 +19,24 @@ An independent community project; not an official DeepSeek or DeepSeek Harness p
 
 The delegated harness sits behind a swappable adapter layer; the bundled [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness) adapter delegates transparently to upstream `dsh`, and model routing via `rdsh provider` already speaks OpenAI-compatible endpoints and local inference (Ollama / llama.cpp). See [docs/HARNESS-ADAPTER.md](docs/HARNESS-ADAPTER.md) for the adapter seam. All existing arguments and options continue to work as-is.
 
-## For AI agents
+## Install with an AI agent
 
-Paste this before you ask an agent to work on this repository.
+Copy the prompt below into your AI agent to get help from installation through your first conversation.
 
 ```text
-You are working on rdsh, a Rust launcher for dsh (DeepSeek Harness).
-- Native subcommands run in Rust. Every other argument is passed to upstream dsh unchanged.
-- A booted profile still runs Node.js, so conversations start and cost memory like upstream. Do not claim rdsh makes them faster or lighter.
-- Read AGENTS.md before editing. Do not touch credentials, published release assets or published tags.
-- Verify with: cargo fmt --check, cargo clippy -- -D warnings, cargo test.
-- Report only commands you actually ran, with their exit codes.
+Install rustdsh (command name: rdsh) on this computer and help me start my first conversation.
+First, read this entire setup guide and follow its steps:
+https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
+
+- Check my OS, shell and existing installation; install only what is needed.
+- After installing and verifying rdsh, open rdsh setup --web first.
+- Help me choose and configure exactly one model connection.
+- Once connected, run rdsh plugins install --recommended=starter, then start a conversation with rdsh tui.
+- Never display API keys or login credentials in chat or logs, and preserve existing settings.
+- Proceed one step at a time and report only verified results. If a step fails, stop and explain the cause and next step.
 ```
 
-Setting up a person who has never used a CLI? Read [docs/SETUP.md](docs/SETUP.md) top to
-bottom first, follow its order, and answer questions from this README and `docs/` rather
-than guessing.
+To follow the instructions yourself, open the [setup guide](docs/SETUP.md).
 
 ## Why rdsh?
 
@@ -862,7 +864,7 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999), [cyrne1-7208](https://github.com/cyrne1-7208)
 - AI provision: [StudioYebisu](https://github.com/yebisu0529-ship-it), Eureka ([@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM))
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
-- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([@_ryu15_](https://x.com/_ryu15_)); the upstream [v1.0.0 release](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
+- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)); the upstream [v1.0.0 release](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
 - Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
 
 Third-party DSH plugins that rdsh uses, adapts or recommends (MIT, by their
@@ -871,7 +873,7 @@ authors):
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama — the
   phone-width layout bundled as
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)
-- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([@_ryu15_](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.0 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
+- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.0 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by
   cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
 - [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
