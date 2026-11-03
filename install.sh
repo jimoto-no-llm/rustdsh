@@ -813,6 +813,8 @@ install_agent_runtime() {
 }
 
 preflight_runtime() {
+  # Default installs prepare these automatically below; avoid contradictory manual steps.
+  [ "${RDSH_SKIP_RUNTIME:-0}" = 1 ] || return 0
   # rdsh is one native binary; conversations and agent runs delegate to the
   # original dsh, which needs Node.js 22+. Native commands keep working without
   # either one, so these stay notes.
@@ -851,9 +853,10 @@ preflight_checks() {
 configure_user_path() {
   [ "${RDSH_SKIP_RUNTIME:-0}" != 1 ] || return 0
   case ":$INSTALL_INITIAL_PATH:" in *":$PREFIX:"*) return 0 ;; esac
-  local env_file="$HOME/.config/rdsh/env" startup="" line="" quoted=""
+  local env_file="$HOME/.config/rdsh/env" startup="" line="" quoted="" env_line=""
   quoted="$(printf '%s' "$PREFIX" | sed "s/'/'\\\\''/g")"
-  printf "export PATH='%s':\$PATH\n" "$quoted" > "$env_file"
+  env_line="export PATH='$quoted':\$PATH # rdsh install PATH"
+  if ! grep -Fqx "$env_line" "$env_file" 2>/dev/null; then printf '\n%s\n' "$env_line" >> "$env_file"; fi
   quoted="$(printf '%s' "$env_file" | sed "s/'/'\\\\''/g")"
   line=". '$quoted' # rdsh user PATH"
   for startup in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do

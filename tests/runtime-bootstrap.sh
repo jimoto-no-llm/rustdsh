@@ -54,6 +54,8 @@ case "${1:-}" in --version) echo 'rdsh 0.15.0' ;; doctor) echo 'fixture healthy'
 RDSH
 chmod +x "$T/bin/cargo" "$T/repo/target/release/rdsh"
 printf '# keep my settings\n' > "$T/shell home'quote/.zshrc"
+mkdir -p "$T/shell home'quote/.config/rdsh"
+printf 'CUSTOM_SETUP_MARKER=kept\n' > "$T/shell home'quote/.config/rdsh/env"
 for attempt in 1 2; do
   (cd "$T/repo" && HOME="$T/shell home'quote" PATH="$T/bin" CI=1 RDSH_SKIP_RUNTIME=0 RDSH_SKIP_PLUGINS=1 DSH_ORIG_BIN= RDSH_ORIG_BIN= bash ./install.sh --no-setup --prefix="$T/shell home'quote/bin'quote") > "$T/full-install-$attempt" 2>&1
  done
@@ -61,6 +63,9 @@ for startup in .profile .bashrc .zshrc; do
   [ "$(grep -c '# rdsh user PATH' "$T/shell home'quote/$startup")" = 1 ]
 done
 grep -q '# keep my settings' "$T/shell home'quote/.zshrc"
+grep -q 'CUSTOM_SETUP_MARKER=kept' "$T/shell home'quote/.config/rdsh/env"
+[ "$(grep -c '# rdsh install PATH' "$T/shell home'quote/.config/rdsh/env")" = 1 ]
+! grep -q 'npm install -g' "$T/full-install-1"
 resolved="$(HOME="$T/shell home'quote" PATH="$T/bin" sh -c '. "$HOME/.config/rdsh/env"; command -v rdsh')"
 [ "$resolved" = "$T/shell home'quote/bin'quote/rdsh" ]
 echo 'PASS: full install persists a quoted PATH once and retains shell settings'
