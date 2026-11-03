@@ -33,6 +33,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - DSH `0.2.2-alpha.3` の厳格ツール境界に対応。公開版の入口とツール本体の
   SHA256 を固定し、正確な版の組み合わせと実ランタイムの検証を追加しました。
 
+- 初回セットアップから実行環境とローカルモデルを自動導入できるようにしました。
+  pnpm を先に用意する必要がなくなり、既存のクラウド接続からのモデル選択、
+  ChatGPT ログインツールの準備、進行状況・中止・再試行も画面で扱えます。
+  詳細は [自動準備](docs/AUTO-PROVISION.md) を参照してください。
+
 ## [0.15.1] - 2026-11-04
 
 ### Fixed
@@ -62,6 +67,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - 状態移行の dry-run が旧形式の state と整合性ファイルを書き換える不具合を修正し、
   初回の移行と元データへの復元を可能にしました。移行後の schema 2 でも
   プロジェクト移動が履歴を保ったまま使えます。
+### Added
+
+- 初回セットアップから実行環境とローカルモデルを自動導入できるようにしました。
+  pnpm を先に用意する必要がなくなり、既存のクラウド接続からのモデル選択、
+  ChatGPT ログインツールの準備、進行状況・中止・再試行も画面で扱えます。
+  詳細は [自動準備](docs/AUTO-PROVISION.md) を参照してください。
 
 ## [0.15.0] - 2026-10-31
 
