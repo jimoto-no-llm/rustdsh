@@ -725,12 +725,16 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 - 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)、[cyrne1-7208](https://github.com/cyrne1-7208)
 - AI 提供: [StudioYebisu](https://github.com/yebisu0529-ship-it)、Eureka（[@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM)）
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
+- モバイル UI・PWA・Web Push 通知: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) の作者 [Ryu（kuraneko1）](https://github.com/kuraneko1) さん（X: [@_ryu15_](https://x.com/_ryu15_)）。[公開版 v1.0.0](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) を Web/desktop の必須プラグインとして同梱しています（[第三者表示](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)）。
 - 標準搭載の Web UI プラグイン（許諾済み、MIT）：[cwd514](https://github.com/cwd514) さんの [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（(c) 2026、効果音・デスクトップ通知）、[yugapor](https://github.com/yugapor) さんの [dsh-gitview](https://github.com/yugapor/dsh-gitview)（(c) 2026、差分・履歴・CI付き Git パネル）。どちらもインストール時に上流 GitHub から取得します（詳細は `plugins/recommended.md`）。
 
 rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）。
 
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）:
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
+- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing)（[Ryu / kuraneko1](https://github.com/kuraneko1)、X: [@_ryu15_](https://x.com/_ryu15_)）:
+  v1.0.0 を必須プラグインとして同梱（PWA・スマホ/タブレット向け UI・アプリ内通知・Web Push 通知）。
+  同梱の `dsh-md-rendering` と `dsh-locale-ja` は別パッケージで、標準で自動登録されるわけではありません
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）:
   推奨プラグイン `sound`（効果音とデスクトップ通知）。web/desktop では既定で導入し、
   `--recommended=none`／`SOUND=0`／`features.sound=false` でスキップできます
