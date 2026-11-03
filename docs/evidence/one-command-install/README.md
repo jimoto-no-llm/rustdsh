@@ -52,4 +52,4 @@ Windows の実導入は `tests/runtime-bootstrap.ps1` を Windows CI で確認�
 
 - progress: “Use a native `<progress>` element” — label を関連付け、未確定時は value を外します。
 - forms: “use `<fieldset>` and `<legend>` to group related controls.” — モデルの大きさをネイティブのラジオボタンで選びます。
-- accessibility: “Prefer native HTML elements and attributes to ARIA” — button / label / select と控えめな状態通知を使います。
+- accessibility: “Prefer HTML elements and attributes to ARIA” — button / label / select と控えめな状態通知を使います。
