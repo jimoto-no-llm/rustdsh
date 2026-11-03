@@ -5,6 +5,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- DSH `0.2.2-alpha.3` の厳格ツール境界に対応。公開版の入口とツール本体の
+  SHA256 を固定し、正確な版の組み合わせと実ランタイムの検証を追加しました。
+
 ## [0.15.0] - 2026-10-31
 
 ### Added
