@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "9.8.2",
-    "@remotion/cli": "4.0.538",
+    "@remotion/cli": "4.0.539",
     "@remotion/three": "4.0.538",
     "@remotion/transitions": "4.0.538",
     "@types/three": "0.186.0",
