@@ -22,18 +22,24 @@
 
 本書のクイックスタートは、いま `dsh` や OpenCode・Codex CLI などの別のハーネスをお使いの方に向けて、本家 `dsh` と `rdsh` を導入する順序を案内します。すでに `dsh` を入れている方は、手順 A を飛ばして構いません。
 
-## AI エージェント向け
+## AI に導入を任せる
 
-このリポジトリでエージェントに作業させる前に、次を貼ってください。
+次をコピーして、お使いの AI エージェントに貼ってください。初めて使う方も、導入から最初の会話まで案内してもらえます。
 
 ```text
-あなたは rdsh（dsh 用の Rust 製ランチャー）で作業しています。
-- ネイティブのサブコマンドだけが Rust で動きます。それ以外の引数は本家 dsh へそのまま渡ります。
-- プロファイルを起動すると本家の Node.js が動くので、対話の起動時間とメモリは本家と同じです。rdsh が対話を速く・軽くすると書かないでください。
-- 編集の前に AGENTS.md を読んでください。認証情報、公開済みのリリース成果物、公開済みのタグには触らないでください。
-- 検証は cargo fmt --check、cargo clippy -- -D warnings、cargo test で行ってください。
-- 実際に実行したコマンドだけを、終了コードと一緒に報告してください。
+この PC に rustdsh（コマンド名 rdsh）を導入し、最初の会話を始められる状態にしてください。
+最初に、次の手順書を全文読んで、その順序に従ってください。
+https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
+
+- OS とシェル、既存のインストールを確認し、必要なものだけを導入してください。
+- rdsh の導入・動作確認後、まず rdsh setup --web を開いてください。
+- モデルの接続先を私と相談して1つだけ設定してください。
+- 接続を確認したら rdsh plugins install --recommended=starter を実行し、最後に rdsh tui で会話を始めてください。
+- API キーやログイン情報をチャットやログに表示せず、既存の設定は消さないでください。
+- 1ステップずつ進め、実際に確認した結果だけを報告してください。失敗したら止めて、原因と次の手順を伝えてください。
 ```
+
+手順を自分で確認する場合は [セットアップ手順書](docs/SETUP.md) を開いてください。
 
 ## rdsh を選ぶ理由
 
@@ -725,14 +731,14 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 - 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)、[cyrne1-7208](https://github.com/cyrne1-7208)
 - AI 提供: [StudioYebisu](https://github.com/yebisu0529-ship-it)、Eureka（[@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM)）
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
-- モバイル UI・PWA・Web Push 通知: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) の作者 [Ryu（kuraneko1）](https://github.com/kuraneko1) さん（X: [@_ryu15_](https://x.com/_ryu15_)）。[公開版 v1.0.0](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) を Web/desktop の必須プラグインとして同梱しています（[第三者表示](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)）。
+- モバイル UI・PWA・Web Push 通知: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) の作者 [Ryu（kuraneko1）](https://github.com/kuraneko1) さん（X: [`@_ryu15_`](https://x.com/_ryu15_)）。[公開版 v1.0.0](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) を Web/desktop の必須プラグインとして同梱しています（[第三者表示](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)）。
 - 標準搭載の Web UI プラグイン（許諾済み、MIT）：[cwd514](https://github.com/cwd514) さんの [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（(c) 2026、効果音・デスクトップ通知）、[yugapor](https://github.com/yugapor) さんの [dsh-gitview](https://github.com/yugapor/dsh-gitview)（(c) 2026、差分・履歴・CI付き Git パネル）。どちらもインストール時に上流 GitHub から取得します（詳細は `plugins/recommended.md`）。
 
 rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）。
 
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）:
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
-- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing)（[Ryu / kuraneko1](https://github.com/kuraneko1)、X: [@_ryu15_](https://x.com/_ryu15_)）:
+- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing)（[Ryu / kuraneko1](https://github.com/kuraneko1)、X: [`@_ryu15_`](https://x.com/_ryu15_)）:
   v1.0.0 を必須プラグインとして同梱（PWA・スマホ/タブレット向け UI・アプリ内通知・Web Push 通知）。
   同梱の `dsh-md-rendering` と `dsh-locale-ja` は別パッケージで、標準で自動登録されるわけではありません
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）:
