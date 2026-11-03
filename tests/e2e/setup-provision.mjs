@@ -93,6 +93,7 @@ try {
   assert.deepEqual(posts,[{action:'select',provider:'openai-codex',model:'fixture-mini'}]); checks++;
   selected={...choices[0]};job={running:false,ready:true,phase:'complete',action:'select'};
   await page.waitForFunction(() => document.querySelector('#model-line').textContent.includes('fixture-mini'));
+  await page.waitForFunction(() => !Array.from(document.querySelectorAll('#starts button')).some(b => b.textContent.startsWith('ターミナルで会話をはじめる')));
   assert.equal(await page.getByRole('button',{name:/^ターミナルで会話をはじめる/}).count(),0); checks++;
   assert.deepEqual(errors,[]); checks++;
   console.log(`PASS: ${checks} setup UX checks; desktop/mobile screenshots: ${artifacts}`);
