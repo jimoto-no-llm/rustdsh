@@ -864,7 +864,7 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999), [cyrne1-7208](https://github.com/cyrne1-7208)
 - AI provision: [StudioYebisu](https://github.com/yebisu0529-ship-it), Eureka ([@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM))
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
-- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([@_ryu15_](https://x.com/_ryu15_)); the upstream [v1.0.0 release](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
+- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)); the upstream [v1.0.0 release](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
 - Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
 
 Third-party DSH plugins that rdsh uses, adapts or recommends (MIT, by their
@@ -873,7 +873,7 @@ authors):
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama — the
   phone-width layout bundled as
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)
-- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([@_ryu15_](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.0 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
+- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.0 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by
   cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
 - [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
