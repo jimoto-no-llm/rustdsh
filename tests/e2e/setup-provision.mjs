@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 const artifacts = resolve(process.env.RDSH_SETUP_EVIDENCE || 'target/e2e/setup-provision');
 await mkdir(artifacts, {recursive: true});
 const html = (await readFile('src/setup.html', 'utf8')).replaceAll('__RDSH_LOCALE__', 'ja');
-const before = execFileSync('git', ['show', 'HEAD:src/setup.html'], {encoding:'utf8'}).replaceAll('__RDSH_LOCALE__', 'ja');
+const before = execFileSync('git', ['show', `${process.env.RDSH_SETUP_BEFORE_REF || 'HEAD'}:src/setup.html`], {encoding:'utf8'}).replaceAll('__RDSH_LOCALE__', 'ja');
 const js = await readFile('src/setup-provision.js', 'utf8');
 const server = createServer((req, res) => {
   if (req.url === '/icon.png') { readFile('assets/icon-256.png').then(data => {res.setHeader('Content-Type','image/png');res.end(data);}); return; }
@@ -24,12 +24,12 @@ try {
   await context.addInitScript(() => sessionStorage.setItem('rdsh_setup_token','fixture-only'));
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  let ready = false, posts = [], selected = null, job = {}, choices = [], connected = false;
+  let ready = false, tui = false, posts = [], selected = null, job = {}, choices = [], connected = false;
   await page.route('**/api/**', async route => {
     const req = route.request(), path = new URL(req.url()).pathname;
     let response = {};
     if (path === '/api/status') response = {needed:!connected, defaults:[], refs_stored:[], records:[], sharing:{inventory:[]}};
-    if (path === '/api/env') response = {rdsh:'0.15.0', node:{found:ready,supported:ready},pnpm:ready,dsh:{found:ready},codex:false,opencode:false};
+    if (path === '/api/env') response = {rdsh:'0.15.0', node:{found:ready,supported:ready},pnpm:ready,dsh:{found:ready},codex:false,opencode:false,tui};
     if (path === '/api/provision') {
       if (req.method() === 'POST') {
         const body = req.postDataJSON(); posts.push(body);
@@ -75,10 +75,16 @@ try {
   selected={provider:'rdsh-local',model:'qwen3:1.7b',profiles:['web','tui']};
   job={running:false,ready:true,phase:'complete',action:'local-model'};
   await page.waitForSelector('#step-finish:not([hidden])');
+  assert.equal(await page.locator('.provision-progress').isVisible(),false); checks++;
   assert.match(await page.locator('#model-line').textContent(),/qwen3:1.7b/); checks++;
+  assert.equal(await page.getByRole('button',{name:/^ターミナルで会話をはじめる/}).count(),0); checks++;
+  assert.equal(await page.getByRole('button',{name:/^ブラウザで使う/}).count(),1); checks++;
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(artifacts,'after-mobile.png'),fullPage:true});
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth),true); checks++;
+  tui=true;
+  await page.evaluate(async () => {await loadEnv();renderFinish();});
+  assert.equal(await page.getByRole('button',{name:/^ターミナルで会話をはじめる/}).count(),1); checks++;
   // Existing accounts choose a catalog model automatically, preserving profile scope.
   posts=[]; selected=null; job={}; connected=true;
   choices=[{provider:'openai-codex',model:'fixture-mini',profiles:['web']}];
@@ -87,7 +93,7 @@ try {
   assert.deepEqual(posts,[{action:'select',provider:'openai-codex',model:'fixture-mini'}]); checks++;
   selected={...choices[0]};job={running:false,ready:true,phase:'complete',action:'select'};
   await page.waitForFunction(() => document.querySelector('#model-line').textContent.includes('fixture-mini'));
-  assert.equal(await page.getByRole('button',{name:'ターミナルで会話をはじめる',exact:true}).count(),0); checks++;
+  assert.equal(await page.getByRole('button',{name:/^ターミナルで会話をはじめる/}).count(),0); checks++;
   assert.deepEqual(errors,[]); checks++;
   console.log(`PASS: ${checks} setup UX checks; desktop/mobile screenshots: ${artifacts}`);
   await context.close();

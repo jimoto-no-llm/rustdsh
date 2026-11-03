@@ -92,7 +92,7 @@
     panel.hidden = !!(ENV && ENV.node && ENV.node.supported && ENV.dsh.found && ENV.pnpm);
     [runtimeButton, localButton, cloudButton, cloudSelect].forEach(function (button) { button.disabled = running || busy; });
     fieldset.disabled = running || busy;
-    progressBox.hidden = !running && !job.error && !job.ready;
+    progressBox.hidden = !running && !job.error;
     progress.hidden = !running;
     progressLabel.textContent = t.apply(null, phases[job.phase] || phases.preparing);
     cancel.hidden = !running; cancel.disabled = job.phase === "cancelling"; retry.hidden = running || !job.error || !lastRequest;
@@ -141,6 +141,7 @@
     if (state && state.job && state.job.running) poll = setTimeout(refresh, 1000);
     else if (state && state.job && state.job.ready && lastRequest) {
       var completed = lastRequest; lastRequest = null;
+      toast(t("準備ができました", "Ready", "准备就绪"));
       await loadEnv(); await load();
       if (completed.action === "codex") {
         try { await api("POST", "/api/login", {tool:"codex"}); pendingLogin = "codex"; renderOptions(); }
