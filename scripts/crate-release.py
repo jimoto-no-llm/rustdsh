@@ -34,7 +34,7 @@ USER_AGENT = "rdsh-crate-release (+https://github.com/jimoto-no-llm/rustdsh)"
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Compile-time inputs. `build.rs`, `assets/` (icon, .rc), `security/` (preload
-# and isolation scripts), `install.sh`, and the SearXNG compose project
+# and isolation scripts), `install.sh` / `install.ps1`, and the SearXNG compose project
 # (`docker/`, `docker-compose.searxng.yml`, embedded so an installed binary can
 # start the local instance) are read by include_str!, include_bytes! or
 # embed-resource, so a crate without them does not build.
