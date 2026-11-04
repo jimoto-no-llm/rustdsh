@@ -1,10 +1,11 @@
 use super::super::{
-    engine::{Message, Pending, State},
+    engine::{Engine, Message, Pending, State},
     profiles, sdk,
 };
 use super::*;
 use ratatui::backend::TestBackend;
 use std::sync::Mutex;
+use tokio::runtime::Runtime;
 fn engine() -> Arc<Engine> {
     Arc::new(Engine {
         state: Mutex::new(State::default()),
@@ -19,7 +20,7 @@ fn engine() -> Arc<Engine> {
     })
 }
 fn ready_app(engine: &Engine) -> App {
-    let mut app = App::new(engine);
+    let mut app = App::new(engine.providers());
     app.set_size(100, 32);
     app
 }
@@ -31,6 +32,9 @@ fn runtime() -> Arc<Runtime> {
             .build()
             .unwrap(),
     )
+}
+fn backend(engine: &Arc<Engine>) -> NativeBackend {
+    NativeBackend::new(engine.clone(), runtime())
 }
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
@@ -85,7 +89,7 @@ fn layout_adapts_without_panics_and_renders_unicode_and_overlays() {
 #[test]
 fn approval_defaults_to_deny_and_is_tied_to_visible_id() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     {
@@ -107,9 +111,9 @@ fn approval_defaults_to_deny_and_is_tied_to_visible_id() {
     assert!(output.contains("日本語.txt"));
     assert!(!app.allow);
     assert!(rx.try_recv().is_err());
-    app.key(key(KeyCode::Char('y')), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Char('y')), &snapshot, &backend);
     assert!(rx.try_recv().is_err(), "typing y must not auto-approve");
-    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Enter), &snapshot, &backend);
     assert!(!rx.try_recv().unwrap());
     assert_eq!(app.editor.text, "preserved draft");
     // A stale view cannot approve a new request; a new ID resets to deny.
@@ -126,18 +130,18 @@ fn approval_defaults_to_deny_and_is_tied_to_visible_id() {
         state.decision = Some(tx);
     }
     app.allow = true;
-    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Enter), &snapshot, &backend);
     assert!(rx.try_recv().is_err());
     app.sync_pending(&engine.snapshot());
     assert!(!app.allow);
-    app.key(key(KeyCode::Tab), &engine.snapshot(), &engine, &runtime);
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(rx.try_recv().unwrap());
 }
 #[test]
 fn editor_history_model_filter_and_scrolling_preserve_drafts() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     app.history = vec!["previous".into()];
     app.editor.insert("draft");
@@ -153,7 +157,7 @@ fn editor_history_model_filter_and_scrolling_preserve_drafts() {
         query.insert("composer");
     }
     assert_eq!(app.filtered_models().len(), 1);
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(matches!(app.overlay, Overlay::None));
     assert_eq!(app.editor.text, "draft");
     app.max_scroll = 30;
@@ -183,91 +187,122 @@ fn localized_cli_includes_native_terminal_command() {
 #[test]
 fn slash_menu_completion_execution_and_errors_stay_local() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     app.editor.insert("/");
     assert_eq!(app.command_candidates().len(), commands::COMMANDS.len());
     let output = render(&mut app, &engine.snapshot(), 80, 24);
     assert!(output.contains("コマンド"));
     assert!(output.contains("/status"));
-    app.key(key(KeyCode::Down), &engine.snapshot(), &engine, &runtime);
-    app.key(key(KeyCode::Tab), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Down), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
     assert_eq!(app.editor.text, "/model ");
     assert!(!app.palette_open());
     assert!(engine.state.lock().unwrap().messages.is_empty());
     app.editor.clear();
     app.editor.insert("/sta");
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(matches!(app.overlay, Overlay::Status));
     assert!(app.editor.text.is_empty());
-    app.key(key(KeyCode::Esc), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Esc), &engine.snapshot(), &backend);
     app.editor.insert("/unknown");
-    app.submit(&engine, &runtime);
+    app.submit(&backend);
     assert!(app.notice.contains("不明なコマンド"));
     assert_eq!(app.editor.text, "/unknown");
     assert!(engine.state.lock().unwrap().messages.is_empty());
     app.editor.clear();
     app.editor.insert("/model extra");
-    app.submit(&engine, &runtime);
+    app.submit(&backend);
     assert!(app.notice.contains("使い方"));
     assert_eq!(engine.state.lock().unwrap().model, "composer-2.5");
     app.editor.clear();
     app.editor.insert("/logs");
-    app.submit(&engine, &runtime);
+    app.submit(&backend);
     assert!(matches!(app.overlay, Overlay::Logs));
     assert!(render(&mut app, &engine.snapshot(), 42, 14).contains("実行ログ"));
 }
 #[test]
 fn slash_new_requires_confirmation_and_rejects_running_work() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     engine.state.lock().unwrap().messages.push(Message {
         role: "user".into(),
         content: "keep me".into(),
     });
     app.editor.insert("/new");
-    app.submit(&engine, &runtime);
+    app.submit(&backend);
     assert!(matches!(app.overlay, Overlay::New { confirm: false }));
     assert!(render(&mut app, &engine.snapshot(), 80, 24).contains("元の会話には戻れません"));
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
     app.editor.insert("/new");
-    app.submit(&engine, &runtime);
-    app.key(key(KeyCode::Tab), &engine.snapshot(), &engine, &runtime);
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(engine.state.lock().unwrap().messages.is_empty());
     assert_eq!(engine.state.lock().unwrap().model, "composer-2.5");
     engine.state.lock().unwrap().status = "running".into();
     for command in ["/model", "/new", "/model cursor-sdk composer-2.5"] {
         app.editor.clear();
         app.editor.insert(command);
-        app.submit(&engine, &runtime);
+        app.submit(&backend);
         assert!(matches!(app.overlay, Overlay::None));
         assert_eq!(app.editor.text, command);
         assert!(app.notice.contains("実行中"));
     }
     app.editor.clear();
     app.editor.insert("/cancel");
-    app.submit(&engine, &runtime);
+    app.submit(&backend);
     assert_eq!(engine.state.lock().unwrap().status, "idle");
+}
+#[test]
+fn new_chat_preserves_history_when_backend_rejects_reset_and_invalidates_old_runs_on_success() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    app.history = vec!["previous message".into()];
+    app.history_index = Some(0);
+    app.saved_draft = "saved draft".into();
+    {
+        let mut state = engine.state.lock().unwrap();
+        state.status = "running".into();
+        state.run_id = 42;
+        state.error = Some("old error".into());
+        state.messages.push(Message {
+            role: "user".into(),
+            content: "keep until reset succeeds".into(),
+        });
+    }
+    assert!(!app.new_chat(&backend));
+    assert_eq!(app.history, ["previous message"]);
+    assert_eq!(app.history_index, Some(0));
+    assert_eq!(app.saved_draft, "saved draft");
+    assert_eq!(engine.state.lock().unwrap().run_id, 42);
+    assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
+    engine.state.lock().unwrap().status = "idle".into();
+    assert!(app.new_chat(&backend));
+    assert!(app.history.is_empty());
+    assert!(app.history_index.is_none());
+    assert!(app.saved_draft.is_empty());
+    let state = engine.state.lock().unwrap();
+    assert_eq!(state.run_id, 43);
+    assert_eq!(state.provider, "cursor-sdk");
+    assert_eq!(state.model, "composer-2.5");
+    assert!(state.messages.is_empty());
+    assert!(state.error.is_none());
 }
 #[test]
 fn escape_dismisses_palette_without_cancelling_and_edit_reopens_it() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     engine.state.lock().unwrap().status = "running".into();
     app.editor.insert("/");
-    app.key(key(KeyCode::Esc), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Esc), &engine.snapshot(), &backend);
     assert!(!app.palette_open());
     assert_eq!(engine.state.lock().unwrap().status, "running");
-    app.key(
-        key(KeyCode::Char('s')),
-        &engine.snapshot(),
-        &engine,
-        &runtime,
-    );
+    app.key(key(KeyCode::Char('s')), &engine.snapshot(), &backend);
     assert!(app.palette_open());
     assert_eq!(app.command_candidates()[0].name, "status");
 }
@@ -275,13 +310,13 @@ fn escape_dismisses_palette_without_cancelling_and_edit_reopens_it() {
 #[test]
 fn forward_history_outside_navigation_preserves_current_and_edited_drafts() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     app.history = vec!["sent message".into()];
     app.editor.insert("new draft 日本語");
     app.editor.cursor = 3;
     let forward = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL);
-    app.key(forward, &engine.snapshot(), &engine, &runtime);
+    app.key(forward, &engine.snapshot(), &backend);
     assert_eq!(app.editor.text, "new draft 日本語");
     assert_eq!(app.editor.cursor, 3);
     app.history(true);
@@ -290,8 +325,8 @@ fn forward_history_outside_navigation_preserves_current_and_edited_drafts() {
     app.editor.insert(" edited");
     let edited = app.editor.text.clone();
     let cursor = app.editor.cursor;
-    app.key(forward, &engine.snapshot(), &engine, &runtime);
-    app.key(forward, &engine.snapshot(), &engine, &runtime);
+    app.key(forward, &engine.snapshot(), &backend);
+    app.key(forward, &engine.snapshot(), &backend);
     assert_eq!(app.editor.text, edited);
     assert_eq!(app.editor.cursor, cursor);
 }
@@ -299,7 +334,7 @@ fn forward_history_outside_navigation_preserves_current_and_edited_drafts() {
 #[test]
 fn hidden_approval_cannot_confirm_and_resizing_back_resets_to_deny() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     {
@@ -318,8 +353,8 @@ fn hidden_approval_cannot_confirm_and_resizing_back_resets_to_deny() {
     app.allow = true;
     assert!(render(&mut app, &snapshot, 41, 13).contains("端末を42列"));
     assert!(!app.allow);
-    app.key(key(KeyCode::Tab), &snapshot, &engine, &runtime);
-    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Tab), &snapshot, &backend);
+    app.key(key(KeyCode::Enter), &snapshot, &backend);
     assert!(rx.try_recv().is_err());
     assert_eq!(engine.state.lock().unwrap().status, "approval");
     app.guard_input_size(80, 24);
@@ -327,11 +362,11 @@ fn hidden_approval_cannot_confirm_and_resizing_back_resets_to_deny() {
         !app.input_visible,
         "resizing alone cannot expose an unrendered dialog"
     );
-    app.key(key(KeyCode::Tab), &snapshot, &engine, &runtime);
-    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Tab), &snapshot, &backend);
+    app.key(key(KeyCode::Enter), &snapshot, &backend);
     assert!(rx.try_recv().is_err());
     render(&mut app, &snapshot, 80, 24);
-    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Enter), &snapshot, &backend);
     assert!(
         !rx.try_recv().unwrap(),
         "a hidden selection must not survive resize"
@@ -341,7 +376,7 @@ fn hidden_approval_cannot_confirm_and_resizing_back_resets_to_deny() {
 #[test]
 fn hidden_new_chat_and_input_are_blocked_but_cancel_and_quit_remain_available() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     engine.state.lock().unwrap().messages.push(Message {
         role: "user".into(),
@@ -349,37 +384,35 @@ fn hidden_new_chat_and_input_are_blocked_but_cancel_and_quit_remain_available() 
     });
     app.overlay = Overlay::New { confirm: true };
     render(&mut app, &engine.snapshot(), 80, 13);
-    app.key(key(KeyCode::Tab), &engine.snapshot(), &engine, &runtime);
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(matches!(app.overlay, Overlay::New { confirm: false }));
     assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
-    app.key(key(KeyCode::Esc), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Esc), &engine.snapshot(), &backend);
     assert!(matches!(app.overlay, Overlay::None));
     app.editor.insert("unsent draft");
     app.paste("hidden paste");
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert_eq!(app.editor.text, "unsent draft");
     assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
     engine.state.lock().unwrap().status = "running".into();
     app.key(
         KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
         &engine.snapshot(),
-        &engine,
-        &runtime,
+        &backend,
     );
     assert_eq!(engine.state.lock().unwrap().status, "idle");
     assert!(app.key(
         KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
         &engine.snapshot(),
-        &engine,
-        &runtime
+        &backend
     ));
 }
 
 #[test]
 fn pasted_model_query_resets_selection_to_the_highlighted_match() {
     let engine = engine();
-    let runtime = runtime();
+    let backend = backend(&engine);
     let mut app = ready_app(&engine);
     app.overlay = Overlay::Models {
         query: Editor::default(),
@@ -389,8 +422,401 @@ fn pasted_model_query_resets_selection_to_the_highlighted_match() {
     assert!(matches!(app.overlay, Overlay::Models { selected: 0, .. }));
     assert_eq!(app.filtered_models().len(), 1);
     assert!(render(&mut app, &engine.snapshot(), 80, 24).contains("composer-2.5"));
-    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
     assert!(matches!(app.overlay, Overlay::None));
     assert_eq!(engine.state.lock().unwrap().provider, "cursor-sdk");
     assert_eq!(engine.state.lock().unwrap().model, "composer-2.5");
+}
+
+#[test]
+fn usage_footer_reports_real_counters_and_keeps_missing_usage_distinct_from_zero() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    let unknown = render(&mut app, &engine.snapshot(), 100, 32);
+    assert!(unknown.contains("Cache:未取得"));
+    {
+        let mut state = engine.state.lock().unwrap();
+        state.usage.start("test", "model");
+        state.usage.finish(
+            &super::super::usage::Usage {
+                input_tokens: Some(100),
+                output_tokens: Some(20),
+                cache_read_tokens: Some(80),
+                ..Default::default()
+            },
+            15,
+        );
+    }
+    let output = render(&mut app, &engine.snapshot(), 100, 32);
+    assert!(output.contains("In:100"));
+    assert!(output.contains("Out:20"));
+    assert!(output.contains("Cache:80.0%"));
+    engine.state.lock().unwrap().usage.start("sdk", "unknown");
+    assert!(render(&mut app, &engine.snapshot(), 100, 32).contains("Cache:80.0%*"));
+    app.editor.insert("/usage");
+    app.submit(&backend);
+    assert!(matches!(app.overlay, Overlay::Status));
+    assert!(render(&mut app, &engine.snapshot(), 100, 32).contains("キャッシュ集計対象"));
+    assert!(app.new_chat(&backend));
+    assert_eq!(engine.snapshot()["usage"]["requests"], 0);
+}
+
+#[test]
+fn web_diagnostics_and_complete_event_history_are_readable_in_narrow_terminals() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    let mut state = engine.snapshot();
+    state["diagnostics"] = json!(["PROFILE_DIAGNOSTIC_DETAILS"]);
+    state["providers"][0]["models"][0]["unavailable"] = json!("MODEL_UNAVAILABLE_REASON_COMPLETE");
+    app.editor.insert("/diagnostics");
+    app.submit(&backend);
+    assert!(matches!(app.overlay, Overlay::Diagnostics));
+    assert!(render(&mut app, &state, 60, 24).contains("PROFILE_DIAGNOSTIC_DETAILS"));
+    assert!(render(&mut app, &state, 60, 24).contains("MODEL_UNAVAILABLE_REASON_COMPLETE"));
+    app.overlay = Overlay::None;
+    app.editor.insert("/logs");
+    app.submit(&backend);
+    state["events"] = json!((0..40)
+        .map(|n| json!({"kind":"info","name":format!("EVENT{n}"),"content":"complete event text"}))
+        .collect::<Vec<_>>());
+    assert!(render(&mut app, &state, 42, 14).contains("EVENT39"));
+    app.key(key(KeyCode::Home), &state, &backend);
+    assert!(render(&mut app, &state, 42, 14).contains("EVENT0"));
+    app.key(key(KeyCode::End), &state, &backend);
+    assert!(render(&mut app, &state, 42, 14).contains("EVENT39"));
+}
+
+struct TestHarness {
+    state: Mutex<Value>,
+    requests: Mutex<Vec<(String, Value)>>,
+    replies: Mutex<std::collections::HashMap<String, Value>>,
+    fail_path: Mutex<Option<String>>,
+    cancelled: std::sync::atomic::AtomicBool,
+}
+impl TestHarness {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(json!({
+                "backend":"dsh", "engine":"dsh-runtime", "status":"idle", "providers":[],
+                "messages":[], "events":[], "usage":{}, "workspace":"/mock/workspace",
+                "provider":"test", "model":"test", "capabilities":{"sessionPersistence":true}
+            })),
+            requests: Mutex::new(vec![]),
+            replies: Mutex::new(std::collections::HashMap::new()),
+            fail_path: Mutex::new(None),
+            cancelled: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+    fn questions(value: Value) -> Self {
+        let backend = Self::new();
+        backend.state.lock().unwrap()["pending"] = json!({
+            "id":"question-call", "kind":"questions", "tool":"user_questions", "questions":value
+        });
+        backend.state.lock().unwrap()["status"] = json!("approval");
+        backend
+    }
+    fn app(&self) -> App {
+        let snapshot = self.snapshot();
+        let mut app = App::new(snapshot["providers"].clone());
+        app.set_size(100, 32);
+        app.sync_pending(&snapshot);
+        app
+    }
+}
+impl HarnessBackend for TestHarness {
+    fn snapshot(&self) -> Value {
+        self.state.lock().unwrap().clone()
+    }
+    fn request(&self, path: &str, body: Value) -> Result<Value> {
+        self.requests.lock().unwrap().push((path.into(), body));
+        if self.fail_path.lock().unwrap().as_deref() == Some(path) {
+            bail!("mock request failed");
+        }
+        Ok(self
+            .replies
+            .lock()
+            .unwrap()
+            .get(path)
+            .cloned()
+            .unwrap_or(json!({"ok":true})))
+    }
+    fn cancel(&self) {
+        self.cancelled
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+    fn reset(&self) -> Result<()> {
+        Ok(())
+    }
+    fn redact(&self, text: &str) -> String {
+        text.into()
+    }
+}
+fn control(c: char) -> KeyEvent {
+    KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
+}
+
+#[test]
+fn questions_and_plan_review_have_no_default_and_only_ctrl_s_submits() {
+    let detail = (0..80)
+        .map(|i| format!("PLAN_DETAIL_{i}\n"))
+        .collect::<String>();
+    let backend = TestHarness::questions(json!([{
+        "id":"review", "question":"計画を確認してください", "detail":detail,
+        "options":[{"label":"承認"},{"label":"戻す"}],
+        "intent":{"kind":"plan-review","approve":"承認"}
+    }]));
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    assert!(app.question_form.as_ref().unwrap().items[0]
+        .selected
+        .iter()
+        .all(|s| !s));
+    let output = render(&mut app, &state, 100, 32);
+    assert!(output.contains("計画レビュー"));
+    assert!(output.contains("PLAN_DETAIL_0"));
+    app.key(key(KeyCode::End), &state, &backend);
+    assert!(render(&mut app, &state, 100, 32).contains("PLAN_DETAIL_79"));
+    app.key(key(KeyCode::Enter), &state, &backend);
+    app.key(control('s'), &state, &backend);
+    assert!(backend.requests.lock().unwrap().is_empty());
+    assert!(app.notice.contains("未回答"));
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    app.key(key(KeyCode::Enter), &state, &backend);
+    assert!(backend.requests.lock().unwrap().is_empty());
+    app.key(control('s'), &state, &backend);
+    assert_eq!(
+        backend.requests.lock().unwrap().as_slice(),
+        &[(
+            "/api/question".into(),
+            json!({"id":"question-call","answers":[{"id":"review","selected":["承認"]}]})
+        )]
+    );
+}
+
+#[test]
+fn hidden_questions_clear_answers_and_block_submission_while_cancel_and_quit_work() {
+    let backend = TestHarness::questions(json!([{
+        "id":"q", "question":"choose", "options":[{"label":"yes"},{"label":"no"}]
+    }]));
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    assert!(app.question_form.as_ref().unwrap().items[0].selected[0]);
+    render(&mut app, &state, 41, 13);
+    assert!(!app.question_form.as_ref().unwrap().items[0].selected[0]);
+    app.key(control('e'), &state, &backend);
+    app.paste("hidden answer");
+    app.key(control('s'), &state, &backend);
+    app.guard_input_size(100, 32);
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    app.key(control('s'), &state, &backend);
+    assert!(backend.requests.lock().unwrap().is_empty());
+    render(&mut app, &state, 100, 32);
+    app.key(control('s'), &state, &backend);
+    assert!(backend.requests.lock().unwrap().is_empty());
+    render(&mut app, &state, 41, 13);
+    app.key(control('c'), &state, &backend);
+    assert!(backend.cancelled.load(std::sync::atomic::Ordering::SeqCst));
+    app.key(key(KeyCode::Esc), &state, &backend);
+    assert_eq!(
+        backend.requests.lock().unwrap()[0],
+        (
+            "/api/approval".into(),
+            json!({"id":"question-call","allow":false})
+        )
+    );
+    assert!(app.key(control('q'), &state, &backend));
+}
+
+#[test]
+fn multiselect_custom_text_and_multiple_questions_keep_exact_labels() {
+    let backend = TestHarness::questions(json!([
+        {"id":"multi","question":"pick", "multiSelect":true,"options":[
+            {"label":" A α  ","description":"full context"},{"label":"日本語B"}
+        ]},
+        {"id":"free","question":"自由入力"}
+    ]));
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    app.key(key(KeyCode::Down), &state, &backend);
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    app.key(control('e'), &state, &backend);
+    app.paste("custom 日本語\nsecond line");
+    app.key(key(KeyCode::Tab), &state, &backend);
+    assert_eq!(app.question_form.as_ref().unwrap().current, 1);
+    app.key(control('e'), &state, &backend);
+    app.paste("Other");
+    app.key(control('s'), &state, &backend);
+    assert_eq!(
+        backend.requests.lock().unwrap()[0].1,
+        json!({
+            "id":"question-call", "answers":[
+                {"id":"multi","selected":[" A α  ","日本語B"],"custom":"custom 日本語\nsecond line"},
+                {"id":"free","selected":[],"custom":"Other"}
+            ]
+        })
+    );
+}
+
+#[test]
+fn invalid_or_oversize_question_forms_never_fall_back_to_approval() {
+    let invalid = vec![
+        json!([]),
+        json!([{"id":"q"}]),
+        json!([{"id":"q","question":"?"},{"id":"q","question":"duplicate"}]),
+        json!([{"id":"q","question":"?","options":[{"label":"same"},{"label":"same"}]}]),
+        json!([{"id":"q","question":"?","options":[{"label":"hidden\u{1b}"}]}]),
+        json!([{"id":"q","question":"?","detail":"plan","options":[{"label":"no"}],"intent":{"kind":"plan-review","approve":"yes"}}]),
+        json!([{"id":"q","question":"?","options":[{"label":"yes"}],"intent":{"kind":"plan-review","approve":"yes"}}]),
+        json!([{"id":"q","question":"?","detail":"x".repeat(256 * 1024)}]),
+        json!((0..33)
+            .map(|n| json!({"id":n.to_string(),"question":"?"}))
+            .collect::<Vec<_>>()),
+        json!([{"id":"q","question":"?","options":(0..65).map(|n|json!({"label":n.to_string()})).collect::<Vec<_>>()}]),
+    ];
+    for questions in invalid {
+        let backend = TestHarness::questions(questions);
+        let mut app = backend.app();
+        let state = backend.snapshot();
+        assert!(app.question_form.is_none());
+        assert!(app.question_error.is_some());
+        render(&mut app, &state, 100, 32);
+        for event in [
+            key(KeyCode::Char(' ')),
+            key(KeyCode::Tab),
+            key(KeyCode::Enter),
+            control('e'),
+            control('s'),
+        ] {
+            app.key(event, &state, &backend);
+        }
+        app.paste("cannot answer invalid form");
+        assert!(backend.requests.lock().unwrap().is_empty());
+        app.key(key(KeyCode::Esc), &state, &backend);
+        assert_eq!(backend.requests.lock().unwrap()[0].0, "/api/approval");
+        assert_eq!(backend.requests.lock().unwrap()[0].1["allow"], false);
+    }
+}
+
+#[test]
+fn changed_question_with_same_id_does_not_accept_old_selection() {
+    let backend =
+        TestHarness::questions(json!([{"id":"q","question":"first","options":[{"label":"yes"}]}]));
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    app.key(key(KeyCode::Char(' ')), &state, &backend);
+    backend.state.lock().unwrap()["pending"]["questions"][0]["question"] = json!("changed");
+    app.key(control('s'), &state, &backend);
+    assert!(backend.requests.lock().unwrap().is_empty());
+    assert!(app.notice.contains("更新"));
+    assert!(!app.question_form.as_ref().unwrap().items[0].selected[0]);
+}
+
+#[test]
+fn malformed_question_request_id_blocks_input_and_can_still_cancel() {
+    let backend = TestHarness::questions(json!([{"id":"q","question":"question"}]));
+    backend.state.lock().unwrap()["pending"]["id"] = Value::Null;
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    app.editor.insert("preserved message draft");
+    assert!(app.has_pending());
+    assert!(app.question_form.is_none());
+    assert!(app.question_error.as_deref().unwrap().contains("要求ID"));
+    app.key(key(KeyCode::Enter), &state, &backend);
+    app.key(control('s'), &state, &backend);
+    app.paste("hidden text");
+    assert_eq!(app.editor.text, "preserved message draft");
+    assert!(backend.requests.lock().unwrap().is_empty());
+    app.key(key(KeyCode::Esc), &state, &backend);
+    assert!(backend.cancelled.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn session_picker_keeps_draft_until_resume_succeeds() {
+    let backend = TestHarness::new();
+    backend.replies.lock().unwrap().insert(
+        "/api/sessions".into(),
+        json!({"items":[{"id":"exact-id","title":"過去の会話","cwd":"/saved"}]}),
+    );
+    let mut app = backend.app();
+    app.editor.insert("preserved draft 日本語");
+    app.execute_command(commands::Invocation::Sessions, &backend);
+    assert_eq!(app.editor.text, "preserved draft 日本語");
+    assert!(matches!(app.overlay, Overlay::Sessions { .. }));
+    *backend.fail_path.lock().unwrap() = Some("/api/resume".into());
+    app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+    assert_eq!(app.editor.text, "preserved draft 日本語");
+    assert!(matches!(app.overlay, Overlay::Sessions { .. }));
+    assert!(app.notice.contains("failed"));
+    *backend.fail_path.lock().unwrap() = None;
+    app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+    assert!(app.editor.text.is_empty());
+    assert!(matches!(app.overlay, Overlay::None));
+    assert_eq!(
+        backend.requests.lock().unwrap()[2],
+        ("/api/resume".into(), json!({"sessionId":"exact-id"}))
+    );
+}
+
+#[test]
+fn dsh_only_commands_are_local_errors_in_native_mode() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    for command in ["/sessions", "/plugins", "/settings"] {
+        app.editor.clear();
+        app.editor.insert(command);
+        app.submit(&backend);
+        assert!(app.notice.contains("DSHバックエンド専用"));
+        assert_eq!(app.editor.text, command);
+        assert!(matches!(app.overlay, Overlay::None));
+    }
+    assert!(engine.state.lock().unwrap().messages.is_empty());
+    assert!(engine.state.lock().unwrap().events.is_empty());
+}
+
+#[test]
+fn readonly_settings_redact_secret_fields_and_limit_scrollable_output() {
+    let backend = TestHarness::new();
+    backend.replies.lock().unwrap().insert("/api/settings".into(), json!({
+        "apiKey":"private-fixture-a", "nested":{"OPENAI_API_KEY":"private-fixture-b","access_token":"private-fixture-c"},
+        "body":"x".repeat(300 * 1024)
+    }));
+    let mut app = backend.app();
+    app.execute_command(commands::Invocation::Settings, &backend);
+    let Overlay::ReadOnly { content, .. } = &app.overlay else {
+        panic!("missing readonly overlay")
+    };
+    assert!(!content.contains("private-fixture"));
+    assert!(content.contains("[REDACTED]"));
+    assert!(content.contains("表示上限256KiB"));
+    assert!(content.len() < 257 * 1024);
+    render(&mut app, &backend.snapshot(), 60, 24);
+    assert!(app.detail_max_scroll > 0);
+    app.key(key(KeyCode::End), &backend.snapshot(), &backend);
+    assert!(render(&mut app, &backend.snapshot(), 60, 24).contains("省略しました"));
+    assert_eq!(backend.requests.lock().unwrap()[0].0, "/api/settings");
+}
+
+#[test]
+fn header_and_new_chat_describe_actual_backend_and_persistence() {
+    let backend = TestHarness::new();
+    backend.state.lock().unwrap()["usage"]["request_count_unknown"] = json!(true);
+    let mut app = backend.app();
+    let state = backend.snapshot();
+    let output = render(&mut app, &state, 120, 40);
+    assert!(output.contains("dsh-runtime"));
+    assert!(output.contains("Req:?"));
+    app.overlay = Overlay::New { confirm: false };
+    let output = render(&mut app, &state, 120, 40);
+    assert!(output.contains("/sessionsで再開できます"));
+    assert!(!output.contains("元の会話には戻れません"));
+    let engine = engine();
+    let mut native = ready_app(&engine);
+    assert!(render(&mut native, &engine.snapshot(), 120, 40).contains("rust-rdsh"));
+    native.overlay = Overlay::New { confirm: false };
+    assert!(render(&mut native, &engine.snapshot(), 120, 40).contains("元の会話には戻れません"));
 }

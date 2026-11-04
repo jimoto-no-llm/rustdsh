@@ -318,16 +318,29 @@ impl Registry {
         let route = self.routes.iter().find(|r| r.id == provider)?;
         Some((route, route.models.iter().find(|m| m.id == model)?))
     }
+    #[cfg(test)]
     pub async fn generate(&self, provider: &str, model: &str, prompt: &str) -> Result<String> {
+        Ok(self
+            .generate_with_usage(provider, model, prompt)
+            .await?
+            .text)
+    }
+    pub async fn generate_with_usage(
+        &self,
+        provider: &str,
+        model: &str,
+        prompt: &str,
+    ) -> Result<super::usage::Generation> {
         let (route, model) = self
             .find(provider, model)
             .filter(|(_, m)| m.unavailable.is_none())
             .ok_or_else(|| anyhow::anyhow!("NATIVE_MODEL_UNAVAILABLE"))?;
         if route.claude {
-            return super::claude::generate(&model.id, prompt).await;
+            return super::claude::generate_with_usage(&model.id, prompt).await;
         }
         if let Some(grant) = &route.oauth {
-            return super::oauth::generate(grant, "openai-codex", &model.id, prompt).await;
+            return super::oauth::generate_with_usage(grant, "openai-codex", &model.id, prompt)
+                .await;
         }
         let url = endpoint(&model.base, &model.api, &model.id)?;
         let mut body = match model.api.as_str() {
@@ -421,7 +434,10 @@ impl Registry {
             }
             .filter(|s| !s.is_empty())
             .ok_or_else(|| anyhow::anyhow!("NATIVE_HTTP_NO_TEXT"))?;
-        Ok(text)
+        Ok(super::usage::Generation {
+            text,
+            usage: super::usage::Usage::parse(&model.api, &value),
+        })
     }
 }
 

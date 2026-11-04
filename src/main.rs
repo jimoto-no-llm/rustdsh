@@ -355,9 +355,11 @@ enum Commands {
         #[arg(long = "devin-bin")]
         devin_bin: Option<std::path::PathBuf>,
     },
-    /// Rust-owned terminal chat, model selection and per-call approvals (no DSH runtime).
+    /// Rust-owned terminal UI with native or DSH tools/plugins backend.
     #[command(name = "native-tui")]
     NativeTui {
+        #[arg(long, default_value = "native", value_parser = ["native", "dsh"])]
+        backend: String,
         #[arg(long)]
         workspace: std::path::PathBuf,
         #[arg(long = "sdk-dir")]
@@ -368,10 +370,10 @@ enum Commands {
         dsh_catalog: Option<std::path::PathBuf>,
         #[arg(long = "devin-bin")]
         devin_bin: Option<std::path::PathBuf>,
-        #[arg(long, default_value = "cursor-sdk")]
-        provider: String,
-        #[arg(long, default_value = "composer-2.5")]
-        model: String,
+        #[arg(long, requires = "model")]
+        provider: Option<String>,
+        #[arg(long, requires = "provider")]
+        model: Option<String>,
     },
     /// Start the local dashboard (127.0.0.1 only, read-only API)
     Serve {
@@ -1352,6 +1354,7 @@ fn main() {
             inspect::cmd_logs(tail.unwrap_or(cfg.logs.tail), grep, file, locale)
         }
         Some(Commands::NativeTui {
+            backend,
             workspace,
             sdk_dir,
             dsh_profile,
@@ -1360,6 +1363,7 @@ fn main() {
             provider,
             model,
         }) => native_harness::cmd_native_tui(
+            backend,
             workspace,
             sdk_dir,
             dsh_profile,

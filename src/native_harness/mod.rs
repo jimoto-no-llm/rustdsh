@@ -1,11 +1,15 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+#[cfg(test)]
+mod delegation_tests;
+mod devin_acp;
 mod engine;
 mod oauth;
 mod profiles;
 mod sdk;
 mod tools;
 mod tui;
+mod usage;
 pub use tui::cmd_native_tui;
 
 use anyhow::{bail, Result};

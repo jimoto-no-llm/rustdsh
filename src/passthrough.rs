@@ -715,6 +715,19 @@ fn base_cmd(
     Ok(command)
 }
 
+/// Rust-owned TUI uses the existing Web profile as a headless remote host.
+/// Keep the same privacy, runtime and optional tool-security boundary as boot.
+pub(crate) fn tui_host_command(
+    profile: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<std::process::Command> {
+    let orig =
+        find_original_dsh().ok_or_else(|| anyhow::anyhow!("DSH runtime が見つかりません"))?;
+    let mut command = base_cmd(&orig, false, false, locale)?;
+    command.args(["--profile", profile, "--no-open", "--port", "0"]);
+    Ok(command)
+}
+
 /// Upstream provider id for delegated web search, set once from the settings
 /// document in `main`. Empty means "leave the child environment alone".
 static WEB_SEARCH_PROVIDER: std::sync::OnceLock<String> = std::sync::OnceLock::new();

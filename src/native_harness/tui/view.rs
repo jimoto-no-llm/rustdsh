@@ -48,7 +48,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
     let area = frame.area();
     app.set_size(area.width, area.height);
     if !app.input_visible {
-        frame.render_widget(Paragraph::new("RDSH Native TUI\n端末を42列×14行以上に広げてください\nCtrl+Q 終了 / Ctrl+C 実行中止"),area);
+        frame.render_widget(
+            Paragraph::new(
+                "RDSH TUI\n端末を42列×14行以上に広げてください\nCtrl+Q 終了 / Ctrl+C 実行中止",
+            ),
+            area,
+        );
         return;
     }
     let input_height = wrap(
@@ -66,12 +71,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
             Constraint::Length(3),
             Constraint::Min(3),
             Constraint::Length(input_height.min(area.height / 3)),
-            Constraint::Length(2),
+            Constraint::Length(3),
         ])
         .split(area);
     let status = match snapshot["status"].as_str() {
         Some("running") => ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
             [(elapsed.as_millis() / 100 % 10) as usize],
+        Some("approval") if app.pending_is_questions => "回答待ち",
         Some("approval") => "承認待ち",
         Some("error") => "エラー",
         _ => "待機中",
@@ -82,10 +88,19 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
                 " RDSH ",
                 Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Native TUI  "),
+            Span::raw(format!(
+                "{}  ",
+                clean(
+                    snapshot["engine"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| snapshot["backend"].as_str())
+                        .unwrap_or("TUI")
+                )
+            )),
             Span::styled(
                 status,
-                Style::default().fg(if app.pending_id.is_some() {
+                Style::default().fg(if app.has_pending() {
                     APPROVAL
                 } else {
                     Color::Green
@@ -120,7 +135,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
         activity(frame, snapshot, columns[1]);
     }
     let input_block = block(" メッセージ ").border_style(Style::default().fg(
-        if matches!(app.overlay, Overlay::None) && app.pending_id.is_none() {
+        if matches!(app.overlay, Overlay::None) && !app.has_pending() {
             ACCENT
         } else {
             MUTED
@@ -152,7 +167,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
             input,
         );
     }
-    if matches!(app.overlay, Overlay::None) && app.pending_id.is_none() {
+    if matches!(app.overlay, Overlay::None) && !app.has_pending() {
         frame.set_cursor_position((
             input.x + cx.min(input.width.saturating_sub(1)),
             input.y + cy.saturating_sub(start).min(input.height.saturating_sub(1)),
@@ -175,6 +190,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
     };
     frame.render_widget(
         Paragraph::new(vec![
+            Line::styled(usage_line(&snapshot["usage"]), Style::default().fg(ACCENT)),
             Line::styled(
                 clean(&notice),
                 Style::default().fg(if app.notice.is_empty() && snapshot["error"].is_null() {
@@ -195,19 +211,22 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
             Rect::new(rows[1].x, rows[1].y, rows[1].width, rows[1].height),
         );
     }
-    if app.pending_id.is_some() {
-        approval(frame, app, snapshot, area);
+    if app.has_pending() {
+        if app.pending_is_questions {
+            question_panel(frame, app, area);
+        } else {
+            approval(frame, app, snapshot, area);
+        }
     } else {
         match &app.overlay {
             Overlay::Models { .. } => models(frame, app, area),
             Overlay::Help => help(frame, area),
-            Overlay::Status => status_panel(frame, snapshot, area),
-            Overlay::Logs => {
-                let panel = popup(area, 96, 26);
-                frame.render_widget(Clear, panel);
-                activity(frame, snapshot, panel);
-            }
-            Overlay::New { confirm } => new_chat(frame, *confirm, area),
+            Overlay::Status => status_panel(frame, app, snapshot, area),
+            Overlay::Logs => log_panel(frame, app, snapshot, area),
+            Overlay::Diagnostics => diagnostics(frame, app, snapshot, area),
+            Overlay::Sessions { .. } => sessions(frame, app, area),
+            Overlay::ReadOnly { .. } => readonly(frame, app, area),
+            Overlay::New { confirm } => new_chat(frame, *confirm, snapshot, area),
             _ => {}
         }
     }
@@ -465,6 +484,259 @@ fn models(frame: &mut Frame, app: &App, area: Rect) {
         rows[0].y + cursor_y.saturating_sub(search_start).min(1),
     ));
 }
+fn question_panel(frame: &mut Frame, app: &mut App, area: Rect) {
+    let area = popup(area, 112, 30);
+    frame.render_widget(Clear, area);
+    let title = app
+        .question_form
+        .as_ref()
+        .map(|f| format!(" 質問 {}/{} · 初期選択なし ", f.current + 1, f.items.len()))
+        .unwrap_or_else(|| " 質問を表示できません · Esc 中止 ".into());
+    let border = block(&title).border_style(Style::default().fg(APPROVAL));
+    let inner = border.inner(area);
+    frame.render_widget(border, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(inner);
+    let Some(form) = &mut app.question_form else {
+        let error = app
+            .question_error
+            .as_deref()
+            .unwrap_or("質問の形式が不正です");
+        frame.render_widget(
+            Paragraph::new(lines(error, rows[0].width, Style::default().fg(APPROVAL))),
+            rows[0],
+        );
+        frame.render_widget(
+            Paragraph::new("回答を送信できません\nEsc 中止 / Ctrl+Q 終了"),
+            rows[1],
+        );
+        return;
+    };
+    let q = &form.items[form.current];
+    let width = rows[0].width.saturating_sub(1);
+    let mut content = Vec::new();
+    if let Some(header) = &q.header {
+        content.extend(lines(header, width, Style::default().fg(ACCENT)));
+    }
+    content.extend(lines(
+        &q.question,
+        width,
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+    if q.intent
+        .as_ref()
+        .is_some_and(|i| i["kind"] == "plan-review")
+    {
+        content.extend(lines(
+            "計画レビュー: 内容を読み、選択してからCtrl+Sで送信してください。",
+            width,
+            Style::default().fg(APPROVAL),
+        ));
+    }
+    if let Some(detail) = &q.detail {
+        content.push(Line::raw(""));
+        content.extend(lines(detail, width, Style::default()));
+    }
+    content.push(Line::raw(""));
+    content.push(Line::styled(
+        if q.multi_select {
+            "複数選択可 · Spaceで選択/解除"
+        } else {
+            "単一選択 · Spaceで選択/解除"
+        },
+        Style::default().fg(MUTED),
+    ));
+    let mut focused_line = content.len();
+    for (i, option) in q.options.iter().enumerate() {
+        if i == form.focused && !form.editing {
+            focused_line = content.len();
+        }
+        content.extend(lines(
+            &format!(
+                "{} [{}] {}",
+                if i == form.focused && !form.editing {
+                    "›"
+                } else {
+                    " "
+                },
+                if q.selected[i] { "x" } else { " " },
+                option.label
+            ),
+            width,
+            Style::default().fg(if q.selected[i] { ACCENT } else { Color::Reset }),
+        ));
+        if let Some(description) = &option.description {
+            content.extend(lines(
+                &format!("    {description}"),
+                width,
+                Style::default().fg(MUTED),
+            ));
+        }
+    }
+    content.push(Line::raw(""));
+    content.push(Line::styled(
+        if form.editing {
+            "自由入力 · 編集中（Ctrl+Eで選択へ）"
+        } else {
+            "自由入力 · Ctrl+Eで編集"
+        },
+        Style::default().fg(if form.editing { ACCENT } else { MUTED }),
+    ));
+    let custom_start = content.len();
+    let (custom, (cx, cy)) = wrap(&q.custom.text, width, q.custom.cursor);
+    content.extend(custom.into_iter().map(Line::raw));
+    if form.editing {
+        focused_line = custom_start + cy as usize;
+    }
+    form.max_scroll = content.len().saturating_sub(rows[0].height as usize);
+    if form.follow_focus {
+        if focused_line < form.scroll {
+            form.scroll = focused_line;
+        } else if focused_line >= form.scroll + rows[0].height as usize {
+            form.scroll = focused_line.saturating_sub(rows[0].height.saturating_sub(1) as usize);
+        }
+    }
+    form.scroll = form.scroll.min(form.max_scroll);
+    frame.render_widget(
+        Paragraph::new(
+            content
+                .into_iter()
+                .skip(form.scroll)
+                .take(rows[0].height as usize)
+                .collect::<Vec<_>>(),
+        ),
+        rows[0],
+    );
+    if form.editing
+        && focused_line >= form.scroll
+        && focused_line < form.scroll + rows[0].height as usize
+    {
+        frame.set_cursor_position((
+            rows[0].x + cx.min(rows[0].width.saturating_sub(1)),
+            rows[0].y + (focused_line - form.scroll) as u16,
+        ));
+    }
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::raw("Space 選択 / ↑↓ 移動 / Tab 次 / Shift+Tab 前"),
+            Line::raw("Ctrl+E 自由入力 / Ctrl+S 全回答を送信"),
+            Line::styled(
+                if app.notice.is_empty() {
+                    "PgUp/Dn・Home/End 詳細 / Esc 中止".into()
+                } else {
+                    clean(&app.notice)
+                },
+                Style::default().fg(APPROVAL),
+            ),
+        ]),
+        rows[1],
+    );
+}
+fn sessions(frame: &mut Frame, app: &App, area: Rect) {
+    let Overlay::Sessions { items, selected } = &app.overlay else {
+        return;
+    };
+    let area = popup(area, 96, 26);
+    frame.render_widget(Clear, area);
+    let border = block(" DSH セッション · Enter 再開 / Esc 戻る ");
+    let inner = border.inner(area);
+    frame.render_widget(border, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(2)])
+        .split(inner);
+    let entries = items
+        .iter()
+        .map(|item| {
+            ListItem::new(vec![
+                Line::raw(clean(&format!("{} · {}", item.title, item.id))),
+                Line::styled(clean(&item.cwd), Style::default().fg(MUTED)),
+            ])
+        })
+        .collect::<Vec<_>>();
+    let mut state = ListState::default().with_selected((!entries.is_empty()).then_some(*selected));
+    frame.render_stateful_widget(
+        List::new(entries)
+            .highlight_symbol("› ")
+            .highlight_style(Style::default().fg(Color::Black).bg(ACCENT)),
+        rows[0],
+        &mut state,
+    );
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::raw(if items.is_empty() {
+                "保存済みセッションはありません".into()
+            } else {
+                format!("{} 件 · ↑↓ 選択 / Home/End", items.len())
+            }),
+            Line::styled(clean(&app.notice), Style::default().fg(APPROVAL)),
+        ]),
+        rows[1],
+    );
+}
+fn readonly(frame: &mut Frame, app: &mut App, area: Rect) {
+    let Overlay::ReadOnly { title, content } = &app.overlay else {
+        return;
+    };
+    let title = *title;
+    let content = content.clone();
+    details(
+        frame,
+        app,
+        popup(area, 112, 30),
+        title,
+        vec![
+            Line::raw("↑↓ / PgUp/Dn / Home/End 閲覧 · Esc 閉じる"),
+            Line::raw(content),
+        ],
+    );
+}
+fn usage_counter(usage: &Value, field: &str, known: &str) -> String {
+    let requests = usage["requests"].as_u64().unwrap_or(0);
+    let known = usage[known].as_u64().unwrap_or(0);
+    if known == 0 {
+        return "未取得".into();
+    }
+    format!(
+        "{}{}",
+        usage[field].as_u64().unwrap_or(0),
+        if known < requests || usage["request_count_unknown"] == true {
+            "*"
+        } else {
+            ""
+        }
+    )
+}
+fn usage_line(usage: &Value) -> String {
+    let cache = usage["cache_hit_rate"]
+        .as_f64()
+        .map(|p| {
+            format!(
+                "{p:.1}%{}",
+                if usage["known_cache_requests"] != usage["requests"]
+                    || usage["request_count_unknown"] == true
+                {
+                    "*"
+                } else {
+                    ""
+                }
+            )
+        })
+        .unwrap_or_else(|| "未取得".into());
+    format!(
+        "Token In:{} Out:{}  Cache:{}  Req:{}",
+        usage_counter(usage, "input_tokens", "known_input_requests"),
+        usage_counter(usage, "output_tokens", "known_output_requests"),
+        cache,
+        if usage["request_count_unknown"] == true {
+            "?".into()
+        } else {
+            usage["requests"].as_u64().unwrap_or(0).to_string()
+        }
+    )
+}
 fn command_palette(frame: &mut Frame, app: &App, snapshot: &Value, above: Rect) {
     let candidates = app.command_candidates();
     let height = (candidates.len().max(1) as u16 + 2).min(above.height);
@@ -517,8 +789,84 @@ fn command_palette(frame: &mut Frame, app: &App, snapshot: &Value, above: Rect) 
         &mut state,
     );
 }
-fn status_panel(frame: &mut Frame, snapshot: &Value, area: Rect) {
-    let area = popup(area, 86, 18);
+fn details(frame: &mut Frame, app: &mut App, area: Rect, title: &str, content: Vec<Line<'static>>) {
+    frame.render_widget(Clear, area);
+    let border = block(title).border_style(Style::default().fg(ACCENT));
+    let inner = border.inner(area);
+    frame.render_widget(border, area);
+    let wrapped = content
+        .into_iter()
+        .flat_map(|line| lines(&line.to_string(), inner.width.saturating_sub(1), line.style))
+        .collect::<Vec<_>>();
+    app.detail_max_scroll = wrapped.len().saturating_sub(inner.height as usize);
+    app.detail_scroll = if app.detail_follow {
+        app.detail_max_scroll
+    } else {
+        app.detail_scroll.min(app.detail_max_scroll)
+    };
+    frame.render_widget(
+        Paragraph::new(
+            wrapped
+                .into_iter()
+                .skip(app.detail_scroll)
+                .take(inner.height as usize)
+                .collect::<Vec<_>>(),
+        ),
+        inner,
+    );
+}
+fn log_panel(frame: &mut Frame, app: &mut App, snapshot: &Value, area: Rect) {
+    let area = popup(area, 96, 26);
+    let mut content = Vec::new();
+    for event in snapshot["events"].as_array().into_iter().flatten() {
+        content.push(Line::styled(
+            format!("{} / {}", text(&event["kind"]), text(&event["name"])),
+            Style::default().fg(ACCENT),
+        ));
+        content.push(Line::raw(text(&event["content"])));
+        content.push(Line::raw(""));
+    }
+    if content.is_empty() {
+        content.push(Line::raw("実行ログはまだありません。"));
+    }
+    details(
+        frame,
+        app,
+        area,
+        " 実行ログ · ↑↓ / PgUp/Dn / Home/End / Esc ",
+        content,
+    );
+}
+fn diagnostics(frame: &mut Frame, app: &mut App, snapshot: &Value, area: Rect) {
+    let mut content = Vec::new();
+    for note in snapshot["diagnostics"].as_array().into_iter().flatten() {
+        content.push(Line::raw(text(note)));
+    }
+    for provider in snapshot["providers"].as_array().into_iter().flatten() {
+        for model in provider["models"].as_array().into_iter().flatten() {
+            if let Some(reason) = model["unavailable"].as_str() {
+                content.push(Line::styled(
+                    format!("{} / {}", text(&provider["id"]), text(&model["id"])),
+                    Style::default().fg(APPROVAL),
+                ));
+                content.push(Line::raw(clean(reason)));
+                content.push(Line::raw(""));
+            }
+        }
+    }
+    if content.is_empty() {
+        content.push(Line::raw("問題は報告されていません。"));
+    }
+    details(
+        frame,
+        app,
+        popup(area, 96, 26),
+        " 接続診断 · ↑↓ / PgUp/Dn / Esc ",
+        content,
+    );
+}
+fn status_panel(frame: &mut Frame, app: &mut App, snapshot: &Value, area: Rect) {
+    let area = popup(area, 96, 24);
     frame.render_widget(Clear, area);
     let mut content = vec![
         Line::raw(format!("状態: {}", text(&snapshot["status"]))),
@@ -538,9 +886,66 @@ fn status_panel(frame: &mut Frame, snapshot: &Value, area: Rect) {
         snapshot["messages"].as_array().map(Vec::len).unwrap_or(0),
         snapshot["events"].as_array().map(Vec::len).unwrap_or(0)
     )));
+    let usage = &snapshot["usage"];
+    content.push(Line::raw(""));
+    content.extend(lines(
+        &usage_line(usage),
+        area.width.saturating_sub(2),
+        Style::default().fg(ACCENT),
+    ));
+    content.push(Line::raw(format!(
+        "キャッシュ集計対象: {} / {} リクエスト（読込 / 入力）",
+        usage["known_cache_requests"].as_u64().unwrap_or(0),
+        if usage["request_count_unknown"] == true {
+            "?".into()
+        } else {
+            usage["requests"].as_u64().unwrap_or(0).to_string()
+        }
+    )));
+    if let Some(last) = usage.get("last").filter(|v| !v.is_null()) {
+        content.extend(lines(
+            &format!(
+                "直近: {} / {}",
+                text(&last["provider"]),
+                text(&last["model"])
+            ),
+            area.width.saturating_sub(2),
+            Style::default(),
+        ));
+        content.push(Line::raw(format!(
+            "直近応答時間: {}",
+            last["elapsed_ms"]
+                .as_u64()
+                .map(|v| format!("{v} ms"))
+                .unwrap_or_else(|| "未取得".into())
+        )));
+        content.push(Line::raw(format!(
+            "直近 Cache Read:{} Write:{} Reasoning:{}",
+            last["usage"]["cache_read_tokens"]
+                .as_u64()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "未取得".into()),
+            last["usage"]["cache_write_tokens"]
+                .as_u64()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "未取得".into()),
+            last["usage"]["reasoning_tokens"]
+                .as_u64()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "未取得".into())
+        )));
+    }
+    content.push(Line::styled(
+        "* は既知分のみ。未取得は0ではありません。料金・残枠の推定は行いません。",
+        Style::default().fg(MUTED),
+    ));
     content.push(Line::raw(""));
     content.push(Line::styled(
-        "会話はメモリー内で保持。保存・再開は未対応です。",
+        if snapshot["capabilities"]["sessionPersistence"] == true {
+            "DSHセッションは保存されます。/sessionsで再開できます。"
+        } else {
+            "会話はメモリー内で保持。保存・再開は未対応です。"
+        },
         Style::default().fg(MUTED),
     ));
     content.extend(lines(
@@ -550,12 +955,9 @@ fn status_panel(frame: &mut Frame, snapshot: &Value, area: Rect) {
     ));
     content.push(Line::raw(""));
     content.push(Line::raw("Esc / Enter で閉じる"));
-    frame.render_widget(
-        Paragraph::new(content).block(block(" 状態 ").border_style(Style::default().fg(ACCENT))),
-        area,
-    );
+    details(frame, app, area, " 状態 · ↑↓ / PgUp/Dn / Esc ", content);
 }
-fn new_chat(frame: &mut Frame, confirm: bool, area: Rect) {
+fn new_chat(frame: &mut Frame, confirm: bool, snapshot: &Value, area: Rect) {
     let area = popup(area, 76, 10);
     frame.render_widget(Clear, area);
     let selected = Style::default()
@@ -564,8 +966,16 @@ fn new_chat(frame: &mut Frame, confirm: bool, area: Rect) {
         .add_modifier(Modifier::BOLD);
     frame.render_widget(
         Paragraph::new(vec![
-            Line::raw("現在の会話と入力履歴を消して、新しい会話を始めます。"),
-            Line::raw("元の会話には戻れません。ファイルは変更しません。"),
+            Line::raw(if snapshot["capabilities"]["sessionPersistence"] == true {
+                "新しいセッションを開始し、画面と入力履歴を初期化します。"
+            } else {
+                "現在の会話と入力履歴を消して、新しい会話を始めます。"
+            }),
+            Line::raw(if snapshot["capabilities"]["sessionPersistence"] == true {
+                "現在のセッションは保存され、/sessionsで再開できます。"
+            } else {
+                "元の会話には戻れません。ファイルは変更しません。"
+            }),
             Line::raw(""),
             Line::from(vec![
                 Span::styled(" 戻る ", if !confirm { selected } else { Style::default() }),

@@ -22,11 +22,17 @@ import pyte
 binary = str(Path(sys.argv[1]).resolve())
 runner = r'''import fs from 'node:fs';
 const p=JSON.parse(fs.readFileSync(0,'utf8')).prompt;
-const h=JSON.parse(p.split('History JSON:\n')[1]);
-const result=h.filter(m=>m.role==='tool').at(-1);
-if(h.filter(m=>m.role==='user').at(-1)?.content==='slow') await new Promise(r=>setTimeout(r,30000));
-const turn=result?{version:1,text:JSON.parse(result.content).result.content??'DENIED',toolCalls:[]}:{version:1,text:'',toolCalls:[{id:'r1',name:'read',arguments:{path:'nonce.txt'}}]};
-process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
+const write=text=>process.stdout.write(JSON.stringify({text,usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:50}}}));
+if(!p.includes('History JSON:\n')) {write('DELEGATE_CHILD_PROOF');}
+else {
+ const h=JSON.parse(p.split('History JSON:\n')[1]);
+ const result=h.filter(m=>m.role==='tool').at(-1);
+ const user=h.filter(m=>m.role==='user').at(-1)?.content;
+ if(user==='slow') await new Promise(r=>setTimeout(r,30000));
+ const call=user==='delegate'?{id:'m1',name:'model_call',arguments:{provider:'cursor-sdk',model:'composer-2.5',prompt:'Reply DELEGATE_CHILD_PROOF'}}:{id:'r1',name:'read',arguments:{path:'nonce.txt'}};
+ const turn=result?{version:1,text:JSON.parse(result.content).result.content??JSON.parse(result.content).result.text??'DENIED',toolCalls:[]}:{version:1,text:'',toolCalls:[call]};
+ write(JSON.stringify(turn));
+}
 '''
 class Client:
     def __init__(self, root, provider="cursor-sdk", model="composer-2.5", sdk_dir=None, isolated=True):
@@ -166,4 +172,17 @@ if __name__ == '__main__':
             assert '👨' not in client.text(),'backspace split the emoji grapheme'
             os.kill(client.proc.pid,signal.SIGTERM);client.restored()
             print('PASS cancellation, Japanese/emoji editing and SIGTERM terminal restoration')
+        finally:client.close()
+
+    with tempfile.TemporaryDirectory(prefix='rdsh-model-call-ui-') as folder:
+        root=Path(folder);(root/'dsh').mkdir();(root/'cursor-sdk-runner.mjs').write_text(runner)
+        client=Client(root)
+        try:
+            client.wait('Rustdshへようこそ');client.send('delegate\r');client.wait('model_call')
+            client.send('\t\r');client.wait('DELEGATE_CHILD_PROOF');client.wait('待機中')
+            client.wait('Cache:50.0%');client.wait('In:300');client.wait('Out:60')
+            client.send('/usage\r');client.wait('キャッシュ集計対象');client.dismiss('キャッシュ集計対象')
+            client.send('/diagnostics\r');client.wait('問題は報告されていません');client.dismiss('問題は報告されていません')
+            client.send('/quit\r');client.restored()
+            print('PASS model_call approval/result, actual token/cache counters, /usage and diagnostics')
         finally:client.close()

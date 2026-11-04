@@ -40,7 +40,7 @@ Antigravityは `GEMINI_API_KEY` / `GOOGLE_API_KEY` の環境変数、または�
 
 ## ツールと承認
 
-最初のnative実装は `read` と `devin_cli` の2ツールを持ちます。
+native実装は `read`、`devin_cli`、`model_call` を持ちます。
 DSHの既存プラグインを自動で移植・実行するものではありません。
 
 - `read {"path":"relative/file.txt"}`: 明示したワークスペース内のUTF-8通常ファイル、
@@ -48,10 +48,15 @@ DSHの既存プラグインを自動で移植・実行するものではあり�
   Unixでは各パス成分を `openat` / `O_NOFOLLOW` で開き、承認待ち中のsymlink置換も
   追跡しません。読み取り内容を選択中のプロバイダーへ送信する前に毎回承認が必要です。
 - `devin_cli {"prompt":"...","timeout":60}`: Rustが固定のDevin CLIを直接起動します。
-  作業ディレクトリはRustのワークスペース、promptはシェルを介さず一引数で渡します。
-  timeoutは1〜300秒、stdout/stderr合計64KiB。Devin自身の通常の認証・信頼・承認を
-  維持し、承認バイパスフラグは渡しません。毎回Rust GUIの承認が必要です。
+  作業ディレクトリはRustのワークスペース、promptはシェルを介さずACPのJSON-RPCで渡します。
+  timeoutは1〜300秒、フレーム1MiB、通信合計8MiB、回答テキスト64KiBを上限にします。通常の認証・信頼・承認を
+  維持し、承認バイパスフラグは渡しません。毎回Rust GUIまたはTUIの承認が必要です。
   CLIの場所は `--devin-bin` で明示できます。既定は `~/.local/bin/devin` です。
+  現在はACPで起動し、Devin内部の操作承認も同じRust画面へ中継します。
+  `processStarted` と `completed` を区別します。詳細は [NATIVE-DEVIN-ACP.md](NATIVE-DEVIN-ACP.md)。
+- `model_call {"provider":"...","model":"...","prompt":"..."}`: 登録済みの利用可能な
+  モデルへ、表示して承認した依頼文だけを送信します。親履歴は自動共有せず、相手の
+  ツール実行や再帰的な委譲は行いません。結果と実測使用量を主モデルへ返します。
 
 拒否は未実行のツール結果として履歴に入り、永続的な許可にはなりません。
 承認は再利用できず、キャンセル後は実行開始ゲートで新たな起動を拒否します。
@@ -132,3 +137,6 @@ Cerebrasは既存アカウントがHTTP 402を返したため生成未確認、�
 ありません。4プロトコルの要求・応答、エラー秘匿、承認の許可・拒否はmock HTTPでも検証します。
 
 Google API仕様: [GenerateContent](https://ai.google.dev/api/generate-content)。認証は`x-goog-api-key`ヘッダーを使い、thoughtパートを最終応答から除外します。
+
+Rust TUIとWeb GUIはモデル・ツール・使用量を共有実装で処理します。
+機能対応と実測値の意味は [NATIVE-PARITY.md](NATIVE-PARITY.md) を参照してください。

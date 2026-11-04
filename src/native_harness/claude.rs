@@ -50,11 +50,18 @@ fn command(binary: &std::ffi::OsStr, model: &str, cwd: &std::path::Path) -> Comm
     command
 }
 
-pub(super) async fn generate(model: &str, prompt: &str) -> Result<String> {
+pub(super) async fn generate_with_usage(
+    model: &str,
+    prompt: &str,
+) -> Result<super::usage::Generation> {
     generate_with(std::ffi::OsStr::new("claude"), model, prompt).await
 }
 
-async fn generate_with(binary: &std::ffi::OsStr, model: &str, prompt: &str) -> Result<String> {
+async fn generate_with(
+    binary: &std::ffi::OsStr,
+    model: &str,
+    prompt: &str,
+) -> Result<super::usage::Generation> {
     if model.is_empty()
         || model.starts_with('-')
         || model.len() > 200
@@ -72,10 +79,14 @@ async fn generate_with(binary: &std::ffi::OsStr, model: &str, prompt: &str) -> R
         LIMIT,
     )
     .await?;
-    decode(status, &stdout)
+    decode_generation(status, &stdout)
 }
 
+#[cfg(test)]
 fn decode(status: i32, bytes: &[u8]) -> Result<String> {
+    Ok(decode_generation(status, bytes)?.text)
+}
+fn decode_generation(status: i32, bytes: &[u8]) -> Result<super::usage::Generation> {
     let result: Value =
         serde_json::from_slice(bytes).map_err(|_| anyhow::anyhow!("CLAUDE_INVALID_RESPONSE"))?;
     if status != 0
@@ -109,13 +120,24 @@ fn decode(status: i32, bytes: &[u8]) -> Result<String> {
     .into_iter()
     .find_map(|(start, end)| text.strip_prefix(start).and_then(|s| s.strip_suffix(end)))
     .unwrap_or(text);
-    Ok(text.to_owned())
+    Ok(super::usage::Generation {
+        text: text.to_owned(),
+        usage: super::usage::Usage::parse("anthropic-messages", &result),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn cli_usage_preserves_cache_read_and_write_in_total_input() {
+        let reply = json!({"type":"result","subtype":"success","is_error":false,"result":"answer","num_turns":1,"permission_denials":[],"usage":{"input_tokens":10,"cache_read_input_tokens":80,"cache_creation_input_tokens":10,"output_tokens":7}});
+        let result = decode_generation(0, &serde_json::to_vec(&reply).unwrap()).unwrap();
+        assert_eq!(result.usage.input_tokens, Some(100));
+        assert_eq!(result.usage.cache_read_tokens, Some(80));
+        assert_eq!(result.usage.output_tokens, Some(7));
+    }
     #[test]
     fn child_has_no_tools_mcp_hooks_sessions_or_permission_bypass() {
         let command = command(
@@ -210,7 +232,8 @@ printf '%s' '{"type":"result","subtype":"success","is_error":false,"result":"fix
         assert_eq!(
             generate_with(binary.as_os_str(), "test-model", "fixture prompt")
                 .await
-                .unwrap(),
+                .unwrap()
+                .text,
             "fixture answer"
         );
         assert_eq!(

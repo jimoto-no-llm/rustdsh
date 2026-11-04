@@ -1,10 +1,14 @@
-//! Full-screen terminal client of the Rust engine; no DSH runtime or HTTP server.
+//! Full-screen terminal client shared by harness backends.
+pub(super) mod backend;
 mod commands;
+mod dsh;
 mod editor;
+mod questions;
 mod view;
 
-use super::{create_engine, dispatch, engine::Engine};
+use super::create_engine;
 use anyhow::{bail, Result};
+use backend::{HarnessBackend, NativeBackend};
 use crossterm::{
     cursor::{Hide, Show},
     event::{
@@ -23,7 +27,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::runtime::Runtime;
 
 const MIN_WIDTH: u16 = 42;
 const MIN_HEIGHT: u16 = 14;
@@ -33,6 +36,12 @@ struct ModelRow {
     provider: String,
     id: String,
     unavailable: Option<String>,
+}
+#[derive(Clone)]
+struct SessionRow {
+    id: String,
+    title: String,
+    cwd: String,
 }
 #[derive(Default)]
 enum Overlay {
@@ -45,6 +54,15 @@ enum Overlay {
     Help,
     Status,
     Logs,
+    Diagnostics,
+    Sessions {
+        items: Vec<SessionRow>,
+        selected: usize,
+    },
+    ReadOnly {
+        title: &'static str,
+        content: String,
+    },
     New {
         confirm: bool,
     },
@@ -62,17 +80,26 @@ struct App {
     history_index: Option<usize>,
     saved_draft: String,
     pending_id: Option<String>,
+    pending_is_questions: bool,
+    question_form: Option<questions::QuestionForm>,
+    question_error: Option<String>,
     allow: bool,
     approval_scroll: u16,
     models: Vec<ModelRow>,
+    detail_scroll: usize,
+    detail_max_scroll: usize,
+    detail_follow: bool,
     input_visible: bool,
     command_selected: usize,
     command_dismissed: Option<String>,
 }
 impl App {
-    fn new(engine: &Engine) -> Self {
+    fn has_pending(&self) -> bool {
+        self.pending_id.is_some() || self.pending_is_questions
+    }
+    fn new(providers: Value) -> Self {
         let mut models = Vec::new();
-        for p in engine.providers().as_array().into_iter().flatten() {
+        for p in providers.as_array().into_iter().flatten() {
             for m in p["models"].as_array().into_iter().flatten() {
                 models.push(ModelRow {
                     provider: p["id"].as_str().unwrap_or("").into(),
@@ -92,6 +119,9 @@ impl App {
         if !self.input_visible {
             // A hidden dialog must not retain a previously selected confirmation.
             self.allow = false;
+            if let Some(form) = &mut self.question_form {
+                form.clear_answers();
+            }
             if let Overlay::New { confirm } = &mut self.overlay {
                 *confirm = false;
             }
@@ -104,7 +134,15 @@ impl App {
         }
     }
     fn paste(&mut self, value: &str) {
-        if !self.input_visible || self.pending_id.is_some() {
+        if !self.input_visible {
+            return;
+        }
+        if self.has_pending() {
+            if let Some(form) = &mut self.question_form {
+                if !form.paste(value) {
+                    self.notice = "自由入力は16KiB以内にしてください".into();
+                }
+            }
             return;
         }
         let inserted = match &mut self.overlay {
@@ -125,15 +163,61 @@ impl App {
         self.command_dismissed = None;
     }
     fn sync_pending(&mut self, snapshot: &Value) {
-        let id = snapshot["pending"]["id"].as_str().map(str::to_owned);
-        if id != self.pending_id {
+        let is_questions = snapshot["pending"]["kind"] == "questions";
+        let id = snapshot["pending"]["id"]
+            .as_str()
+            .filter(|id| {
+                !is_questions
+                    || (!id.trim().is_empty()
+                        && id.len() <= 512
+                        && !id.chars().any(char::is_control))
+            })
+            .map(str::to_owned);
+        let changed = id != self.pending_id || is_questions != self.pending_is_questions;
+        if changed {
             self.pending_id = id;
+            self.pending_is_questions = is_questions;
+            self.question_form = None;
+            self.question_error = None;
             self.allow = false;
             self.approval_scroll = 0;
-            if self.pending_id.is_some() {
+            if self.has_pending() {
                 self.overlay = Overlay::None;
             }
         }
+        if is_questions {
+            if self.pending_id.is_none() {
+                self.question_form = None;
+                self.question_error = Some("質問要求IDが不正です。Escで中止してください".into());
+                return;
+            }
+            let data = questions::data(&snapshot["pending"]);
+            if self.question_form.as_ref().is_none_or(|f| !f.matches(data)) {
+                match questions::QuestionForm::parse(data) {
+                    Ok(form) => {
+                        self.question_form = Some(form);
+                        self.question_error = None;
+                    }
+                    Err(error) => {
+                        self.question_form = None;
+                        self.question_error = Some(error.to_string());
+                    }
+                }
+            }
+        }
+    }
+    fn open_details(&mut self, overlay: Overlay) {
+        self.detail_scroll = 0;
+        self.detail_max_scroll = 0;
+        self.detail_follow = matches!(overlay, Overlay::Logs);
+        self.overlay = overlay;
+    }
+    fn scroll_details(&mut self, delta: isize) {
+        self.detail_scroll = self
+            .detail_scroll
+            .saturating_add_signed(delta)
+            .min(self.detail_max_scroll);
+        self.detail_follow = self.detail_scroll == self.detail_max_scroll;
     }
     fn filtered_models(&self) -> Vec<&ModelRow> {
         let query = match &self.overlay {
@@ -149,26 +233,14 @@ impl App {
             })
             .collect()
     }
-    fn call(
-        &mut self,
-        path: &str,
-        body: Value,
-        engine: &Arc<Engine>,
-        runtime: &Arc<Runtime>,
-    ) -> bool {
-        match dispatch(
-            "POST",
-            path,
-            &body.to_string(),
-            engine.clone(),
-            runtime.clone(),
-        ) {
+    fn call(&mut self, path: &str, body: Value, backend: &dyn HarnessBackend) -> bool {
+        match backend.request(path, body) {
             Ok(_) => {
                 self.notice.clear();
                 true
             }
             Err(e) => {
-                self.notice = engine.redact(&e.to_string());
+                self.notice = backend.redact(&e.to_string());
                 false
             }
         }
@@ -199,7 +271,7 @@ impl App {
             .unwrap_or_else(|| self.saved_draft.clone());
         self.editor.cursor = self.editor.text.len();
     }
-    fn submit(&mut self, engine: &Arc<Engine>, runtime: &Arc<Runtime>) -> bool {
+    fn submit(&mut self, backend: &dyn HarnessBackend) -> bool {
         let text = self.editor.text.trim().to_owned();
         if text.is_empty() {
             return false;
@@ -207,7 +279,7 @@ impl App {
         if let Some(command) = commands::parse(&text) {
             match command {
                 Ok(command) => {
-                    if let Some(quit) = self.execute_command(command, engine, runtime) {
+                    if let Some(quit) = self.execute_command(command, backend) {
                         self.editor.clear();
                         self.command_selected = 0;
                         self.command_dismissed = None;
@@ -224,7 +296,7 @@ impl App {
             self.editor.text.clone()
         };
         let (path, body) = ("/api/message", json!({"text":literal}));
-        if self.call(path, body, engine, runtime) {
+        if self.call(path, body, backend) {
             if path == "/api/message" {
                 if self.history.len() == 100 {
                     self.history.remove(0);
@@ -239,24 +311,19 @@ impl App {
         false
     }
     /// Return true only for the explicit quit action. Approval uses the displayed ID.
-    fn key(
-        &mut self,
-        key: KeyEvent,
-        snapshot: &Value,
-        engine: &Arc<Engine>,
-        runtime: &Arc<Runtime>,
-    ) -> bool {
+    fn key(&mut self, key: KeyEvent, snapshot: &Value, backend: &dyn HarnessBackend) -> bool {
         if key.kind == KeyEventKind::Release {
             return false;
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let busy = matches!(snapshot["status"].as_str(), Some("running" | "approval"));
+        let busy = self.has_pending()
+            || matches!(snapshot["status"].as_str(), Some("running" | "approval"));
         if ctrl && key.code == KeyCode::Char('q') {
             return true;
         }
         if ctrl && key.code == KeyCode::Char('c') {
             if busy {
-                engine.cancel();
+                backend.cancel();
             } else {
                 self.editor.clear();
             }
@@ -265,22 +332,50 @@ impl App {
         if !self.input_visible {
             if key.code == KeyCode::Esc {
                 if let Some(id) = self.pending_id.clone() {
-                    self.call(
-                        "/api/approval",
-                        json!({"id":id,"allow":false}),
-                        engine,
-                        runtime,
-                    );
+                    self.call("/api/approval", json!({"id":id,"allow":false}), backend);
                 } else {
                     if busy {
-                        engine.cancel();
+                        backend.cancel();
                     }
                     self.overlay = Overlay::None;
                 }
             }
             return false;
         }
-        if self.pending_id.is_some() {
+        if self.has_pending() {
+            if self.pending_is_questions {
+                if key.code == KeyCode::Esc {
+                    if let Some(id) = self.pending_id.clone() {
+                        self.call("/api/approval", json!({"id":id,"allow":false}), backend);
+                    } else {
+                        backend.cancel();
+                    }
+                } else if let Some(form) = &mut self.question_form {
+                    match form.key(key) {
+                        Ok(Some(answers)) => {
+                            let latest = backend.snapshot();
+                            if latest["pending"]["id"].as_str() != self.pending_id.as_deref()
+                                || latest["pending"]["kind"] != "questions"
+                                || !form.matches(questions::data(&latest["pending"]))
+                            {
+                                self.sync_pending(&latest);
+                                self.notice =
+                                    "質問が更新されました。内容を確認して回答し直してください"
+                                        .into();
+                            } else {
+                                self.call(
+                                    "/api/question",
+                                    json!({"id":self.pending_id,"answers":answers}),
+                                    backend,
+                                );
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(error) => self.notice = backend.redact(&error.to_string()),
+                    }
+                }
+                return false;
+            }
             match key.code {
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
                     self.allow = !self.allow
@@ -296,19 +391,13 @@ impl App {
                         self.call(
                             "/api/approval",
                             json!({"id":id,"allow":self.allow}),
-                            engine,
-                            runtime,
+                            backend,
                         );
                     }
                 }
                 KeyCode::Esc => {
                     if let Some(id) = self.pending_id.clone() {
-                        self.call(
-                            "/api/approval",
-                            json!({"id":id,"allow":false}),
-                            engine,
-                            runtime,
-                        );
+                        self.call("/api/approval", json!({"id":id,"allow":false}), backend);
                     }
                 }
                 _ => {}
@@ -323,7 +412,7 @@ impl App {
                 KeyCode::Esc => self.overlay = Overlay::None,
                 KeyCode::Enter if key.kind == KeyEventKind::Press => {
                     let confirmed = *confirm;
-                    if !confirmed || self.new_chat(engine) {
+                    if !confirmed || self.new_chat(backend) {
                         self.overlay = Overlay::None;
                     }
                 }
@@ -333,10 +422,53 @@ impl App {
         }
         if matches!(
             self.overlay,
-            Overlay::Help | Overlay::Status | Overlay::Logs
+            Overlay::Help
+                | Overlay::Status
+                | Overlay::Logs
+                | Overlay::Diagnostics
+                | Overlay::ReadOnly { .. }
         ) {
-            if matches!(key.code, KeyCode::Esc | KeyCode::F(1) | KeyCode::Enter) {
-                self.overlay = Overlay::None;
+            match key.code {
+                KeyCode::Esc | KeyCode::F(1) | KeyCode::Enter => self.overlay = Overlay::None,
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.scroll_details(if key.code == KeyCode::Up { -1 } else { -8 })
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.scroll_details(if key.code == KeyCode::Down { 1 } else { 8 })
+                }
+                KeyCode::Home => {
+                    self.detail_scroll = 0;
+                    self.detail_follow = false;
+                }
+                KeyCode::End => {
+                    self.detail_scroll = self.detail_max_scroll;
+                    self.detail_follow = true;
+                }
+                _ => {}
+            }
+            return false;
+        }
+        if let Overlay::Sessions { items, selected } = &mut self.overlay {
+            match key.code {
+                KeyCode::Up => *selected = selected.saturating_sub(1),
+                KeyCode::Down => *selected = (*selected + 1).min(items.len().saturating_sub(1)),
+                KeyCode::Home => *selected = 0,
+                KeyCode::End => *selected = items.len().saturating_sub(1),
+                KeyCode::Esc => self.overlay = Overlay::None,
+                KeyCode::Enter if key.kind == KeyEventKind::Press => {
+                    if let Some(row) = items.get(*selected).cloned() {
+                        if self.call("/api/resume", json!({"sessionId":row.id}), backend) {
+                            self.editor.clear();
+                            self.history.clear();
+                            self.history_index = None;
+                            self.saved_draft.clear();
+                            self.scroll = 0;
+                            self.follow = true;
+                            self.overlay = Overlay::None;
+                        }
+                    }
+                }
+                _ => {}
             }
             return false;
         }
@@ -358,8 +490,7 @@ impl App {
                     } else if self.call(
                         "/api/model",
                         json!({"provider":row.provider,"model":row.id}),
-                        engine,
-                        runtime,
+                        backend,
                     ) {
                         self.overlay = Overlay::None;
                     }
@@ -379,7 +510,7 @@ impl App {
             }
             return false;
         }
-        if let Some(quit) = self.command_key(key, engine, runtime) {
+        if let Some(quit) = self.command_key(key, backend) {
             return quit;
         }
         match key.code {
@@ -409,7 +540,7 @@ impl App {
             KeyCode::Char('n') if ctrl => self.history(false),
             KeyCode::Esc => {
                 if busy {
-                    engine.cancel();
+                    backend.cancel();
                 }
                 self.notice.clear();
             }
@@ -420,9 +551,7 @@ impl App {
             {
                 self.editor.insert("\n");
             }
-            KeyCode::Enter if key.kind == KeyEventKind::Press => {
-                return self.submit(engine, runtime)
-            }
+            KeyCode::Enter if key.kind == KeyEventKind::Press => return self.submit(backend),
             _ => {
                 let before = self.editor.text.clone();
                 if !edit(&mut self.editor, key) {
@@ -490,50 +619,59 @@ impl Drop for Screen {
 
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_native_tui(
+    mode: String,
     workspace: PathBuf,
     sdk_dir: Option<PathBuf>,
     dsh_profile: Option<String>,
     dsh_catalog: Option<PathBuf>,
     devin: Option<PathBuf>,
-    provider: String,
-    model: String,
+    provider: Option<String>,
+    model: Option<String>,
     locale: crate::locale::Locale,
 ) -> Result<()> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         bail!("native-tui requires an interactive terminal");
     }
-    let engine = create_engine(workspace, sdk_dir, dsh_profile, dsh_catalog, devin)?;
-    let runtime = Arc::new(
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()?,
-    );
-    dispatch(
-        "POST",
-        "/api/model",
-        &json!({"provider":provider,"model":model}).to_string(),
-        engine.clone(),
-        runtime.clone(),
-    )?;
+    let backend: Box<dyn HarnessBackend> = if mode == "dsh" {
+        if sdk_dir.is_some() || dsh_catalog.is_some() || devin.is_some() {
+            bail!("DSHモードでは --sdk-dir / --dsh-catalog / --devin-bin を使えません。既存DSHプロファイルの設定を使用します");
+        }
+        let backend =
+            dsh::DshBackend::start(workspace, dsh_profile.as_deref().unwrap_or("web"), locale)?;
+        if let (Some(provider), Some(model)) = (provider, model) {
+            backend.request("/api/model", json!({"provider":provider,"model":model}))?;
+        }
+        Box::new(backend)
+    } else {
+        let engine = create_engine(workspace, sdk_dir, dsh_profile, dsh_catalog, devin)?;
+        let runtime = Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()?,
+        );
+        let backend = NativeBackend::new(engine, runtime);
+        backend.request("/api/model", json!({"provider":provider.unwrap_or_else(||"cursor-sdk".into()),"model":model.unwrap_or_else(||"composer-2.5".into())}))?;
+        Box::new(backend)
+    };
     crate::shutdown::install(locale)?;
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         restore_terminal();
         previous(info);
     }));
-    let result = run_screen(&engine, &runtime);
-    engine.cancel();
+    let result = run_screen(backend.as_ref());
+    backend.cancel();
     result
 }
-fn run_screen(engine: &Arc<Engine>, runtime: &Arc<Runtime>) -> Result<()> {
+pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
     let _screen = Screen::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.clear()?;
-    let mut app = App::new(engine);
+    let mut app = App::new(backend.snapshot()["providers"].clone());
     let started = Instant::now();
     while !crate::shutdown::requested() {
-        let snapshot = engine.snapshot();
+        let snapshot = backend.snapshot();
         app.sync_pending(&snapshot);
         terminal.draw(|frame| view::draw(frame, &mut app, &snapshot, started.elapsed()))?;
         if !event::poll(Duration::from_millis(100))? {
@@ -546,13 +684,49 @@ fn run_screen(engine: &Arc<Engine>, runtime: &Arc<Runtime>) -> Result<()> {
         app.guard_input_size(size.width, size.height);
         match input {
             Event::Key(key) => {
-                if app.key(key, &snapshot, engine, runtime) {
+                if app.key(key, &snapshot, backend) {
                     break;
                 }
             }
             Event::Paste(value) => app.paste(&value),
             Event::Resize(width, height) => app.guard_input_size(width, height),
+            Event::Mouse(mouse) if app.pending_is_questions => {
+                if let Some(form) = &mut app.question_form {
+                    let delta = match mouse.kind {
+                        MouseEventKind::ScrollUp => -3,
+                        MouseEventKind::ScrollDown => 3,
+                        _ => 0,
+                    };
+                    form.scroll = form
+                        .scroll
+                        .saturating_add_signed(delta)
+                        .min(form.max_scroll);
+                    form.follow_focus = false;
+                }
+            }
             Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::ScrollUp
+                    if matches!(
+                        app.overlay,
+                        Overlay::Status
+                            | Overlay::Logs
+                            | Overlay::Diagnostics
+                            | Overlay::ReadOnly { .. }
+                    ) =>
+                {
+                    app.scroll_details(-3)
+                }
+                MouseEventKind::ScrollDown
+                    if matches!(
+                        app.overlay,
+                        Overlay::Status
+                            | Overlay::Logs
+                            | Overlay::Diagnostics
+                            | Overlay::ReadOnly { .. }
+                    ) =>
+                {
+                    app.scroll_details(3)
+                }
                 MouseEventKind::ScrollUp => app.scroll_by(-3),
                 MouseEventKind::ScrollDown => app.scroll_by(3),
                 _ => {}
