@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-04
+
 ### Fixed
 
 - GitHub が検出したプラグイン・動画用の Zod と desktop SDK の MCP client の
