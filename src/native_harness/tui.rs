@@ -25,6 +25,9 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
+const MIN_WIDTH: u16 = 42;
+const MIN_HEIGHT: u16 = 14;
+
 #[derive(Clone)]
 struct ModelRow {
     provider: String,
@@ -62,6 +65,7 @@ struct App {
     allow: bool,
     approval_scroll: u16,
     models: Vec<ModelRow>,
+    input_visible: bool,
     command_selected: usize,
     command_dismissed: Option<String>,
 }
@@ -82,6 +86,43 @@ impl App {
             models,
             ..Self::default()
         }
+    }
+    fn set_size(&mut self, width: u16, height: u16) {
+        self.input_visible = width >= MIN_WIDTH && height >= MIN_HEIGHT;
+        if !self.input_visible {
+            // A hidden dialog must not retain a previously selected confirmation.
+            self.allow = false;
+            if let Overlay::New { confirm } = &mut self.overlay {
+                *confirm = false;
+            }
+        }
+    }
+    fn guard_input_size(&mut self, width: u16, height: u16) {
+        // Input may restrict visibility, but only a rendered frame may restore it.
+        if width < MIN_WIDTH || height < MIN_HEIGHT {
+            self.set_size(width, height);
+        }
+    }
+    fn paste(&mut self, value: &str) {
+        if !self.input_visible || self.pending_id.is_some() {
+            return;
+        }
+        let inserted = match &mut self.overlay {
+            Overlay::None => self.editor.insert(value),
+            Overlay::Models { query, selected } => {
+                let inserted = query.insert(value);
+                if inserted {
+                    *selected = 0;
+                }
+                inserted
+            }
+            _ => return,
+        };
+        if !inserted {
+            self.notice = "貼り付けが上限16KiBを超えています".into();
+        }
+        self.command_selected = 0;
+        self.command_dismissed = None;
     }
     fn sync_pending(&mut self, snapshot: &Value) {
         let id = snapshot["pending"]["id"].as_str().map(str::to_owned);
@@ -140,7 +181,7 @@ impl App {
         self.follow = self.scroll == self.max_scroll;
     }
     fn history(&mut self, previous: bool) {
-        if self.history.is_empty() {
+        if self.history.is_empty() || (self.history_index.is_none() && !previous) {
             return;
         }
         let index = match (self.history_index, previous) {
@@ -221,6 +262,24 @@ impl App {
             }
             return false;
         }
+        if !self.input_visible {
+            if key.code == KeyCode::Esc {
+                if let Some(id) = self.pending_id.clone() {
+                    self.call(
+                        "/api/approval",
+                        json!({"id":id,"allow":false}),
+                        engine,
+                        runtime,
+                    );
+                } else {
+                    if busy {
+                        engine.cancel();
+                    }
+                    self.overlay = Overlay::None;
+                }
+            }
+            return false;
+        }
         if self.pending_id.is_some() {
             match key.code {
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
@@ -288,7 +347,12 @@ impl App {
                     Overlay::Models { selected, .. } => *selected,
                     _ => 0,
                 };
-                if let Some(row) = self.filtered_models().get(selected).cloned().cloned() {
+                if let Some(row) = self
+                    .filtered_models()
+                    .get(selected.min(count.saturating_sub(1)))
+                    .cloned()
+                    .cloned()
+                {
                     if let Some(reason) = row.unavailable {
                         self.notice = reason;
                     } else if self.call(
@@ -475,27 +539,19 @@ fn run_screen(engine: &Arc<Engine>, runtime: &Arc<Runtime>) -> Result<()> {
         if !event::poll(Duration::from_millis(100))? {
             continue;
         }
-        match event::read()? {
+        let input = event::read()?;
+        // Recheck the actual size at input time as well as at draw time: a key
+        // may already be queued when the terminal shrinks after the last frame.
+        let size = terminal.size()?;
+        app.guard_input_size(size.width, size.height);
+        match input {
             Event::Key(key) => {
                 if app.key(key, &snapshot, engine, runtime) {
                     break;
                 }
             }
-            Event::Paste(value) => {
-                if app.pending_id.is_some() {
-                    continue;
-                }
-                let target = match &mut app.overlay {
-                    Overlay::None => &mut app.editor,
-                    Overlay::Models { query, .. } => query,
-                    _ => continue,
-                };
-                if !target.insert(&value) {
-                    app.notice = "貼り付けが上限16KiBを超えています".into();
-                }
-                app.command_selected = 0;
-                app.command_dismissed = None;
-            }
+            Event::Paste(value) => app.paste(&value),
+            Event::Resize(width, height) => app.guard_input_size(width, height),
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollUp => app.scroll_by(-3),
                 MouseEventKind::ScrollDown => app.scroll_by(3),

@@ -46,7 +46,8 @@ fn popup(area: Rect, width: u16, height: u16) -> Rect {
 }
 pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: Duration) {
     let area = frame.area();
-    if area.width < 42 || area.height < 14 {
+    app.set_size(area.width, area.height);
+    if !app.input_visible {
         frame.render_widget(Paragraph::new("RDSH Native TUI\n端末を42列×14行以上に広げてください\nCtrl+Q 終了 / Ctrl+C 実行中止"),area);
         return;
     }

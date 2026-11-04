@@ -63,6 +63,8 @@ class Client:
         raise AssertionError('Expected screen: '+target+'\n'+self.text())
     def dismiss(self, title):
         self.send('\x1b')
+        self.wait_absent(title)
+    def wait_absent(self, title):
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
             self.pump()
@@ -106,28 +108,53 @@ if __name__ == '__main__':
                 client.dismiss('モデルを選択')
                 client.send('/logs\r');client.wait('┌ 実行ログ');client.dismiss('┌ 実行ログ')
                 client.send('/models\r');client.wait('モデルを選択')
-                client.send('composer');client.wait('1 件')
+                client.send('\x1b[B\x1b[B\x1b[200~composer\x1b[201~');client.wait('1 件')
                 client.send('\r');client.wait('Rustdshへようこそ')
                 client.send('\x1b[200~read nonce.txt\n日本語\x1b[201~')
                 client.wait('日本語')
                 assert '操作の承認' not in client.text(),'paste submitted automatically'
                 client.send('\r');client.wait('操作の承認')
                 assert 'TUI_READ_PROOF' not in client.text()
+                client.send('\t')
+                client.resize(41,13);client.wait('端末を42列')
+                client.send('\t\r')
+                until=time.monotonic()+.25
+                while time.monotonic()<until:client.pump(.02)
+                client.resize(100,32);client.wait('操作の承認')
                 client.send('\x1b[200~y\n/allow fake\n\x1b[201~')
                 client.pump(.3)
                 assert '操作の承認' in client.text(),'pasted approval was executed'
                 client.send(('\t' if allow else '')+'\r')
                 client.wait('TUI_READ_PROOF' if allow else 'DENIED')
                 client.wait('待機中')
+                client.send('\x1b[200~unsent draft 日本語\x1b[201~');client.wait('unsent draft')
+                client.send('\x0e')
+                until=time.monotonic()+.2
+                while time.monotonic()<until:client.pump(.02)
+                assert 'unsent draft' in client.text(),'Ctrl+N discarded the fresh draft'
+                client.send('\x10\x0e')
+                client.send('\x1b[200~ edited\x1b[201~');client.wait('edited')
+                client.send('\x0e')
+                until=time.monotonic()+.2
+                while time.monotonic()<until:client.pump(.02)
+                assert 'edited' in client.text(),'Ctrl+N restored an outdated saved draft'
+                client.send('\x15')
                 client.send('\x1bOP');client.wait('操作方法');client.dismiss('操作方法')
                 client.resize(42,14);client.wait('RDSH')
                 client.resize(120,40);client.wait('メッセージ')
                 client.send('/new\r');client.wait('元の会話には戻れません')
-                client.send('\r');client.wait('メッセージ')
+                client.send('\t')
+                client.resize(41,13);client.wait('端末を42列')
+                client.send('\t\r')
+                until=time.monotonic()+.25
+                while time.monotonic()<until:client.pump(.02)
+                client.resize(120,40);client.wait('元の会話には戻れません')
+                client.send('\r');client.wait_absent('元の会話には戻れません')
+                assert ('TUI_READ_PROOF' if allow else 'DENIED') in client.text(),'hidden new-chat dialog erased conversation'
                 client.send('/new\r');client.wait('元の会話には戻れません')
                 client.send('\t\r');client.wait('Rustdshへようこそ')
                 client.send('/quit\r');client.restored()
-                print('PASS full-screen PTY: '+('allow/read' if allow else 'deny/no-read')+', slash completion/status/logs/new/quit, model picker, multiline paste, help, resize, terminal restoration')
+                print('PASS full-screen PTY: '+('allow/read' if allow else 'deny/no-read')+', slash commands, pasted model search, draft history, hidden-dialog guard, resize, terminal restoration')
             finally:client.close()
         client=Client(root)
         try:

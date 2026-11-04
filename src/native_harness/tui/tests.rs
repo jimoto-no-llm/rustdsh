@@ -18,6 +18,11 @@ fn engine() -> Arc<Engine> {
         registry: profiles::Registry::default(),
     })
 }
+fn ready_app(engine: &Engine) -> App {
+    let mut app = App::new(engine);
+    app.set_size(100, 32);
+    app
+}
 fn runtime() -> Arc<Runtime> {
     Arc::new(
         tokio::runtime::Builder::new_multi_thread()
@@ -49,7 +54,7 @@ fn render(app: &mut App, state: &Value, width: u16, height: u16) -> String {
 #[test]
 fn layout_adapts_without_panics_and_renders_unicode_and_overlays() {
     let engine = engine();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     engine.state.lock().unwrap().messages.push(Message {
         role: "assistant".into(),
         content: "日本語の応答\n```rust\nlet x = 1;\n```".into(),
@@ -81,7 +86,7 @@ fn layout_adapts_without_panics_and_renders_unicode_and_overlays() {
 fn approval_defaults_to_deny_and_is_tied_to_visible_id() {
     let engine = engine();
     let runtime = runtime();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     {
         let mut state = engine.state.lock().unwrap();
@@ -133,7 +138,7 @@ fn approval_defaults_to_deny_and_is_tied_to_visible_id() {
 fn editor_history_model_filter_and_scrolling_preserve_drafts() {
     let engine = engine();
     let runtime = runtime();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     app.history = vec!["previous".into()];
     app.editor.insert("draft");
     app.history(true);
@@ -179,7 +184,7 @@ fn localized_cli_includes_native_terminal_command() {
 fn slash_menu_completion_execution_and_errors_stay_local() {
     let engine = engine();
     let runtime = runtime();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     app.editor.insert("/");
     assert_eq!(app.command_candidates().len(), commands::COMMANDS.len());
     let output = render(&mut app, &engine.snapshot(), 80, 24);
@@ -216,7 +221,7 @@ fn slash_menu_completion_execution_and_errors_stay_local() {
 fn slash_new_requires_confirmation_and_rejects_running_work() {
     let engine = engine();
     let runtime = runtime();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     engine.state.lock().unwrap().messages.push(Message {
         role: "user".into(),
         content: "keep me".into(),
@@ -251,7 +256,7 @@ fn slash_new_requires_confirmation_and_rejects_running_work() {
 fn escape_dismisses_palette_without_cancelling_and_edit_reopens_it() {
     let engine = engine();
     let runtime = runtime();
-    let mut app = App::new(&engine);
+    let mut app = ready_app(&engine);
     engine.state.lock().unwrap().status = "running".into();
     app.editor.insert("/");
     app.key(key(KeyCode::Esc), &engine.snapshot(), &engine, &runtime);
@@ -265,4 +270,127 @@ fn escape_dismisses_palette_without_cancelling_and_edit_reopens_it() {
     );
     assert!(app.palette_open());
     assert_eq!(app.command_candidates()[0].name, "status");
+}
+
+#[test]
+fn forward_history_outside_navigation_preserves_current_and_edited_drafts() {
+    let engine = engine();
+    let runtime = runtime();
+    let mut app = ready_app(&engine);
+    app.history = vec!["sent message".into()];
+    app.editor.insert("new draft 日本語");
+    app.editor.cursor = 3;
+    let forward = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL);
+    app.key(forward, &engine.snapshot(), &engine, &runtime);
+    assert_eq!(app.editor.text, "new draft 日本語");
+    assert_eq!(app.editor.cursor, 3);
+    app.history(true);
+    assert_eq!(app.editor.text, "sent message");
+    app.history(false);
+    app.editor.insert(" edited");
+    let edited = app.editor.text.clone();
+    let cursor = app.editor.cursor;
+    app.key(forward, &engine.snapshot(), &engine, &runtime);
+    app.key(forward, &engine.snapshot(), &engine, &runtime);
+    assert_eq!(app.editor.text, edited);
+    assert_eq!(app.editor.cursor, cursor);
+}
+
+#[test]
+fn hidden_approval_cannot_confirm_and_resizing_back_resets_to_deny() {
+    let engine = engine();
+    let runtime = runtime();
+    let mut app = ready_app(&engine);
+    let (tx, mut rx) = tokio::sync::oneshot::channel();
+    {
+        let mut state = engine.state.lock().unwrap();
+        state.status = "approval".into();
+        state.pending = Some(Pending {
+            id: "small-screen".into(),
+            tool: "read".into(),
+            arguments: json!({"path":"proof.txt"}),
+            reason: "confirm".into(),
+        });
+        state.decision = Some(tx);
+    }
+    let snapshot = engine.snapshot();
+    app.sync_pending(&snapshot);
+    app.allow = true;
+    assert!(render(&mut app, &snapshot, 41, 13).contains("端末を42列"));
+    assert!(!app.allow);
+    app.key(key(KeyCode::Tab), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    assert!(rx.try_recv().is_err());
+    assert_eq!(engine.state.lock().unwrap().status, "approval");
+    app.guard_input_size(80, 24);
+    assert!(
+        !app.input_visible,
+        "resizing alone cannot expose an unrendered dialog"
+    );
+    app.key(key(KeyCode::Tab), &snapshot, &engine, &runtime);
+    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    assert!(rx.try_recv().is_err());
+    render(&mut app, &snapshot, 80, 24);
+    app.key(key(KeyCode::Enter), &snapshot, &engine, &runtime);
+    assert!(
+        !rx.try_recv().unwrap(),
+        "a hidden selection must not survive resize"
+    );
+}
+
+#[test]
+fn hidden_new_chat_and_input_are_blocked_but_cancel_and_quit_remain_available() {
+    let engine = engine();
+    let runtime = runtime();
+    let mut app = ready_app(&engine);
+    engine.state.lock().unwrap().messages.push(Message {
+        role: "user".into(),
+        content: "keep this conversation".into(),
+    });
+    app.overlay = Overlay::New { confirm: true };
+    render(&mut app, &engine.snapshot(), 80, 13);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &engine, &runtime);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    assert!(matches!(app.overlay, Overlay::New { confirm: false }));
+    assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
+    app.key(key(KeyCode::Esc), &engine.snapshot(), &engine, &runtime);
+    assert!(matches!(app.overlay, Overlay::None));
+    app.editor.insert("unsent draft");
+    app.paste("hidden paste");
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    assert_eq!(app.editor.text, "unsent draft");
+    assert_eq!(engine.state.lock().unwrap().messages.len(), 1);
+    engine.state.lock().unwrap().status = "running".into();
+    app.key(
+        KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        &engine.snapshot(),
+        &engine,
+        &runtime,
+    );
+    assert_eq!(engine.state.lock().unwrap().status, "idle");
+    assert!(app.key(
+        KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+        &engine.snapshot(),
+        &engine,
+        &runtime
+    ));
+}
+
+#[test]
+fn pasted_model_query_resets_selection_to_the_highlighted_match() {
+    let engine = engine();
+    let runtime = runtime();
+    let mut app = ready_app(&engine);
+    app.overlay = Overlay::Models {
+        query: Editor::default(),
+        selected: 2,
+    };
+    app.paste("composer");
+    assert!(matches!(app.overlay, Overlay::Models { selected: 0, .. }));
+    assert_eq!(app.filtered_models().len(), 1);
+    assert!(render(&mut app, &engine.snapshot(), 80, 24).contains("composer-2.5"));
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &engine, &runtime);
+    assert!(matches!(app.overlay, Overlay::None));
+    assert_eq!(engine.state.lock().unwrap().provider, "cursor-sdk");
+    assert_eq!(engine.state.lock().unwrap().model, "composer-2.5");
 }
