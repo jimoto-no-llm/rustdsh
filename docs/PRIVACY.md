@@ -1,22 +1,31 @@
 # プライバシーと外部通信の既定
 
-rustdsh は、委譲先の DeepSeek Harness (DSH) を起動するランチャーです。既定では
-**モデル推論のための LLM API リクエスト**、**利用者が明示的に実行した Web 検索・
-Web ページ取得**、およびその動作に必要な認証・トークン更新だけを外部通信として
-許可し、それ以外のテレメトリやバックグラウンド通信は既定で止めます。
+rdsh の既定値は [機能スイッチ](RDSH-SETTINGS.md#機能スイッチonoff)と
+[`src/rdsh_config.rs`](../src/rdsh_config.rs)に対応します。セッション telemetry と
+Discord は既定OFFです。Web検索や更新関連の機能には既定ONのものもあり、
+すべてのバックグラウンド通信を止める設定ではありません。
 
-対象は rustdsh 本体と、rustdsh が起動する子プロセスです。DSH 本体のコードや既定
-設定は変更しません。
+対象は rdsh 本体と rdsh が起動する子プロセスです。委譲先の設定や、利用者が追加した
+プラグイン・MCP サーバーが独自に行う通信は、それぞれの実装に従います。
 
-## 既定で止めているもの
+## 通信経路と既定値
 
-| 経路 | 既定 | rustdsh 側の仕組み |
+| 経路 | 既定 | 動作する条件・設定 |
 | --- | --- | --- |
-| 委譲先 DSH のセッション telemetry（OpenTelemetry） | 無効 | 子プロセスへ `DSH_TELEMETRY_DISABLED=1` を渡す |
-| Discord Rich Presence | 無効 | `features.discord`（旧 `discord.enabled`）の既定を off |
-| 更新確認・リリース探索 | 無効 | `features.release_probe` は既定 off。日次更新は `rdsh update auto on` を明示したときだけ |
-| Web 検索（`rdsh search-web`） | 無効 | `features.search-web`（`search-web` extra）は既定 off |
-| DSH 本体の Web 検索プロバイダ | 変更しない | `search.dsh_search_provider` を設定したときだけ子プロセスへ `DSH_WEB_SEARCH_PROVIDER` を渡す（シェルの明示値が優先） |
+| 委譲先 DSH のセッション telemetry（OpenTelemetry） | off | 子プロセスへ `DSH_TELEMETRY_DISABLED=1` を渡す |
+| Discord Rich Presence | off | `features.discord`。既存の明示的な有効設定は保持する |
+| 更新バナー・通知 | on | `update_check`・`update_notifications`。同梱プラグインが保存された更新状態を表示・通知する。画面からの更新操作も提供する |
+| 日次の自動更新 | 未設定 | `rdsh update auto on` でスケジューラを明示的に導入したときに実行する |
+| release qualification probe | off | `features.release_probe`。固定更新の適格性確認用で、通常の更新バナーとは別の機能 |
+| Web検索（`rdsh search-web`） | on | 利用者が検索コマンドを実行したときに問い合わせる。必要に応じた rustxng の導入を含む |
+| 委譲先のローカル検索ブリッジ | on | `web_search_bridge`。導入済みプラグインと利用可能なローカル検索先があるときに `DSH_WEB_SEARCH_PROVIDER=rdsh-rustxng` を渡す。利用者の明示値が優先 |
+| 同梱プラグインの自動更新 | 条件付きで有効 | release 版プラグインを使う対象プロファイルの利用時に、既定24時間間隔で確認する。`RDSH_PLUGINS_SKIP_UPDATE=1` で停止 |
+| 管理下 rustxng の自動更新 | 条件付きで有効 | `rdsh search-web` / `rdsh rustxng start` の利用時に、既定24時間間隔で確認する。`RUSTXNG_SKIP_UPDATE=1` で停止 |
+
+導入・更新では GitHub Releases 等への問い合わせと配布物の取得が発生します。
+`update_check` をOFFにしても、日次スケジューラやプラグイン・rustxng の更新設定は別に残ります。
+各経路は [Web検索](WEB-SEARCH.md)、[同梱プラグインの更新実装](../src/plugins_release.rs)、
+[日次自動更新](AUTO-UPDATE.md)の手順で確認してください。
 
 `DSH_TELEMETRY_DISABLED` は upstream DSH の opt-out で、**空でない値なら
 `0` や `false` でも無効**として扱われます（upstream の `session-telemetry-otel`
@@ -48,11 +57,10 @@ rdsh settings set discord.enabled true   # 旧キーも引き続き有効
 `features.discord: true` が明示されていれば、それらは尊重されて有効のままです。
 両方ある場合は `features.discord` が優先されます。
 
-## 既定で許可する通信
+## モデル・検索・ローカル画面の通信
 
 - 設定済み LLM プロバイダへの推論・モデル一覧取得などの API リクエスト
-- 利用者が明示的に実行した Web 検索・Web ページ取得（`rdsh search-web` を
-  有効化した場合の SearXNG、`--provider ollama` で選んだ Ollama Web Search API、DSH の検索ツールなど）
+- 利用者が明示的に実行した Web 検索・Web ページ取得（SearXNG、`--provider ollama` で選んだ Ollama Web Search API、DSH の検索ツールなど）
 - 上記に必要な認証・トークン更新
 - `rdsh serve` / `rdsh setup --web` は `127.0.0.1` のローカル待受だけを使います
 
@@ -63,9 +71,9 @@ Ollama へ送りません。`--provider ollama` の指定時は検索語と件�
 
 ## 制約と保証できない範囲
 
-- rustdsh はネットワークを遮断しません。ファイアウォールやサンドボックスの
-  強制は行わず、既定 off は「rustdsh がその通信を起こさない・有効化しない」
-  という意味です。
+- rdsh 全体の通信を一括遮断する仕組みではありません。任意の保護付きツール
+  サンドボックスは対象ツールだけを制限します。各機能のOFFは、その機能が行う
+  処理を止める設定です。
 - 委譲先 DSH、利用者が導入したプラグイン、登録した MCP サーバーは、それぞれ
   自身の設定に従って外部通信できます。
 - 委譲先 DSH が既定で持つ送信経路（例: profile の `session-log-deepseek` による

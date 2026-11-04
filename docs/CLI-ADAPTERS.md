@@ -13,11 +13,13 @@ session control, which is a separate interface from calling dashboard tools.
 
 | CLI | Verified version | Transport | Operations |
 | ----------- | ---------------- | ----------------- | ------------------------------------------- |
-| DSH | 0.2.0-rc.2, 0.2.1-alpha.1 | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
+| DSH | 0.2.0-rc.2 | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
 | Codex | None | Not implemented | All unsupported |
 | Claude Code | None | Not implemented | All unsupported |
 | Kimi | None | Not implemented | All unsupported |
 
+This range comes from [adapter-catalog.mjs](../dashboard/adapter-catalog.mjs).
+The Rust tool sandbox and each plugin have separate [compatibility contracts](DSH-COMPATIBILITY.md).
 DSH support is conditional on a successful version probe and ACP initialization.
 Resume also requires the peer to advertise sessionCapabilities.resume.
 The registry lists verification requirements; a probe alone does not claim that

@@ -2,7 +2,7 @@ name: pin-release-digests
 
 # A published stable release only reaches install.sh --from-release, the
 # automatic updater and install.ps1 -FromRelease once its archive digests are
-# pinned in the two ledgers on main; see docs/RELEASING.md.
+# pinned in all three ledgers on main; see docs/RELEASING.md.
 #
 # 注意: このワークフローは pull-requests: write を持っているが、それだけでは
 # PR を作れない。リポジトリ設定 can_approve_pull_request_reviews=false の間は
@@ -51,7 +51,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Pin the published digests in both ledgers
+      - name: Pin the published digests in all three ledgers
         env:
           TAG: ${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,7 +88,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "${branch}"
-          git add release-digests.tsv release-digests-windows.tsv
+          git add release-digests.tsv release-digests-windows.tsv release-plugins-digests.tsv
           git commit -m "chore(release): pin ${TAG} digests"
           # ブランチ push は contents: write だけで成功する。ここで作った内容は
           # PR の作成に失敗しても失われない。
@@ -98,9 +98,9 @@ jobs:
           body="${RUNNER_TEMP}/pin-pr-body.md"
           cat > "${body}" <<EOF
           概要: ${TAG} の公開アセットのダイジェストを installer 台帳へ pin します。
-          変更: release-digests.tsv と release-digests-windows.tsv に ${TAG} の行を追加し、latest 行を更新します。
+          変更: release-digests.tsv、release-digests-windows.tsv、release-plugins-digests.tsv に ${TAG} の行を追加し、latest 行を更新します。
           検証: ダイジェストは GitHub Releases API の値を使い、prerelease・欠損アセット・不正な値はスクリプトが拒否します。
-          注意点: マージすると自動更新とインストーラがこの版を解決できるようになるため、両台帳の差分を確認してからマージしてください。
+          注意点: マージすると自動更新とインストーラがこの版を解決できるようになるため、3台帳の差分を確認してからマージしてください。
           EOF
 
           pr_error=""
@@ -113,7 +113,7 @@ jobs:
             issue="${RUNNER_TEMP}/pin-issue.md"
             cat > "${issue}" <<EOF
           概要: pin-release-digests が ${branch} を push しましたが、Actions が PR を作成できませんでした（${pr_error}）。
-          変更: commit ${sha} で release-digests.tsv と release-digests-windows.tsv の ${TAG} 行と latest 行を更新しました。
+          変更: commit ${sha} で release-digests.tsv、release-digests-windows.tsv、release-plugins-digests.tsv の ${TAG} 行と latest 行を更新しました。
           検証: ダイジェストは GitHub Releases API の値で、scripts/pin-release-digests.py ${TAG} が生成した差分です。
           次の一手: 手元で gh pr create --base main --head ${branch} --title "${title}" を実行するか、Settings → Actions → General の "Allow GitHub Actions to create and approve pull requests" を有効にしてこのワークフローを再実行してください。
           注意点: ${TAG} が pin されるまで、自動更新とインストーラはこの版を解決できません。

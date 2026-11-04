@@ -7,6 +7,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- 公開プラグインの照合表を v0.15.0 まで補完し、pin ワークフローが3台帳すべてをコミットするよう修正しました。保護付き委譲の対応版、通信の既定値、自動更新と公開インストーラの説明を実装に合わせました。
+
 - GitHub が検出したプラグイン・動画用の Zod と desktop SDK の MCP client の
   依存脆弱性を修正版へ更新しました。
 
