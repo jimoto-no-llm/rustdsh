@@ -1,5 +1,7 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
+mod claude;
 mod engine;
+mod oauth;
 mod profiles;
 mod sdk;
 mod tools;

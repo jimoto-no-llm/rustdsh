@@ -257,9 +257,9 @@ impl Drop for ProcessGroupGuard {
     }
 }
 
-struct TemporaryRoot(PathBuf);
+pub(super) struct TemporaryRoot(pub(super) PathBuf);
 impl TemporaryRoot {
-    fn create() -> Result<Self> {
+    pub(super) fn create() -> Result<Self> {
         let mut random = [0_u8; 16];
         getrandom::fill(&mut random).map_err(|_| anyhow::anyhow!("SDK_TEMP_FAILED"))?;
         let suffix: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
