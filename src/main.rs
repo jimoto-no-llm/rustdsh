@@ -358,7 +358,7 @@ enum Commands {
     /// Rust-owned terminal UI with native or DSH tools/plugins backend.
     #[command(name = "native-tui")]
     NativeTui {
-        #[arg(long, default_value = "native", value_parser = ["native", "dsh"])]
+        #[arg(long, default_value = "native", value_parser = ["native", "dsh"], help = "Terminal harness backend: Rust native or installed DSH")]
         backend: String,
         #[arg(long)]
         workspace: std::path::PathBuf,
@@ -2509,7 +2509,21 @@ fn localize_command_tree(command: clap::Command, locale: locale::Locale) -> clap
             };
             let arg = arg.help_heading(heading);
             let id = arg.get_id().to_string();
-            let help = if name == "cost-ledger" && id == "action" {
+            let help = if name == "native-tui" && id == "backend" {
+                match locale {
+                    locale::Locale::Chinese => "终端运行后端：Rust native 或现有 DSH",
+                    locale::Locale::Japanese => "端末の実行バックエンド: Rust native または既存DSH",
+                    locale::Locale::English => unreachable!(),
+                }
+            } else if name == "native-tui" && id == "dsh_profile" {
+                match locale {
+                    locale::Locale::Chinese => "native读取模型注册；DSH模式启动此配置文件",
+                    locale::Locale::Japanese => {
+                        "nativeではモデル登録を読取、DSHではこのプロファイルを起動"
+                    }
+                    locale::Locale::English => unreachable!(),
+                }
+            } else if name == "cost-ledger" && id == "action" {
                 match locale {
                     locale::Locale::Chinese => {
                         "操作：declare | report | validate | public | schema"
@@ -2600,8 +2614,8 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "$DSH_HOME に記録したインスタンスを終了",
         ),
         "native-tui" => (
-            "启动 Rust 原生终端对话、工具与单次审批（不启动 DSH）",
-            "Rust独自の端末対話・ツール・一回限りの承認を起動（DSH起動なし）",
+            "启动 Rust 终端界面（native / DSH 工具与插件）",
+            "Rust製の端末UIを起動（native / DSHツール・プラグイン）",
         ),
         "native-web" => (
             "启动 Rust 原生推理、工具与审批的独立网页界面",
