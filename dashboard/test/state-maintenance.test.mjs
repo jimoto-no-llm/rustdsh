@@ -94,6 +94,21 @@ test("sealed dry-run verifies integrity without repairing or removing recovery f
   await assert.rejects(readOnly.mutate("event", { title: "Must not write" }), /read-only/);
   assert.deepEqual(await snapshot(project.directory), before);
 
+  const keyFile = path.join(project.directory, "state-integrity.key");
+  for (const [key, failure] of [
+    [null, /integrity key is missing/],
+    [Buffer.alloc(1), /integrity key is invalid/],
+    [Buffer.alloc(32), /integrity check failed/],
+  ]) {
+    if (key === null) await fs.unlink(keyFile);
+    else await fs.writeFile(keyFile, key);
+    const damaged = await snapshot(project.directory);
+    await assert.rejects(dryRunStateMigration(project), failure);
+    await assert.rejects(applyStateMigration(project), failure);
+    assert.deepEqual(await snapshot(project.directory), damaged);
+  }
+  await fs.writeFile(keyFile, before["state-integrity.key"]);
+
   const corrupt = JSON.parse(await fs.readFile(stateFile, "utf8"));
   corrupt.tasks[0].title = "Changed without a valid seal";
   await writeJson(stateFile, corrupt);
