@@ -18,6 +18,8 @@ pub struct Route {
     pub name: String,
     pub models: Vec<Model>,
     pub key: Option<String>,
+    pub oauth: Option<crate::auth::native_oauth::Grant>,
+    pub claude: bool,
 }
 pub struct Model {
     pub id: String,
@@ -105,17 +107,33 @@ impl Registry {
         let root = PathBuf::from(crate::inspect::dsh_home())
             .join("profiles")
             .join(profile);
-        Self::load_from(&root, catalog.or_else(catalog_dir).as_deref(), |env| {
-            std::env::var(env)
-                .ok()
-                .filter(|v| !v.is_empty())
-                .or_else(|| crate::models::credential_ref(env))
-        })
+        Self::load_with_transports(
+            &root,
+            catalog.or_else(catalog_dir).as_deref(),
+            |env| {
+                std::env::var(env)
+                    .ok()
+                    .filter(|v| !v.is_empty())
+                    .or_else(|| crate::models::credential_ref(env))
+            },
+            crate::auth::native_oauth::load,
+            crate::auth::command_on_path("claude"),
+        )
     }
+    #[cfg(test)]
     fn load_from(
         root: &Path,
         catalog: Option<&Path>,
         key: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self> {
+        Self::load_with_transports(root, catalog, key, |_| Ok(None), false)
+    }
+    fn load_with_transports(
+        root: &Path,
+        catalog: Option<&Path>,
+        key: impl Fn(&str) -> Option<String>,
+        oauth: impl Fn(&str) -> Result<Option<crate::auth::native_oauth::Grant>>,
+        claude_available: bool,
     ) -> Result<Self> {
         if !root.is_dir() {
             bail!("NATIVE_PROFILE_NOT_FOUND");
@@ -169,7 +187,17 @@ impl Registry {
                 .cloned()
                 .unwrap_or_else(|| catalog_models.clone());
             let key_name = scalar(&config, "apiKeyEnv");
-            let auth = key_name.and_then(&key);
+            let grant = if key_name.is_none() && id == "openai-codex" {
+                oauth(&id)
+            } else {
+                Ok(None)
+            };
+            let oauth_error = grant.as_ref().err().map(|e| e.to_string());
+            let grant = grant.ok().flatten();
+            let auth = key_name
+                .and_then(&key)
+                .or_else(|| grant.as_ref().map(|g| g.access.clone()));
+            let claude = id == "anthropic" && key_name.is_none();
             let mut seen = HashSet::new();
             let mut resolved = vec![];
             for model in models {
@@ -189,10 +217,39 @@ impl Registry {
                     .or_else(|| scalar(&model, "baseUrl"))
                     .or_else(|| base_model.and_then(|v| scalar(v, "baseUrl")))
                     .unwrap_or("");
-                let unavailable = if config["unsupported"] == true || model["unsupported"] == true {
+                let oauth_endpoint = super::oauth::supported(&id, api, base);
+                let claude_endpoint = claude
+                    && api == "anthropic-messages"
+                    && matches!(
+                        base.trim_end_matches('/'),
+                        "https://api.anthropic.com" | "https://api.anthropic.com/v1"
+                    );
+                let transport_ok = config.get("transport").is_none()
+                    || (id == "openai-codex"
+                        && api == "openai-codex-responses"
+                        && scalar(&config, "transport") == Some("sse"));
+                let unavailable = if config["unsupported"] == true
+                    || model["unsupported"] == true
+                    || !transport_ok
+                {
                     Some("このルートの追加設定にはnative未対応の項目があります".into())
-                } else if endpoint(base, api, mid).is_err() {
-                    Some("未対応APIまたは不正・未指定の接続先です（OAuth専用APIは未対応）".into())
+                } else if claude_endpoint {
+                    (!claude_available).then(|| {
+                        "claude CLIが必要です（ログイン後にnative-webを再起動してください）".into()
+                    })
+                } else if oauth_endpoint && key_name.is_none() {
+                    if let Some(error) = &oauth_error {
+                        Some(format!(
+                            "{error}: 共有済みCodex認証を更新しnative-webを再起動してください"
+                        ))
+                    } else {
+                        grant.is_none().then(|| "共有済みCodex OAuth認証が必要です（rdsh authで共有を選択してください）".into())
+                    }
+                } else if endpoint(base, api, mid).is_err()
+                    || (grant.is_some() && !oauth_endpoint)
+                    || claude
+                {
+                    Some("未対応APIまたは不正・未指定の接続先です".into())
                 } else if key_name.is_none() || auth.is_none() {
                     Some("apiKeyEnvと既存の環境変数またはcredential refが必要です".into())
                 } else {
@@ -244,6 +301,8 @@ impl Registry {
                 name: scalar(&config, "displayName").unwrap_or(&id).into(),
                 models: resolved,
                 key: auth,
+                oauth: grant,
+                claude,
             });
         }
         Ok(registry)
@@ -264,6 +323,12 @@ impl Registry {
             .find(provider, model)
             .filter(|(_, m)| m.unavailable.is_none())
             .ok_or_else(|| anyhow::anyhow!("NATIVE_MODEL_UNAVAILABLE"))?;
+        if route.claude {
+            return super::claude::generate(&model.id, prompt).await;
+        }
+        if let Some(grant) = &route.oauth {
+            return super::oauth::generate(grant, "openai-codex", &model.id, prompt).await;
+        }
         let url = endpoint(&model.base, &model.api, &model.id)?;
         let mut body = match model.api.as_str() {
             "openai-completions" => {
@@ -382,6 +447,100 @@ pub(super) mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+    fn oauth_grant() -> crate::auth::native_oauth::Grant {
+        crate::auth::native_oauth::Grant {
+            access: "synthetic-oauth".into(),
+            expires: i64::MAX,
+            account_id: Some("synthetic-account".into()),
+        }
+    }
+    #[test]
+    fn codex_sse_and_claude_print_routes_do_not_require_api_key_refs() {
+        let root = Scratch::new();
+        let codex = "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        transport: sse\n        api: openai-codex-responses\n        baseURL: https://chatgpt.com/backend-api\n        models:\n          - id: gpt-test\n";
+        root.write("cordis.patch.yml", codex);
+        let r = Registry::load_with_transports(
+            &root.0,
+            None,
+            |_| None,
+            |_| Ok(Some(oauth_grant())),
+            false,
+        )
+        .unwrap();
+        assert!(r.allowed("dsh:openai-codex", "gpt-test"));
+        assert!(!serde_json::to_string(&r.public())
+            .unwrap()
+            .contains("synthetic-oauth"));
+        for changed in [
+            codex.replace("transport: sse", "transport: websocket"),
+            codex.replace("https://chatgpt.com/backend-api", "https://other.invalid"),
+            codex.replace("transport: sse", "headers: {}"),
+        ] {
+            root.write("cordis.patch.yml", &changed);
+            let r = Registry::load_with_transports(
+                &root.0,
+                None,
+                |_| None,
+                |_| Ok(Some(oauth_grant())),
+                false,
+            )
+            .unwrap();
+            assert!(!r.allowed("dsh:openai-codex", "gpt-test"));
+        }
+        let claude = codex
+            .replace("openai-codex:", "anthropic:")
+            .replace("        transport: sse\n", "")
+            .replace("openai-codex-responses", "anthropic-messages")
+            .replace(
+                "https://chatgpt.com/backend-api",
+                "https://api.anthropic.com",
+            );
+        root.write("cordis.patch.yml", &claude);
+        let r = Registry::load_with_transports(
+            &root.0,
+            None,
+            |_| None,
+            |_| panic!("Claude must not read OAuth grants"),
+            true,
+        )
+        .unwrap();
+        assert!(r.allowed("dsh:anthropic", "gpt-test"));
+        assert!(r.routes[0].claude);
+        let missing =
+            Registry::load_with_transports(&root.0, None, |_| None, |_| Ok(None), false).unwrap();
+        assert!(!missing.allowed("dsh:anthropic", "gpt-test"));
+        root.write(
+            "cordis.patch.yml",
+            &claude.replace(
+                "        api:",
+                "        apiKeyEnv: EXPLICIT_KEY\n        api:",
+            ),
+        );
+        let explicit =
+            Registry::load_with_transports(&root.0, None, |_| None, |_| Ok(None), true).unwrap();
+        assert!(
+            !explicit.allowed("dsh:anthropic", "gpt-test"),
+            "do not fall back to CLI when an explicit API key is absent"
+        );
+    }
+    #[test]
+    fn reported_transport_only_codex_and_empty_anthropic_routes_use_installed_catalog() {
+        let root = Scratch::new();
+        root.write("cordis.patch.yml", "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        transport: sse\n      anthropic: {}\n");
+        root.write("openai-codex.json", &json!({"openai-codex-responses":{"test-codex":{"id":"test-codex","api":"openai-codex-responses","baseUrl":"https://chatgpt.com/backend-api"}}}).to_string());
+        root.write("anthropic.json", &json!({"anthropic-messages":{"test-claude":{"id":"test-claude","api":"anthropic-messages","baseUrl":"https://api.anthropic.com"}}}).to_string());
+        let r = Registry::load_with_transports(
+            &root.0,
+            Some(&root.0),
+            |_| None,
+            |_| Ok(Some(oauth_grant())),
+            true,
+        )
+        .unwrap();
+        assert!(r.allowed("dsh:openai-codex", "test-codex"));
+        assert!(r.allowed("dsh:anthropic", "test-claude"));
+        assert!(r.diagnostics.is_empty());
     }
     fn patch(api: &str, base: &str) -> String {
         format!("- id: llm-pi-ai\n  config:\n    providers:\n      test:\n        api: {api}\n        baseURL: '{base}'\n        apiKeyEnv: TEST_API_KEY\n        models:\n          - id: test-model\n            name: Test Model\n")

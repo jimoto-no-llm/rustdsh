@@ -142,7 +142,9 @@ pub(crate) fn read_routes(text: &str) -> Result<Option<Map<String, Value>>> {
                         }
                     }
                     route.insert(key, Value::Array(models));
-                } else if ["api", "baseURL", "apiKeyEnv", "displayName"].contains(&key.as_str()) {
+                } else if ["api", "baseURL", "apiKeyEnv", "displayName", "transport"]
+                    .contains(&key.as_str())
+                {
                     if rest.is_empty() || rest.starts_with(['|', '>', '[', '{', '&', '*', '!']) {
                         bail!("NATIVE_PROFILE_ROUTE_SCALAR");
                     }
