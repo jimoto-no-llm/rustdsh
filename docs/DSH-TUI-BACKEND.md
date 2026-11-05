@@ -10,6 +10,12 @@ DSH側のツール、プラグイン、MCP、skills、モデル登録、認証�
 そのまま使用します。DSHのTUIプラグインを呼び出すコマンドではありません。
 DSHと、そのバージョンに対応するNodeのインストールが必要です。
 
+RustXNG / SearXNGの検索連携も、通常のDSH起動と同じ初期化を使います。
+`rdsh rustxng install`、`rdsh rustxng start` で検索エンジンを用意し、
+同じプロファイルへ `rdsh-web-search-searxng` を導入すると、到達性を確認して
+`web_search` をローカル検索へ接続します。既存の検索先指定と無効化設定は尊重します。
+詳しくは[検索連携](WEB-SEARCH.md)を参照してください。
+
 `--backend native`（既定値）はRust独立ハーネスです。
 [native-webとの対応表](NATIVE-PARITY.md)の処理を共有します。
 DSHモードでは `--sdk-dir`、`--dsh-catalog`、`--devin-bin` は指定できません。

@@ -724,6 +724,7 @@ pub(crate) fn tui_host_command(
     let orig =
         find_original_dsh().ok_or_else(|| anyhow::anyhow!("DSH runtime が見つかりません"))?;
     let mut command = base_cmd(&orig, false, false, locale)?;
+    apply_search_bridge(&mut command, profile, false);
     command.args(["--profile", profile, "--no-open", "--port", "0"]);
     Ok(command)
 }
