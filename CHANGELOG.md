@@ -7,6 +7,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- 成果物の取得で元ファイルや既存のコピー先を上書きせず、現行 DSH の JSONL・
+  圧縮セッションと作業ディレクトリを正しく解釈します。HTTP ダウンロードは
+  検証済みのファイルを分割送信し、ファイル名によるヘッダー注入、不正な JSON、
+  セッション指定の無視を修正しました。
+
 - 公開プラグインの照合表を v0.15.0 まで補完し、pin ワークフローが3台帳すべてをコミットするよう修正しました。保護付き委譲の対応版、通信の既定値、自動更新と公開インストーラの説明を実装に合わせました。
 
 - GitHub が検出したプラグイン・動画用の Zod と desktop SDK の MCP client の
