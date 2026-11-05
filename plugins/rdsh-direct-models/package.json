@@ -3,15 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test agy-sdk.test.mjs cursor-sdk.test.mjs devin-tool.test.mjs index.test.mjs json-turn.test.mjs sdk-runtime-smoke.test.mjs",
-    "test:hermetic": "node --test agy-sdk.test.mjs cursor-sdk.test.mjs devin-tool.test.mjs json-turn.test.mjs"
+    "test": "node --test agy-sdk.test.mjs cursor-sdk.test.mjs claude-cli.test.mjs devin-tool.test.mjs index.test.mjs json-turn.test.mjs sdk-runtime-smoke.test.mjs",
+    "test:hermetic": "node --test agy-sdk.test.mjs cursor-sdk.test.mjs claude-cli.test.mjs devin-tool.test.mjs json-turn.test.mjs"
   },
   "dependencies": {
     "@cursor/sdk": "1.0.40",
     "ajv": "^8.17.1"
   },
   "version": "0.1.0",
-  "description": "Official SDK JSON turns with rdsh-owned tools and approvals",
+  "description": "Official SDK and Claude CLI JSON turns with rdsh-owned tools and approvals",
   "exports": {
     ".": "./index.mjs"
   },
@@ -27,6 +27,8 @@
     "agy-sdk.py",
     "cursor-sdk.mjs",
     "cursor-sdk-runner.mjs",
+    "claude-cli.mjs",
+    "claude-catalog.mjs",
     "devin-tool.mjs",
     "cordis.patch.yml",
     "requirements.txt",

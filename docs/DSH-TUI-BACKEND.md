@@ -1,0 +1,89 @@
+# Rust TUIからDSHのツール・プラグインを使う
+
+```sh
+rdsh native-tui --backend dsh --dsh-profile web --workspace /path/to/project
+```
+
+画面、入力、スクロール、モデル選択、承認・質問への回答はRustが描画します。
+指定した既存DSHプロファイルを、ブラウザーを開かずに子プロセスとして起動します。
+DSH側のツール、プラグイン、MCP、skills、モデル登録、認証、承認・sandbox設定を
+そのまま使用します。DSHのTUIプラグインを呼び出すコマンドではありません。
+DSHと、そのバージョンに対応するNodeのインストールが必要です。
+
+RustXNG / SearXNGの検索連携も、通常のDSH起動と同じ初期化を使います。
+`rdsh rustxng install`、`rdsh rustxng start` で検索エンジンを用意し、
+同じプロファイルへ `rdsh-web-search-searxng` を導入すると、到達性を確認して
+`web_search` をローカル検索へ接続します。既存の検索先指定と無効化設定は尊重します。
+詳しくは[検索連携](WEB-SEARCH.md)を参照してください。
+
+DSHのbase構成が`web.config.searchProvider: deepseek-official`を明示している場合は、
+環境変数よりその指定が優先されます。RustXNGを検索先として選ぶ場合は、
+対象プロファイルの`cordis.patch.yml`に次の設定を追加します。
+
+```yaml
+- id: web
+  config:
+    searchProvider: rdsh-rustxng
+```
+
+この明示指定ではRustXNGが未接続なら検索が失敗します。DSHを再起動して反映してください。
+
+Claude Codeの既存ログインでClaudeを使う場合は、`rdsh-direct-models`の
+`claude-cli`経路を選択します（例: `/model claude-cli claude-opus-5-5`）。
+生成は`claude -p`、ツールと承認はDSHが担当します。
+旧Anthropic OAuth経路はモデル一覧へ表示しません。旧`anthropic`指定や保存会話は
+同じモデルの`claude-cli`へ移行し、CLIにないモデルなら選択を拒否します。
+プロファイルの`llm-pi-ai.providers.anthropic`も退役すると、DSH Web GUIからも
+旧経路が消えます。認証データや会話本文を削除する操作ではありません。
+詳しくは[Claude CLI経路](../plugins/rdsh-direct-models/README.md#claude-cli経路)を参照してください。
+
+`--backend native`（既定値）はRust独立ハーネスです。
+[native-webとの対応表](NATIVE-PARITY.md)の処理を共有します。
+DSHモードでは `--sdk-dir`、`--dsh-catalog`、`--devin-bin` は指定できません。
+既存DSHプロファイルで設定してください。
+
+## 操作
+
+- F2、`/model`、`/model <provider> <model>`: DSHのモデル一覧から選択。
+- 承認: 引数と理由を確認し、Tabで一回限りの許可を選んでEnter。初期選択は拒否。
+  引数がまだ届いていない要求は許可できません。Escで拒否します。
+- 質問: ↑↓で選択肢を移動、Spaceで選択、Tab/Shift+Tabで質問を移動。
+  Ctrl+Eで自由回答を編集し、Ctrl+Sで回答全体を送信します。初期選択は空です。
+  Escで実行を中止します。plan-reviewの承認も明示的に選んで送信します。
+- `/sessions`: 現在のworkspaceの保存済みセッションを表示し、Enterで再開。
+- `/new`: 旧セッションを残して、新しいセッションを開始。
+- `/plugins`、`/settings`: 現在のプロファイルのプラグインと秘匿済み設定を閲覧。
+  この画面からインストール、削除、設定変更は行いません。
+- `/usage`、`/status`、`/logs`、`/diagnostics`: 使用量、接続情報、実行記録を閲覧。
+- Esc、Ctrl+C、`/cancel`: DSH側の実行を中止。Ctrl+Q、`/quit`: 終了。
+
+DSHの公開`session/selectModel`は、Web GUIと同じく選択したモデルを全体の既定値へ
+保存します。起動時の `--provider` と `--model` は両方指定した場合だけ選択します。
+未指定では既存の既定値を使用します。
+
+## 状態と使用量
+
+画面上部の `DSH runtime` がDSH接続中の目印です。回答はホストの逐次配信を表示し、
+確定した履歴を重複表示しません。切断時は入力を止め、再接続後のsnapshotから
+履歴を再構築します。要求への回答を自動再送・自動承認しません。
+
+DSHの永続セッションが持つ通常入力、キャッシュ読込、キャッシュ作成、出力の
+実測値を表示します。入力総計は前三者の合計です。キャッシュ率は内訳を取得できた
+モデル要求のキャッシュ読込÷入力で計算し、欠損を0扱いしません。
+表示履歴が一部の場合の要求件数は `?`、既知の小計は `*` を付けます。
+コンテキスト容量の推定値、料金、契約の残枠とは異なります。
+
+表示する履歴は最新1500イベントまでです。古い履歴はDSHの保存先に残ります。
+画面の診断に表示範囲の制限を明示します。
+子セッションの承認はDSHのカタログで親子関係を確認できた対象だけ表示します。
+所有関係の投影より先に届いた要求は、この画面では引き受けず診断に記録します。画像・ファイルの履歴は添付の存在を
+テキスト表示します。TUIからの画像添付やブラウザー固有のプラグイン画面は対象外です。
+プラグインが提供するモデル向けツールは既存プロファイルのまま利用できますが、
+全プラグインの独自UIを端末へ移植するものではありません。
+
+## 接続境界
+
+専用に起動した子ホストの127.0.0.1起動URLだけを受け付けます。起動トークンと
+HTTP/WSの認証Cookieはメモリ内で扱い、ログや画面へ出しません。
+既存ホストへの無断attach、既存セッションの削除、承認policyの緩和は行いません。
+終了時は自分が起動したホストだけを停止します。

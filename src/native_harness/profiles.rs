@@ -99,6 +99,73 @@ fn catalog_dir() -> Option<PathBuf> {
     }
     None
 }
+/// Read provider metadata only; never evaluate the installed JavaScript.
+fn catalog_models(catalog: Option<&Path>, id: &str) -> Vec<Value> {
+    catalog
+        .and_then(|p| read(&p.join(format!("{id}.json"))).ok())
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.as_object().cloned())
+        .map(|groups| {
+            // pi-ai flattenModelCatalog uses Object.assign: later APIs win.
+            let mut models = serde_json::Map::new();
+            for group in groups.into_values().filter_map(|v| v.as_object().cloned()) {
+                models.extend(group);
+            }
+            models.into_values().collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Claude Code owns authentication and transport; legacy HTTP/OAuth options
+/// contribute no authority to this inference-only CLI route.
+fn claude_route(catalog: Option<&Path>, legacy: Option<&Value>, available: bool) -> Route {
+    let resolve = |items: Vec<Value>| {
+        let mut seen = HashSet::new();
+        items.into_iter().filter_map(|model| {
+            let id = scalar(&model, "id")?;
+            if id.starts_with('-') || id.len() > 200 || !id.bytes().all(|c| c.is_ascii_graphic())
+                || !seen.insert(id.to_owned()) {return None;}
+            Some(Model {
+                id: id.into(),
+                name: scalar(&model,"name").unwrap_or(id).into(),
+                api: "claude-cli".into(), base: "cli://claude".into(),
+                max_tokens: model["maxTokens"].as_u64().unwrap_or(4096).clamp(1,8192),
+                token_field: String::new(),
+                unavailable: (!available).then(|| "claude CLIが必要です（ログイン後にnative-web/native-tuiを再起動してください）".into()),
+            })
+        }).collect::<Vec<_>>()
+    };
+    let mut models = resolve(catalog_models(catalog, "anthropic"));
+    if models.is_empty() {
+        models = resolve(
+            legacy
+                .and_then(|v| v["models"].as_array())
+                .cloned()
+                .unwrap_or_default(),
+        );
+    }
+    if models.is_empty() {
+        models = resolve(
+            [
+                ("opus", "Claude Opus"),
+                ("sonnet", "Claude Sonnet"),
+                ("haiku", "Claude Haiku"),
+            ]
+            .into_iter()
+            .map(|(id, name)| json!({"id":id,"name":name}))
+            .collect(),
+        );
+    }
+    Route {
+        id: "dsh:claude-cli".into(),
+        name: "Claude CLI (claude -p)".into(),
+        models,
+        key: None,
+        oauth: None,
+        claude: true,
+    }
+}
+
 impl Registry {
     pub fn load(profile: &str, catalog: Option<PathBuf>) -> Result<Self> {
         if !safe_id(profile) {
@@ -152,35 +219,31 @@ impl Registry {
                 }
             }
         }
-        let Some(routes) = routes else {
-            return Ok(Self {
-                diagnostics: vec![
-                    "選択プロファイルに明示的なllm-pi-ai providers設定がありません".into(),
-                ],
-                ..Self::default()
-            });
-        };
         let mut registry = Self::default();
+        if routes.is_none() {
+            registry
+                .diagnostics
+                .push("選択プロファイルに明示的なllm-pi-ai providers設定がありません".into());
+        }
+        let routes = routes.unwrap_or_default();
+        let claude = claude_route(
+            catalog,
+            routes.get("anthropic").or_else(|| routes.get("claude-cli")),
+            claude_available,
+        );
         for (id, config) in routes {
+            // Both the retired provider and the public CLI id are reserved for
+            // the independent CLI route. Do not resolve any of their credentials.
+            if matches!(id.as_str(), "anthropic" | "claude-cli") {
+                continue;
+            }
             if !safe_id(&id) {
                 registry
                     .diagnostics
                     .push("未対応のプロバイダーIDを除外しました".into());
                 continue;
             }
-            let catalog_models: Vec<Value> = catalog
-                .and_then(|p| read(&p.join(format!("{id}.json"))).ok())
-                .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-                .and_then(|v| v.as_object().cloned())
-                .map(|groups| {
-                    // pi-ai flattenModelCatalog uses Object.assign: later APIs win.
-                    let mut models = serde_json::Map::new();
-                    for group in groups.into_values().filter_map(|v| v.as_object().cloned()) {
-                        models.extend(group);
-                    }
-                    models.into_values().collect()
-                })
-                .unwrap_or_default();
+            let catalog_models = catalog_models(catalog, &id);
             let models = config
                 .get("models")
                 .and_then(Value::as_array)
@@ -197,7 +260,6 @@ impl Registry {
             let auth = key_name
                 .and_then(&key)
                 .or_else(|| grant.as_ref().map(|g| g.access.clone()));
-            let claude = id == "anthropic" && key_name.is_none();
             let mut seen = HashSet::new();
             let mut resolved = vec![];
             for model in models {
@@ -218,12 +280,6 @@ impl Registry {
                     .or_else(|| base_model.and_then(|v| scalar(v, "baseUrl")))
                     .unwrap_or("");
                 let oauth_endpoint = super::oauth::supported(&id, api, base);
-                let claude_endpoint = claude
-                    && api == "anthropic-messages"
-                    && matches!(
-                        base.trim_end_matches('/'),
-                        "https://api.anthropic.com" | "https://api.anthropic.com/v1"
-                    );
                 let transport_ok = config.get("transport").is_none()
                     || (id == "openai-codex"
                         && api == "openai-codex-responses"
@@ -233,10 +289,6 @@ impl Registry {
                     || !transport_ok
                 {
                     Some("このルートの追加設定にはnative未対応の項目があります".into())
-                } else if claude_endpoint {
-                    (!claude_available).then(|| {
-                        "claude CLIが必要です（ログイン後にnative-webを再起動してください）".into()
-                    })
                 } else if oauth_endpoint && key_name.is_none() {
                     if let Some(error) = &oauth_error {
                         Some(format!(
@@ -245,9 +297,7 @@ impl Registry {
                     } else {
                         grant.is_none().then(|| "共有済みCodex OAuth認証が必要です（rdsh authで共有を選択してください）".into())
                     }
-                } else if endpoint(base, api, mid).is_err()
-                    || (grant.is_some() && !oauth_endpoint)
-                    || claude
+                } else if endpoint(base, api, mid).is_err() || (grant.is_some() && !oauth_endpoint)
                 {
                     Some("未対応APIまたは不正・未指定の接続先です".into())
                 } else if key_name.is_none() || auth.is_none() {
@@ -302,32 +352,52 @@ impl Registry {
                 models: resolved,
                 key: auth,
                 oauth: grant,
-                claude,
+                claude: false,
             });
         }
+        registry.routes.push(claude);
         Ok(registry)
     }
     pub fn public(&self) -> Vec<Value> {
-        self.routes.iter().map(|r| json!({"id":r.id,"name":format!("DSH登録 · {}",r.name),"models":r.models.iter().map(|m| json!({"id":m.id,"name":m.name,"unavailable":m.unavailable})).collect::<Vec<_>>()})).collect()
+        self.routes.iter().map(|r| json!({"id":r.id,"name":if r.claude {r.name.clone()} else {format!("DSH登録 · {}",r.name)},"models":r.models.iter().map(|m| json!({"id":m.id,"name":m.name,"unavailable":m.unavailable})).collect::<Vec<_>>()})).collect()
     }
     pub fn allowed(&self, provider: &str, model: &str) -> bool {
         self.find(provider, model)
             .is_some_and(|(_, m)| m.unavailable.is_none())
     }
     fn find(&self, provider: &str, model: &str) -> Option<(&Route, &Model)> {
+        // Old saved native selections are aliases only, never published routes.
+        let provider = if provider == "dsh:anthropic" {
+            "dsh:claude-cli"
+        } else {
+            provider
+        };
         let route = self.routes.iter().find(|r| r.id == provider)?;
         Some((route, route.models.iter().find(|m| m.id == model)?))
     }
+    #[cfg(test)]
     pub async fn generate(&self, provider: &str, model: &str, prompt: &str) -> Result<String> {
+        Ok(self
+            .generate_with_usage(provider, model, prompt)
+            .await?
+            .text)
+    }
+    pub async fn generate_with_usage(
+        &self,
+        provider: &str,
+        model: &str,
+        prompt: &str,
+    ) -> Result<super::usage::Generation> {
         let (route, model) = self
             .find(provider, model)
             .filter(|(_, m)| m.unavailable.is_none())
             .ok_or_else(|| anyhow::anyhow!("NATIVE_MODEL_UNAVAILABLE"))?;
         if route.claude {
-            return super::claude::generate(&model.id, prompt).await;
+            return super::claude::generate_with_usage(&model.id, prompt).await;
         }
         if let Some(grant) = &route.oauth {
-            return super::oauth::generate(grant, "openai-codex", &model.id, prompt).await;
+            return super::oauth::generate_with_usage(grant, "openai-codex", &model.id, prompt)
+                .await;
         }
         let url = endpoint(&model.base, &model.api, &model.id)?;
         let mut body = match model.api.as_str() {
@@ -421,7 +491,10 @@ impl Registry {
             }
             .filter(|s| !s.is_empty())
             .ok_or_else(|| anyhow::anyhow!("NATIVE_HTTP_NO_TEXT"))?;
-        Ok(text)
+        Ok(super::usage::Generation {
+            text,
+            usage: super::usage::Usage::parse(&model.api, &value),
+        })
     }
 }
 
@@ -519,10 +592,8 @@ pub(super) mod tests {
         );
         let explicit =
             Registry::load_with_transports(&root.0, None, |_| None, |_| Ok(None), true).unwrap();
-        assert!(
-            !explicit.allowed("dsh:anthropic", "gpt-test"),
-            "do not fall back to CLI when an explicit API key is absent"
-        );
+        assert!(explicit.allowed("dsh:claude-cli", "gpt-test"));
+        assert!(explicit.allowed("dsh:anthropic", "gpt-test"));
     }
     #[test]
     fn reported_transport_only_codex_and_empty_anthropic_routes_use_installed_catalog() {
@@ -541,6 +612,116 @@ pub(super) mod tests {
         assert!(r.allowed("dsh:openai-codex", "test-codex"));
         assert!(r.allowed("dsh:anthropic", "test-claude"));
         assert!(r.diagnostics.is_empty());
+    }
+    #[test]
+    fn anthropic_always_uses_cli_and_never_resolves_legacy_credentials() {
+        let root = Scratch::new();
+        root.write("cordis.patch.yml","- id: llm-pi-ai\n  config:\n    providers:\n      anthropic:\n        apiKeyEnv: ANTHROPIC_API_KEY\n        api: anthropic-messages\n        baseURL: https://legacy.invalid\n        headers: {}\n        transport: websocket\n        models:\n          - id: claude-custom\n            name: Legacy Model\n");
+        let registry = Registry::load_with_transports(
+            &root.0,
+            None,
+            |_| panic!("Anthropic must not resolve API key env or credential refs"),
+            |_| panic!("Anthropic must not resolve DSH OAuth"),
+            true,
+        )
+        .unwrap();
+        let (route, model) = registry.find("dsh:claude-cli", "claude-custom").unwrap();
+        assert!(route.claude);
+        assert!(route.key.is_none());
+        assert!(route.oauth.is_none());
+        assert_eq!(model.api, "claude-cli");
+        assert_eq!(model.base, "cli://claude");
+        assert!(registry.allowed("dsh:anthropic", "claude-custom"));
+        assert_eq!(
+            registry
+                .find("dsh:anthropic", "claude-custom")
+                .unwrap()
+                .0
+                .id,
+            "dsh:claude-cli"
+        );
+        let public = serde_json::to_string(&registry.public()).unwrap();
+        assert!(public.contains("claude -p"));
+        assert!(!public.contains("dsh:anthropic"));
+        assert!(!public.contains("ANTHROPIC_API_KEY"));
+        assert!(!public.contains("legacy.invalid"));
+    }
+    #[test]
+    fn claude_catalog_discovery_survives_retiring_the_anthropic_api_route() {
+        let root = Scratch::new();
+        root.write("cordis.patch.yml","- id: llm-pi-ai\n  config:\n    providers:\n      test:\n        apiKeyEnv: TEST_KEY\n        api: openai-completions\n        baseURL: https://example.invalid/v1\n        models:\n          - id: test-model\n");
+        root.write("anthropic.json",&json!({"anthropic-messages":{"claude-catalog":{"id":"claude-catalog","name":"Catalog Claude","api":"anthropic-messages","baseUrl":"https://legacy.invalid","headers":{"Authorization":"must-not-copy"}}}}).to_string());
+        let registry = Registry::load_with_transports(
+            &root.0,
+            Some(&root.0),
+            |name| {
+                assert_eq!(name, "TEST_KEY");
+                Some("synthetic-key".into())
+            },
+            |_| panic!("no OAuth route"),
+            true,
+        )
+        .unwrap();
+        assert!(registry.allowed("dsh:test", "test-model"));
+        assert!(registry.allowed("dsh:claude-cli", "claude-catalog"));
+        let (route, model) = registry.find("dsh:claude-cli", "claude-catalog").unwrap();
+        assert_eq!(model.name, "Catalog Claude");
+        assert!(route.key.is_none());
+        assert!(route.oauth.is_none());
+        assert_eq!(model.base, "cli://claude");
+        assert!(!serde_json::to_string(&registry.public())
+            .unwrap()
+            .contains("dsh:anthropic"));
+    }
+    #[test]
+    fn claude_route_without_api_configuration_uses_cli_aliases() {
+        let root = Scratch::new();
+        for contents in [
+            None,
+            Some("[]\n"),
+            Some("- id: llm-pi-ai\n  config:\n    providers:\n      anthropic: {}\n"),
+        ] {
+            if let Some(contents) = contents {
+                root.write("cordis.patch.yml", contents);
+            }
+            let registry = Registry::load_with_transports(
+                &root.0,
+                None,
+                |_| panic!("no keys"),
+                |_| panic!("no OAuth"),
+                true,
+            )
+            .unwrap();
+            for alias in ["opus", "sonnet", "haiku"] {
+                assert!(registry.allowed("dsh:claude-cli", alias));
+            }
+            assert!(registry.routes.iter().all(|r| r.id != "dsh:anthropic"));
+        }
+        let missing = Registry::load_with_transports(
+            &root.0,
+            None,
+            |_| panic!("no keys"),
+            |_| panic!("no OAuth"),
+            false,
+        )
+        .unwrap();
+        assert!(!missing.allowed("dsh:claude-cli", "opus"));
+    }
+    #[test]
+    fn installed_claude_catalog_overrides_legacy_models_and_http_metadata() {
+        let root = Scratch::new();
+        root.write("cordis.patch.yml","- id: llm-pi-ai\n  config:\n    providers:\n      anthropic:\n        apiKeyEnv: LEGACY_KEY\n        models:\n          - id: old-model\n");
+        root.write("anthropic.json",&json!({"anthropic-messages":{"claude-current":{"id":"claude-current","api":"bad","baseUrl":"https://bad.invalid"}}}).to_string());
+        let registry = Registry::load_with_transports(
+            &root.0,
+            Some(&root.0),
+            |_| panic!("no keys"),
+            |_| panic!("no OAuth"),
+            true,
+        )
+        .unwrap();
+        assert!(registry.allowed("dsh:claude-cli", "claude-current"));
+        assert!(!registry.allowed("dsh:claude-cli", "old-model"));
     }
     fn patch(api: &str, base: &str) -> String {
         format!("- id: llm-pi-ai\n  config:\n    providers:\n      test:\n        api: {api}\n        baseURL: '{base}'\n        apiKeyEnv: TEST_API_KEY\n        models:\n          - id: test-model\n            name: Test Model\n")
