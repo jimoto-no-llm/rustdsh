@@ -24,7 +24,7 @@ struct AuditedAdapter {
     bin_sha256: &'static str,
 }
 
-const AUDITED_ADAPTERS: [AuditedAdapter; 6] = [
+const AUDITED_ADAPTERS: [AuditedAdapter; 7] = [
     AuditedAdapter {
         id: "dsh-tools-0.2.0-rc.2",
         dsh_version: "0.2.0-rc.2",
@@ -64,6 +64,14 @@ const AUDITED_ADAPTERS: [AuditedAdapter; 6] = [
         tools_version: "0.2.2-alpha.2",
         // The 0.2.2 line re-cut both entry files; the digests below are the
         // release tarballs' own lib/bin.js and dsh-tools lib/index.js.
+        bin_sha256: "b6640801a5a65aae9f53ca21bcce3b2ea28bd9e9554c939c1ff7c4448d91fa18",
+    },
+    AuditedAdapter {
+        id: "dsh-tools-0.2.2-alpha.3",
+        dsh_version: "0.2.2-alpha.3",
+        tools_version: "0.2.2-alpha.3",
+        // Verified against the published tarball; both entry files are byte-
+        // identical to alpha.2, but only this exact manifest pair is accepted.
         bin_sha256: "b6640801a5a65aae9f53ca21bcce3b2ea28bd9e9554c939c1ff7c4448d91fa18",
     },
 ];
@@ -600,6 +608,11 @@ mod tests {
                 "RDSH_AUDITED_DSH_ALPHA22",
                 "dsh-tools-0.2.2-alpha.2",
                 "RDSH_AUDITED_RUNTIME_ALPHA22",
+            ),
+            (
+                "RDSH_AUDITED_DSH_ALPHA23",
+                "dsh-tools-0.2.2-alpha.3",
+                "RDSH_AUDITED_RUNTIME_ALPHA23",
             ),
         ];
         // One release per run is enough: a machine normally carries a single

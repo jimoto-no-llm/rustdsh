@@ -5,6 +5,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- DSH `0.2.2-alpha.3` の厳格ツール境界に対応。公開版の入口とツール本体の
+  SHA256 を固定し、正確な版の組み合わせと実ランタイムの検証を追加しました。
+
 ### Fixed
 
 - 公開プラグインの照合表を v0.15.0 まで補完し、pin ワークフローが3台帳すべてをコミットするよう修正しました。保護付き委譲の対応版、通信の既定値、自動更新と公開インストーラの説明を実装に合わせました。
