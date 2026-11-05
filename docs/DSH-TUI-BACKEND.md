@@ -16,6 +16,23 @@ RustXNG / SearXNGの検索連携も、通常のDSH起動と同じ初期化を使
 `web_search` をローカル検索へ接続します。既存の検索先指定と無効化設定は尊重します。
 詳しくは[検索連携](WEB-SEARCH.md)を参照してください。
 
+DSHのbase構成が`web.config.searchProvider: deepseek-official`を明示している場合は、
+環境変数よりその指定が優先されます。RustXNGを検索先として選ぶ場合は、
+対象プロファイルの`cordis.patch.yml`に次の設定を追加します。
+
+```yaml
+- id: web
+  config:
+    searchProvider: rdsh-rustxng
+```
+
+この明示指定ではRustXNGが未接続なら検索が失敗します。DSHを再起動して反映してください。
+
+Claude Codeの既存ログインでClaudeを使う場合は、`rdsh-direct-models`の
+`claude-cli`経路を選択します（例: `/model claude-cli claude-opus-5-5`）。
+生成は`claude -p`、ツールと承認はDSHが担当します。
+詳しくは[Claude CLI経路](../plugins/rdsh-direct-models/README.md#claude-cli経路)を参照してください。
+
 `--backend native`（既定値）はRust独立ハーネスです。
 [native-webとの対応表](NATIVE-PARITY.md)の処理を共有します。
 DSHモードでは `--sdk-dir`、`--dsh-catalog`、`--devin-bin` は指定できません。

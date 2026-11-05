@@ -48,6 +48,28 @@ rdsh features off search-web
 自動で導入して使います（`rdsh rustxng install` で先に導入しておくこともできます）。
 導入を止めたいときは `RUSTXNG_SKIP_INSTALL=1` を付けます。
 
+### RustXNGの検索プロファイル
+
+rdshが起動するRustXNGのプロファイルを永続設定で選べます。既定は従来どおり
+`standard` で、選択肢は `standard`・`full`・`clean` です。`full` は追加の
+検索エンジンを有効にします。
+
+```sh
+rdsh settings set search.rustxng_profile full
+rdsh rustxng stop
+rdsh rustxng start
+```
+
+設定は次の起動時に `--profile full` として渡します。**設定変更後は再起動が必要です。**
+健康な既存プロセスはそのまま再利用され、設定変更だけでは停止・再起動しません。
+上の `stop` はrdshが記録した管理対象だけを停止します。`RUSTXNG_URL` で接続する
+外部インスタンスや、利用者が手動で起動したインスタンスのプロファイルは変更しません。
+
+起動環境に `RUSTXNG_PROFILE` を明示した場合は、その値が永続設定より優先されます。
+`RUSTXNG_PROFILE=clean rdsh rustxng start` のように指定できます。
+`settings set` と明示環境変数は `standard`・`full`・`clean` 以外を拒否します。
+不正な環境値を指定した新規起動は、別のプロファイルに黙って切り替えずエラーになります。
+
 ### サイドカーの自動更新
 
 rdsh が導入した `~/.local/bin/rustxng` だけが更新の対象です。`RUSTXNG_BIN` で指した

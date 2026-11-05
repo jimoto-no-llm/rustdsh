@@ -9,7 +9,7 @@ function adapter(generate, discover = async () => [{ id: 'model', name: 'Example
 test('plugin exports and apply register SDK routes and Devin tool', () => {
   assert.equal(name, 'rdsh-direct-models');
   assert.deepEqual(inject, ['llm', 'tools', 'credentials']);
-  assert.deepEqual(providers, ['cursor-sdk','agy-sdk']);
+  assert.deepEqual(providers, ['cursor-sdk','agy-sdk','claude-cli']);
   let removed=0;
   const cleanup=apply({ credentials:{resolve:async()=>undefined},on(){return ()=>removed++;},tools:{register(tool){assert.equal(tool.name,'devin_cli');return ()=>removed++;}},llm:{registerAdapter(routes,instance){assert.deepEqual(routes,providers);assert.ok(instance instanceof DirectModelsAdapter);return ()=>removed++;}} });
   cleanup(); assert.equal(removed,3);

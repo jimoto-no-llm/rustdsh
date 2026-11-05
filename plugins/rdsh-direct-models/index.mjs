@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createCursorSdkBackend } from './cursor-sdk.mjs';
 import { createAgySdkBackend } from './agy-sdk.mjs';
+import { createClaudeCliBackend } from './claude-cli.mjs';
 import { registerDevinTool } from './devin-tool.mjs';
 import { assertSupportedGenerationOptions } from './json-turn.mjs';
 
@@ -19,11 +20,11 @@ async function loadLlmRuntime() {
 const { LlmAdapter, resolveRetryPolicy } = await loadLlmRuntime();
 export const name = 'rdsh-direct-models';
 export const inject = ['llm', 'tools', 'credentials'];
-export const providers = ['cursor-sdk', 'agy-sdk'];
-const labels = { 'cursor-sdk': 'Cursor (official SDK, rdsh tools)', 'agy-sdk': 'Antigravity (official SDK, rdsh tools)' };
+export const providers = ['cursor-sdk', 'agy-sdk', 'claude-cli'];
+const labels = { 'cursor-sdk': 'Cursor (official SDK, rdsh tools)', 'agy-sdk': 'Antigravity (official SDK, rdsh tools)', 'claude-cli': 'Claude (claude -p, DSH tools)' };
 
-function defaultBackends({ keyResolver } = {}) {
-  return { 'cursor-sdk': createCursorSdkBackend(), 'agy-sdk': createAgySdkBackend({ keyResolver }) };
+function defaultBackends({ keyResolver, claudeModels } = {}) {
+  return { 'cursor-sdk': createCursorSdkBackend(), 'agy-sdk': createAgySdkBackend({ keyResolver }), 'claude-cli': createClaudeCliBackend({ models: claudeModels }) };
 }
 
 function normalizeUsage(usage) {
@@ -96,7 +97,9 @@ export class DirectModelsAdapter extends LlmAdapter {
 
 export function apply(ctx) {
   const keyResolver = async () => (await ctx.credentials.resolve('GEMINI_API_KEY'))?.value ?? (await ctx.credentials.resolve('GOOGLE_API_KEY'))?.value;
-  const unregisterAdapter = ctx.llm.registerAdapter(providers, new DirectModelsAdapter({ backends: defaultBackends({ keyResolver }) }));
+  // Catalog discovery is local metadata; generation never touches DSH's OAuth copy.
+  const claudeModels = async () => (await ctx.llm.listModels('anthropic')).map(({ id, name }) => ({ id, name }));
+  const unregisterAdapter = ctx.llm.registerAdapter(providers, new DirectModelsAdapter({ backends: defaultBackends({ keyResolver, claudeModels }) }));
   const unregisterTool = registerDevinTool(ctx);
   return () => { unregisterTool?.(); unregisterAdapter?.(); };
 }
