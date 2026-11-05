@@ -275,8 +275,11 @@ fn dispatch(
     match (method, path) {
         ("GET", "/api/state") => Ok(engine.snapshot()),
         ("POST", "/api/model") => {
-            let req: ModelRequest =
+            let mut req: ModelRequest =
                 serde_json::from_str(body).map_err(|_| anyhow::anyhow!("モデル指定が不正です"))?;
+            if req.provider == "dsh:anthropic" {
+                req.provider = "dsh:claude-cli".into();
+            }
             if !engine.model_allowed(&req.provider, &req.model) {
                 bail!("登録済みモデルを選択してください");
             }

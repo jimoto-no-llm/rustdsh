@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { createCursorSdkBackend } from './cursor-sdk.mjs';
 import { createAgySdkBackend } from './agy-sdk.mjs';
 import { createClaudeCliBackend } from './claude-cli.mjs';
+import { discoverClaudeModels } from './claude-catalog.mjs';
 import { registerDevinTool } from './devin-tool.mjs';
 import { assertSupportedGenerationOptions } from './json-turn.mjs';
 
@@ -97,8 +98,8 @@ export class DirectModelsAdapter extends LlmAdapter {
 
 export function apply(ctx) {
   const keyResolver = async () => (await ctx.credentials.resolve('GEMINI_API_KEY'))?.value ?? (await ctx.credentials.resolve('GOOGLE_API_KEY'))?.value;
-  // Catalog discovery is local metadata; generation never touches DSH's OAuth copy.
-  const claudeModels = async () => (await ctx.llm.listModels('anthropic')).map(({ id, name }) => ({ id, name }));
+  // Independent of whether the retired Anthropic OAuth adapter is registered.
+  const claudeModels = discoverClaudeModels;
   const unregisterAdapter = ctx.llm.registerAdapter(providers, new DirectModelsAdapter({ backends: defaultBackends({ keyResolver, claudeModels }) }));
   const unregisterTool = registerDevinTool(ctx);
   return () => { unregisterTool?.(); unregisterAdapter?.(); };

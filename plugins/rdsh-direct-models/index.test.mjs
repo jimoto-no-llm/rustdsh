@@ -14,6 +14,22 @@ test('plugin exports and apply register SDK routes and Devin tool', () => {
   const cleanup=apply({ credentials:{resolve:async()=>undefined},on(){return ()=>removed++;},tools:{register(tool){assert.equal(tool.name,'devin_cli');return ()=>removed++;}},llm:{registerAdapter(routes,instance){assert.deepEqual(routes,providers);assert.ok(instance instanceof DirectModelsAdapter);return ()=>removed++;}} });
   cleanup(); assert.equal(removed,3);
 });
+test('Claude model discovery does not call the retired Anthropic adapter or credentials', async () => {
+  let instance;
+  const cleanup = apply({
+    credentials: { resolve() { throw new Error('credentials must not be read'); } },
+    on() { return () => {}; }, tools: { register() { return () => {}; } },
+    llm: {
+      listModels() { throw new Error('legacy Anthropic provider was removed'); },
+      registerAdapter(_routes, value) { instance = value; return () => {}; },
+    },
+  });
+  try {
+    const models = await instance.listModels('claude-cli');
+    assert.ok(models.length > 0);
+    assert.ok(models.every(m => m.provider === 'claude-cli' && m.id.startsWith('claude-')));
+  } finally { cleanup(); }
+});
 test('text generation emits canonical blocks, usage then terminal finish', async () => {
   const chunks = await collect(adapter(async () => ({ text: 'OK', toolCalls: [], usage: { inputTokens: 2, outputTokens: 1 } })).stream({ provider: 'cursor-sdk', model: 'model', messages: [] }));
   assert.deepEqual(chunks, [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text: 'OK' }, { type: 'block-end', index: 0, block: { type: 'text', text: 'OK' } }, { type: 'usage', usage: { inputTokens: 2, outputTokens: 1 } }, { type: 'finish', reason: { kind: 'stop' } }]);

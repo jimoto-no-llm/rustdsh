@@ -286,6 +286,7 @@ def main():
     )
     if probe.returncode:
         raise SystemExit("Node ws is required; pass --ws-package /path/to/a/package.json that resolves ws")
+    verify_claude_migration(binary, ws_package)
     with tempfile.TemporaryDirectory(prefix="rdsh-dsh-tui-pty-") as folder:
         root = Path(folder).resolve()
         (root / "dsh").mkdir()
@@ -395,6 +396,48 @@ def main():
             assert all(secret not in client.raw.decode("utf8", "replace") for secret in ("fixture-launch-token", "fixture-cookie", "FIXTURE_PRIVATE_SETTING"))
             assert any(row["kind"] == "shutdown" for row in rows), "mock host did not stop"
             print("PASS DSH PTY: authenticated HTTP/WS wire, streaming, explicit deny/allow, hidden-dialog guards, timed questions and exact answers, usage, readonly views, model selection, cancel/reconnect, paginated resume, /new persistence, terminal/host restoration")
+        finally:
+            client.close()
+
+
+def verify_claude_migration(binary, ws_package):
+    """A stale default and saved session must select CLI before accepting input."""
+    source = MOCK.replace("next:{provider:'demo',model:'m1'}", "next:{provider:'anthropic',model:'m1'}")
+    source = source.replace("failResume=true", "failResume=false")
+    source = source.replace(
+        "return {default:{provider:'demo',model:'m1'},groups:[{id:'demo',models:[{id:'m1'},{id:'m2'}]}]};",
+        "return {default:{provider:'anthropic',model:'m1'},routableProviders:['anthropic','claude-cli'],groups:[{id:'anthropic',models:[{id:'m1'}]},{id:'claude-cli',models:[{id:'m1'},{id:'m2'}]}]};",
+    )
+    source = source.replace("r.provider==='demo'&&r.model==='m2'", "r.provider==='claude-cli'&&r.model==='m1'")
+    with tempfile.TemporaryDirectory(prefix="rdsh-claude-migration-pty-") as folder:
+        root = Path(folder).resolve()
+        (root / "dsh").mkdir()
+        (root / "mock-dsh.mjs").write_text("#!/usr/bin/env node\n" + source)
+        (root / "mock-dsh.mjs").chmod(0o755)
+        client = Client(root, binary, ws_package)
+        try:
+            client.wait("claude-cli / m1")
+            client.command("/models")
+            client.wait("モデルを選択")
+            client.send("anthropic")
+            client.wait("0 件")
+            client.dismiss("モデルを選択")
+            client.command("/model anthropic m1")
+            client.wait_wire(lambda rows: len(rpc_rows(rows, "session/selectModel")) >= 2)
+            client.command("/sessions")
+            client.wait("DSH セッション")
+            client.send("\r")
+            client.wait_absent("DSH セッション")
+            client.wait("RESUMED_SESSION_PROOF")
+            client.wait("claude-cli / m1")
+            client.wait_wire(lambda rows: len(rpc_rows(rows, "session/selectModel")) >= 3)
+            selections = rpc_rows(client.events(), "session/selectModel")
+            assert all(row["args"]["request"]["provider"] == "claude-cli" for row in selections)
+            assert any(row["args"]["request"]["sessionId"] == "saved-session" for row in selections)
+            assert not [row for row in client.events() if row["kind"] == "assertion"]
+            client.command("/quit")
+            client.restored()
+            print("PASS Claude CLI migration: legacy models hidden; old default, explicit alias and resumed session select CLI only")
         finally:
             client.close()
 

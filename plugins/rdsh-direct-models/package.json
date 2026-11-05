@@ -28,6 +28,7 @@
     "cursor-sdk.mjs",
     "cursor-sdk-runner.mjs",
     "claude-cli.mjs",
+    "claude-catalog.mjs",
     "devin-tool.mjs",
     "cordis.patch.yml",
     "requirements.txt",

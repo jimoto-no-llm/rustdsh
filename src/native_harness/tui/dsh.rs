@@ -1,5 +1,6 @@
 //! Rust terminal surface for the installed DSH Web Remote protocol.
 //! The host owns tools, persistence, credentials and its existing approval policy.
+mod models;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -253,7 +254,11 @@ impl DshBackend {
                 return Err(e);
             }
         };
-        let view = Arc::new(Mutex::new(View::new(&workspace, profile, catalog)));
+        let view = Arc::new(Mutex::new(View::new(
+            &workspace,
+            profile,
+            models::catalog(catalog),
+        )));
         let (commands, rx) = mpsc::unbounded_channel();
         let (ready_tx, mut ready_rx) = watch::channel(false);
         runtime.spawn(pump(remote.clone(), view.clone(), rx, ready_tx));
@@ -337,6 +342,25 @@ impl DshBackend {
             .await
             .context("DSH 会話の読込みがタイムアウトしました")
         })?;
+        let busy = matches!(
+            self.view.lock().unwrap().value["status"].as_str(),
+            Some("running" | "approval")
+        );
+        if !busy {
+            self.upgrade_anthropic()?;
+        }
+        Ok(())
+    }
+
+    fn upgrade_anthropic(&self) -> Result<()> {
+        let model = {
+            let view = self.view.lock().unwrap();
+            (view.value["provider"] == "anthropic")
+                .then(|| view.value["model"].as_str().unwrap_or("").to_owned())
+        };
+        if let Some(model) = model {
+            self.request("/api/model", json!({"provider":"claude-cli","model":model}))?;
+        }
         Ok(())
     }
 }
@@ -350,6 +374,7 @@ impl HarnessBackend for DshBackend {
         match path {
             "/api/message"=>{
                 self.require_idle()?;
+                self.upgrade_anthropic()?;
                 let text=body["text"].as_str().filter(|t|!t.trim().is_empty()&&t.len()<=16384).context("入力は1〜16KiBにしてください")?;
                 let session=self.session();
                 self.view.lock().unwrap().value["status"]=json!("running");
@@ -358,7 +383,7 @@ impl HarnessBackend for DshBackend {
             },
             "/api/model"=>{
                 self.require_idle()?;
-                let p=body["provider"].as_str().context("providerがありません")?;
+                let p=models::provider(body["provider"].as_str().context("providerがありません")?);
                 let m=body["model"].as_str().context("modelがありません")?;
                 let valid=self.view.lock().unwrap().value["providers"].as_array().into_iter().flatten().any(|v|v["id"]==p&&v["models"].as_array().into_iter().flatten().any(|v|v["id"]==m));
                 if !valid {bail!("DSH catalogにないモデルです");}

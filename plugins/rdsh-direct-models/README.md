@@ -70,10 +70,16 @@ NodeとPythonのテストで、JSON境界、SDK/CLI機能の無効化、タイ�
 
 ## Claude CLI経路
 
-モデル一覧の `Claude (claude -p, DSH tools)`、またはRust TUIで
+Anthropicの実行経路は `Claude (claude -p, DSH tools)` に統一します。Rust TUIでは
 `/model claude-cli claude-opus-5-5` を選択します。モデルIDはインストール済みの
-Anthropicカタログから取得し、利用可否はCLIでの実生成時に確認します。
+認証不要カタログから直接取得し、旧Anthropicプロバイダーの登録は必要ありません。
+利用可否はCLIでの実生成時に確認します。
 選択はDSH Web GUIと同様に既定モデルへ保存されます。
+
+旧OAuth経路を退役する際は、対象プロファイルの`llm-pi-ai.providers.anthropic`を
+設定APIから取り除きます。他のプロバイダーや保存済み認証値は削除しません。
+Rust TUIは旧`anthropic`を一覧へ出さず、旧コマンド指定や保存会話の選択を
+同じモデルの`claude-cli`へ読み替えます。CLIにモデルがなければエラーにします。
 
 CLIは空の一時ディレクトリで生成のみ行い、tools・MCP・hooks・設定読込・会話保存を
 無効にします。CLI側へ許可の迂回オプションを渡しません。JSONのツール提案は

@@ -31,6 +31,10 @@ DSHのbase構成が`web.config.searchProvider: deepseek-official`を明示して
 Claude Codeの既存ログインでClaudeを使う場合は、`rdsh-direct-models`の
 `claude-cli`経路を選択します（例: `/model claude-cli claude-opus-5-5`）。
 生成は`claude -p`、ツールと承認はDSHが担当します。
+旧Anthropic OAuth経路はモデル一覧へ表示しません。旧`anthropic`指定や保存会話は
+同じモデルの`claude-cli`へ移行し、CLIにないモデルなら選択を拒否します。
+プロファイルの`llm-pi-ai.providers.anthropic`も退役すると、DSH Web GUIからも
+旧経路が消えます。認証データや会話本文を削除する操作ではありません。
 詳しくは[Claude CLI経路](../plugins/rdsh-direct-models/README.md#claude-cli経路)を参照してください。
 
 `--backend native`（既定値）はRust独立ハーネスです。

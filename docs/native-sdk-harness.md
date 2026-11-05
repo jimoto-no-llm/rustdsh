@@ -112,7 +112,11 @@ JSONをデータとして読むだけで、DSH・Cordis・カタログのJavaScr
 `compat.maxTokensField`、またはOpenAI公式ホストでは `max_completion_tokens`、その他では
 `max_tokens`、Responsesは `max_output_tokens`、Messagesは `max_tokens`、Googleは `maxOutputTokens` を送ります。
 
-認証は登録済み `apiKeyEnv` の環境変数を優先し、なければ既存credential refを使用します。
+専用のAnthropic経路は `dsh:claude-cli` に統一し、`claude -p`の既存認証を利用します。
+モデル一覧はDSHの旧Anthropic登録から独立した組み込みカタログを使います。
+旧 `dsh:anthropic` は非表示のCLI互換aliasで、APIキーやDSHのOAuthは参照しません。
+
+その他のAPI認証は登録済み `apiKeyEnv` の環境変数を優先し、なければ既存credential refを使用します。
 キーなしのローカルAPIもDSHと同じ `apiKeyEnv` の `no-key` refで利用できます。
 認証値をモデル一覧・要求本文・エラー本文へ出さず、HTTPリダイレクトは追跡しません。
 APIからの失敗応答はステータス番号だけを表示します。APIモデルだけなら `--sdk-dir` は
