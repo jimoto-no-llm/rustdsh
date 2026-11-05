@@ -79,7 +79,9 @@ Web 検索（search-web）は既定ON、ローカル状態画面（serve）は�
 
 DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固定できます
 （例: `rdsh settings set search.dsh_search_provider searxng`）。
-既定は空で、設定したときだけ委譲先へ `DSH_WEB_SEARCH_PROVIDER` を渡します。
+設定値の既定は空です。明示した値は委譲先へ `DSH_WEB_SEARCH_PROVIDER` として渡します。
+明示値がない場合も、既定ONの `web_search_bridge` が導入済みプラグインと稼働中の
+ローカル検索先を確認できれば `rdsh-rustxng` を注入します。
 登録済みのプロバイダ ID が必要です。詳細は [Web検索](WEB-SEARCH.md) を参照してください。
 
 設定の破損時は読み込みを停止します。元のファイルを退避し、既定値に戻すと判断した
@@ -101,7 +103,8 @@ DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固�
 | sound | on | DSH サウンド通知の導入（不要ならインストーラの SOUND=0／`features.sound=false`） |
 | gitview | on | DSH Git パネルの導入（不要ならインストーラの GITVIEW=0／`features.gitview=false`） |
 | serve | off | ローカル閲覧画面（rdsh serve） |
-| search-web | on | SearXNG または明示選択した Ollama API による [Web検索](WEB-SEARCH.md) |
+| search-web | on | 明示的に検索コマンドを実行したとき、SearXNG または明示選択した Ollama API を使う [Web検索](WEB-SEARCH.md) |
+| web_search_bridge | on | 使えるローカル検索先とプラグインがあるとき、委譲先 DSH の web_search を切り替える |
 | context_engine | off | 実験的なコンテキストエンジン |
 | models_sync | on | 毎日の自動更新でプロバイダのモデルカタログも更新する（`RDSH_MODELS_SYNC=0` で1回だけスキップ） |
 | dep_graph | on | 静的な依存グラフと変更影響（`rdsh deps`。読み取り専用の解析のため既定 ON） |

@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-05",
+  "package": "@deepseek-ai/dsh@0.2.2-alpha.3",
+  "method": "npm install --package-lock-only --ignore-scripts; npm audit --json; no package code executed",
+  "packages": [
+    {
+      "name": "undici",
+      "resolved_versions": [
+        "8.11.2"
+      ],
+      "severity": "high",
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "moderate"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "moderate"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "high"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-4w7w-5xrc-9h26",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "high"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "high"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "high"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "moderate"
+        },
+        {
+          "url": "https://github.com/advisories/GHSA-55wc-3pg8-jfw6",
+          "range": ">=8.0.0 <8.12.2",
+          "severity": "moderate"
+        }
+      ]
+    },
+    {
+      "name": "zod",
+      "resolved_versions": [
+        "4.4.3",
+        "4.6.7"
+      ],
+      "severity": "high",
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+          "range": "<4.6.6",
+          "severity": "high"
+        }
+      ]
+    },
+    {
+      "name": "@modelcontextprotocol/client",
+      "resolved_versions": [
+        "2.2.0"
+      ],
+      "severity": "moderate",
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-6prh-2h8m-c8cw",
+          "range": ">=2.0.0 <2.3.0",
+          "severity": "moderate"
+        }
+      ]
+    },
+    {
+      "name": "fflate",
+      "resolved_versions": [
+        "0.8.2",
+        "0.8.3"
+      ],
+      "severity": "moderate",
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-px8p-9vwx-vf98",
+          "range": ">=0.8.0 <0.8.3",
+          "severity": "moderate"
+        }
+      ]
+    }
+  ]
+}

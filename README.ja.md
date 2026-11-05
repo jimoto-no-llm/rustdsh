@@ -80,12 +80,13 @@ https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
 
 ### 手順 A. 本家 `dsh` の導入（未導入の方）
 
-Node.js と npm を用意し、npm registry の `@deepseek-ai/dsh`（bin 名: `dsh`、2026-10-29 時点の latest は 0.2.1-rc.2）をグローバルに導入します。
+Node.js・npm・pnpm を別途用意し、npm registry の `@deepseek-ai/dsh`（bin 名: `dsh`）をグローバルに導入します。
 
 ```sh
-npm install -g @deepseek-ai/dsh
-npm install -g @deepseek-ai/dsh@<version>   # バージョンを固定する場合
+npm install -g "@deepseek-ai/dsh@<version>"   # 対応範囲と依存監査を確認した版に置き換える
 ```
+
+`latest`・`next`・`alpha` は更新される npm の配布タグです。`latest` が保護付き起動や全プラグインで検証済みとは限りません。[機能別の対応範囲](docs/DSH-COMPATIBILITY.md)を確認し、版を固定する場合は上の `<version>` を置き換えてください。
 
 ### 手順 B. `rdsh` の導入
 
@@ -757,7 +758,7 @@ MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ラ�
 
 ## 保護付き起動に対応しているバージョン
 
-明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3` です。未知のバージョン、バージョンの混在、改変されたランタイム、または別の依存先へ解決されたランタイムのいずれかに該当する場合は、実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
+明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2` です。この一覧は Rust ランチャーの保護付き委譲だけに適用されます。ACP やプラグインは[機能別の対応範囲](docs/DSH-COMPATIBILITY.md)を確認してください。未知のバージョン、バージョンの混在、改変されたランタイム、または別の依存先へ解決されたランタイムのいずれかに該当する場合は、実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
 
 ### 外部エージェントのジョブ
 

@@ -1,0 +1,44 @@
+[
+  {
+    "tag": "v0.15.0",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "fab6b5c5afbff0a3aba24ff2c209a295fc19a47735c2854c93ba75a4c042222b",
+    "bytes": 2800960
+  },
+  {
+    "tag": "v0.12.1",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "e0c26b9022b1c61e8479bf650eda0921d8bba64247788ed6bd3ab2653660e63f",
+    "bytes": 1294254
+  },
+  {
+    "tag": "v0.12.2",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "28e47f7532c2a1531b8b01e4da8675f63cb6825894c92814b49699ae07779f3e",
+    "bytes": 1294306
+  },
+  {
+    "tag": "v0.13.0",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "c3d46e8ca5d92b811b9d196469428547f10ea9ff7d2f65d07ece7acf6b043ecf",
+    "bytes": 1294479
+  },
+  {
+    "tag": "v0.13.1",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "ab774d47c177bc5b16f7788104fa6bb4531620f54b524f885234c64ab2e77544",
+    "bytes": 1295276
+  },
+  {
+    "tag": "v0.14.0",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "6f04f9f63c35794dfb56d6a268ed0bb494566beed12ae99f80d7df08e2f78aec",
+    "bytes": 1295292
+  },
+  {
+    "tag": "v0.14.1",
+    "asset": "rdsh-plugins.tar.gz",
+    "sha256": "63cf4aa9b93f8931a3c85b6c0952016e8e92b214a01c187b87e65aa9c1512476",
+    "bytes": 2792014
+  }
+]

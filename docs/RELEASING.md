@@ -240,7 +240,7 @@ canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main` URL:
 | --- | --- | --- |
 | `release-digests.tsv` | the four Unix `.tar.gz` archives | `install.sh --from-release`, `sync-dsh.sh` |
 | `release-digests-windows.tsv` | `rdsh-windows-x64.zip` | `install.ps1 -FromRelease` |
-| `release-plugins-digests.tsv` | `rdsh-plugins.tar.gz` | `install.sh` after the binary lands |
+| `release-plugins-digests.tsv` | `rdsh-plugins.tar.gz` | Unix / Windows installers after the binary lands |
 
 The split is a compatibility rule, not a preference: the published v0.3.3
 `install.sh` and every `sync-dsh.sh` copy in users' checkouts refuse
@@ -258,7 +258,7 @@ never does (`install.ps1` gates it the same way). `install.ps1` refuses its
 whole ledger when `latest` does not pin the Windows archive, and the Unix
 ledger's `latest` completeness rule stays the four Unix archives.
 
-After verifying a published release, update both `latest` rows and add each
+After verifying a published release, update all three `latest` rows and add each
 archive's GitHub-reported SHA-256 in a reviewed follow-up PR before announcing
 or directing users to install that release. Keep older rows for explicit
 `--version` installs. Do not derive pins from release `.sha256` sidecars.
@@ -289,13 +289,13 @@ For the installer registries, pin the published digests in one reviewed commit:
 ```sh
 python3 scripts/pin-release-digests.py vX.Y.Z          # --dry-run to preview
 python3 -m unittest discover -s tests -p 'test_release_digest_pin.py'
-git diff release-digests.tsv release-digests-windows.tsv  # latest rows + 5 archives
+git diff release-digests.tsv release-digests-windows.tsv release-plugins-digests.tsv  # all three ledgers
 ```
 
 The script reads GitHub's own asset digests (`gh release view --json assets`
 does not expose them), writes the four Unix archives to `release-digests.tsv`
-and `rdsh-windows-x64.zip` to `release-digests-windows.tsv`, updates both
-`latest` rows, keeps older rows for explicit `--version` installs, and refuses
+`rdsh-windows-x64.zip` to `release-digests-windows.tsv`, and `rdsh-plugins.tar.gz`
+to `release-plugins-digests.tsv`. It updates all three `latest` rows, keeps older rows for explicit `--version` installs, and refuses
 prerelease tags unless explicitly enabled, missing archives or values that are not a SHA-256. Pinning an
 older release only backfills its rows: each `latest` row moves forward only, so
 re-pinning a past version never moves the install and automatic-update channel
@@ -307,7 +307,7 @@ gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
 ```
 
 After publication, the `pin-release-digests` workflow runs this script on `main`
-and opens the `chore/pin-<tag>-digests` PR automatically: review both ledgers and
+and opens the `chore/pin-<tag>-digests` PR automatically: review all three ledgers and
 merge it. Prereleases are skipped, and a release that is already pinned opens no
 PR.
 
@@ -327,20 +327,20 @@ satisfy. Enabling *Settings → Actions → General → Allow GitHub Actions to 
 and approve pull requests* restores the automatic PR, and a re-run then reuses the
 already-pushed branch and only retries the PR creation.
 
-候補版の公開後は、全5アーカイブのGitHub asset digestが揃ってから明示的に登録します。
+候補版の公開後は、全5プラットフォームアーカイブとプラグインアーカイブのGitHub asset digestが揃ってから明示的に登録します。
 自動workflowは引き続きstableのみを扱います。
 
 ```sh
 python3 scripts/pin-release-digests.py vX.Y.Z-rc.N --allow-prerelease --dry-run
 python3 scripts/pin-release-digests.py vX.Y.Z-rc.N --allow-prerelease
-git diff release-digests.tsv release-digests-windows.tsv
+git diff release-digests.tsv release-digests-windows.tsv release-plugins-digests.tsv
 ```
 
-候補行を追加しても両台帳の`latest`は既存のstableを保持し、その後のstable登録でも
+候補行を追加しても3台帳の`latest`は既存のstableを保持し、その後のstable登録でも
 候補行を残します。完全なstableの`latest`がない台帳への候補だけの初回登録は拒否します。
 登録内容をレビューしてmainへ統合するまで、明示tagの候補導入も取得前に安全に拒否されます。
 
-Review both updated ledgers before announcing the new stable channel. Their
+Review all three updated ledgers before announcing the new stable channel. Their
 `latest` rows must name the release GitHub marks Latest.
 
 The package-manager manifests in `packaging/` pin the same release, so refresh
