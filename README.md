@@ -381,9 +381,10 @@ rdsh settings get extras.enable
 | `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
 | `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`; `--auto-start` starts the bundled local SearXNG compose service. The local rustxng sidecar installed by rdsh follows the latest RustXNG release in the background (sha256-verified, one previous version kept; `rdsh rustxng update [--check]`, off with `RUSTXNG_SKIP_UPDATE=1`). See [Web search](docs/WEB-SEARCH.md). |
 
-To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
+To connect Mistral through Chat Completions or an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
 ```sh
+rdsh provider add mistral --profile web --discover --key-stdin # enter MISTRAL_API_KEY on stdin
 rdsh provider add hai --model deepseek-v4-flash              # key from HAI_API_KEY or --key-stdin
 rdsh provider add commandcode --model deepseek/deepseek-v4-flash   # key from COMMANDCODE_API_KEY
 rdsh provider add sarashina                                  # key from SARASHINA_API_KEY; mini and nano built in
