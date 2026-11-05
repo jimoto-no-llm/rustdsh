@@ -178,7 +178,7 @@ enum ProviderAction {
     },
     /// Add a route to a profile's cordis.patch.yml (llm-pi-ai providers)
     Add {
-        /// Preset: hai, sarashina or local-openai
+        /// Preset: mistral, hai, sarashina or local-openai
         preset: String,
         #[arg(long = "profile")]
         profile: Option<String>,
@@ -392,7 +392,7 @@ enum Commands {
     /// Inventory, select and import only explicitly shared credentials
     Auth(auth_sharing::AuthArgs),
     /// Register an OpenAI-compatible endpoint (HAI, a home LLM server) as a
-    /// dsh route in a profile: `provider list`, `provider add hai|sarashina|local-openai`
+    /// dsh route in a profile: `provider list`, `provider add mistral|hai|sarashina|local-openai`
     Provider {
         #[command(subcommand)]
         action: ProviderAction,
@@ -2865,8 +2865,8 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "key_ref" => ("凭据引用名称", "認証情報参照名"),
         "open" => ("打开设置目录", "設定ディレクトリを開く"),
         "preset" => (
-            "提供方预设：hai、sarashina、local-openai、ollama",
-            "プロバイダープリセット: hai、sarashina、local-openai、ollama",
+            "提供方预设：mistral、hai、sarashina、local-openai、ollama",
+            "プロバイダープリセット: mistral、hai、sarashina、local-openai、ollama",
         ),
         "model" => (
             "要声明的模型标识（可重复）",
