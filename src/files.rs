@@ -12,12 +12,13 @@
 
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Largest file `rdsh files get` will copy.
 const MAX_COPY_BYTES: u64 = 512 * 1024 * 1024;
 
-/// Largest transcript read when a session is zstd-compressed.
+/// Largest decoded transcript.
 const MAX_TRANSCRIPT_BYTES: usize = 256 * 1024 * 1024;
 
 /// One file a Session declared as a deliverable.
@@ -36,16 +37,23 @@ fn sessions_root() -> PathBuf {
 
 /// Pull the `present` declarations out of one transcript value.
 ///
-/// The transcript format belongs to dsh. This reader accepts the two shapes it
-/// has used - a `presented` event holding a `files` array - and ignores
-/// everything else instead of guessing at unrelated `path` fields.
+/// DSH stores `deliverables/presented` payloads in `data`.
+/// The existing `presented` JSON forms remain supported.
 fn declarations(value: &Value, out: &mut Vec<Deliverable>) {
     match value {
         Value::Object(map) => {
-            let presented = map.get("type").and_then(Value::as_str) == Some("presented")
-                || map.get("kind").and_then(Value::as_str) == Some("presented");
-            if presented {
-                if let Some(files) = map.get("files").and_then(Value::as_array) {
+            let payload =
+                if map.get("type").and_then(Value::as_str) == Some("deliverables/presented") {
+                    map.get("data").and_then(Value::as_object)
+                } else if map.get("type").and_then(Value::as_str) == Some("presented")
+                    || map.get("kind").and_then(Value::as_str) == Some("presented")
+                {
+                    Some(map)
+                } else {
+                    None
+                };
+            if let Some(payload) = payload {
+                if let Some(files) = payload.get("files").and_then(Value::as_array) {
                     for file in files {
                         let Some(path) = file.get("path").and_then(Value::as_str) else {
                             continue;
@@ -63,6 +71,15 @@ fn declarations(value: &Value, out: &mut Vec<Deliverable>) {
                         });
                     }
                 }
+                return;
+            }
+            if map
+                .get("type")
+                .or_else(|| map.get("kind"))
+                .and_then(Value::as_str)
+                .is_some_and(|kind| kind != "session")
+            {
+                return;
             }
             for child in map.values() {
                 declarations(child, out);
@@ -77,123 +94,188 @@ fn declarations(value: &Value, out: &mut Vec<Deliverable>) {
     }
 }
 
-/// The transcript inside one session directory, if it holds one.
-fn session_file_in(dir: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(dir)
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .find(|path| {
-            path.file_name()
-                .map(|name| {
-                    let name = name.to_string_lossy();
-                    name.ends_with(".jsonl") || name.ends_with(".jsonl.zstd")
-                })
-                .unwrap_or(false)
+fn newest_transcript(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            let metadata = std::fs::symlink_metadata(&path).ok()?;
+            if !metadata.is_file() {
+                return None;
+            }
+            Some((metadata.modified().ok()?, path))
         })
+        .max()
+        .map(|(_, path)| path)
 }
 
-/// The newest transcript one level below a per-cwd folder.
-fn session_file_under(dir: &Path) -> Option<PathBuf> {
-    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
-    for child in std::fs::read_dir(dir).ok()?.flatten() {
-        let Some(inner) = session_file_in(&child.path()) else {
-            continue;
-        };
-        let Ok(modified) = inner.metadata().and_then(|meta| meta.modified()) else {
-            continue;
-        };
-        let is_newer = newest
-            .as_ref()
-            .map(|(when, _)| modified > *when)
-            .unwrap_or(true);
-        if is_newer {
-            newest = Some((modified, inner));
+fn session_file_in(dir: &Path) -> Option<PathBuf> {
+    if !std::fs::symlink_metadata(dir).ok()?.is_dir() {
+        return None;
+    }
+    newest_transcript(std::fs::read_dir(dir).ok()?.flatten().filter_map(|entry| {
+        let name = entry.file_name();
+        let name = name.to_str()?;
+        (name == "session.json" || name.ends_with(".jsonl") || name.ends_with(".jsonl.zstd"))
+            .then(|| entry.path())
+    }))
+}
+
+fn session_directory_name(id: &str) -> String {
+    // DSH's encodeSegment escapes UTF-16 units as ~XXXX.
+    let mut encoded = String::new();
+    for unit in id.encode_utf16() {
+        if unit <= 127
+            && ((unit as u8).is_ascii_alphanumeric() || b"._-".contains(&(unit as u8)))
+            && id != "."
+            && id != ".."
+        {
+            encoded.push(unit as u8 as char);
+        } else {
+            use std::fmt::Write as _;
+            let _ = write!(encoded, "~{unit:04X}");
         }
     }
-    newest.map(|(_, file)| file)
+    encoded
 }
 
 /// Resolve a session id to its transcript, newest first when `session` is None.
-fn transcript_for(session: Option<&str>) -> Result<PathBuf> {
-    let root = sessions_root();
-    if let Some(id) = session {
-        for candidate in [
-            root.join(format!("{id}.json")),
-            root.join(id).join("session.json"),
-        ] {
-            if candidate.is_file() {
-                return Ok(candidate);
-            }
-        }
-        bail!("no session {id} under {}", root.display());
+fn transcript_for(root: &Path, session: Option<&str>) -> Result<PathBuf> {
+    if session == Some("") {
+        bail!("session id must not be empty");
     }
-    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    let encoded = session.map(session_directory_name);
+    let mut candidates = Vec::new();
     let entries =
-        std::fs::read_dir(&root).with_context(|| format!("cannot read {}", root.display()))?;
+        std::fs::read_dir(root).with_context(|| format!("cannot read {}", root.display()))?;
     for entry in entries.flatten() {
         let path = entry.path();
-        // dsh keeps one directory per session under a per-cwd folder:
-        // sessions/<cwd>/<session-id>/session.v4.jsonl[.zstd].
-        let file = if path.is_dir() {
-            match session_file_in(&path).or_else(|| session_file_under(&path)) {
-                Some(inner) => inner,
-                None => continue,
+        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+            if session.is_none_or(|id| path.file_name().is_some_and(|name| name == id))
+                || encoded
+                    .as_deref()
+                    .is_some_and(|id| path.file_name().is_some_and(|name| name == id))
+            {
+                candidates.extend(session_file_in(&path));
             }
-        } else if path.extension().is_some_and(|ext| ext == "json") {
-            path
-        } else {
-            continue;
-        };
-        let Ok(modified) = file.metadata().and_then(|meta| meta.modified()) else {
-            continue;
-        };
-        let is_newer = newest
-            .as_ref()
-            .map(|(when, _)| modified > *when)
-            .unwrap_or(true);
-        if is_newer {
-            newest = Some((modified, file));
+            if let Some(id) = &encoded {
+                candidates.extend(session_file_in(&path.join(id)));
+            } else if let Ok(children) = std::fs::read_dir(&path) {
+                candidates.extend(
+                    children
+                        .flatten()
+                        .filter_map(|child| session_file_in(&child.path())),
+                );
+            }
+        } else if path.extension().is_some_and(|ext| ext == "json")
+            && session.is_none_or(|id| path.file_stem().is_some_and(|name| name == id))
+        {
+            candidates.push(path);
         }
     }
-    newest
-        .map(|(_, file)| file)
-        .ok_or_else(|| anyhow::anyhow!("no session transcripts under {}", root.display()))
+    newest_transcript(candidates).ok_or_else(|| match session {
+        Some(id) => anyhow::anyhow!("no session {id} under {}", root.display()),
+        None => anyhow::anyhow!("no session transcripts under {}", root.display()),
+    })
 }
 
 /// The session id a transcript belongs to.
 pub(crate) fn session_label(transcript: &Path) -> String {
-    transcript
-        .parent()
-        .and_then(Path::file_name)
-        .or_else(|| transcript.file_stem())
+    let name = if transcript.extension().is_some_and(|ext| ext == "json")
+        && transcript
+            .file_name()
+            .is_some_and(|name| name != "session.json")
+    {
+        transcript.file_stem()
+    } else {
+        transcript.parent().and_then(Path::file_name)
+    };
+    name.or_else(|| transcript.file_stem())
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| transcript.display().to_string())
 }
 
+fn read_transcript(root: &Path, transcript: &Path) -> Result<Vec<u8>> {
+    let file = crate::file_security::open_beneath(root, transcript)
+        .with_context(|| format!("cannot read {}", transcript.display()))?;
+    if transcript.extension().is_some_and(|ext| ext == "zstd") {
+        let (bytes, limited) = crate::context::read_zstd_session_from_file(
+            transcript,
+            file,
+            MAX_TRANSCRIPT_BYTES + 1,
+            usize::MAX,
+            None,
+        )
+        .with_context(|| format!("cannot read {}", transcript.display()))?;
+        if limited || bytes.len() > MAX_TRANSCRIPT_BYTES {
+            bail!("{} exceeds the transcript byte limit", transcript.display());
+        }
+        Ok(bytes)
+    } else {
+        if file.metadata()?.len() > MAX_TRANSCRIPT_BYTES as u64 {
+            bail!("{} exceeds the transcript byte limit", transcript.display());
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_TRANSCRIPT_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_TRANSCRIPT_BYTES {
+            bail!("{} exceeds the transcript byte limit", transcript.display());
+        }
+        Ok(bytes)
+    }
+}
+
 /// Read every deliverable a session declared; newest transcript by default.
 pub(crate) fn deliverables(session: Option<&str>) -> Result<(String, Vec<Deliverable>)> {
-    let transcript = transcript_for(session)?;
+    let root = sessions_root();
+    let root =
+        std::fs::canonicalize(&root).with_context(|| format!("cannot read {}", root.display()))?;
+    let transcript = transcript_for(&root, session)?;
+    let bytes = read_transcript(&root, &transcript)?;
+    let text = std::str::from_utf8(&bytes)
+        .with_context(|| format!("{} is not UTF-8", transcript.display()))?;
     let mut found = Vec::new();
-    if transcript.extension().is_some_and(|ext| ext == "zstd") {
-        // dsh writes the transcript as zstd-compressed JSONL; `rdsh tokens`
-        // already decompresses it through the zstd binary.
-        let (bytes, _) =
-            crate::context::read_zstd_session(&transcript, MAX_TRANSCRIPT_BYTES, usize::MAX, None)
-                .with_context(|| format!("cannot read {}", transcript.display()))?;
-        let text = String::from_utf8_lossy(&bytes);
-        for line in text.lines() {
-            let Ok(value) = serde_json::from_str::<Value>(line) else {
+    let mut header = Value::Null;
+    if transcript.extension().is_some_and(|ext| ext != "json") {
+        for (index, line) in text.split_inclusive('\n').enumerate() {
+            if line.trim().is_empty() {
                 continue;
+            }
+            let value = match serde_json::from_str::<Value>(line) {
+                Ok(value) => value,
+                Err(error) if error.is_eof() && !line.ends_with('\n') => break,
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("{}:{} is not JSON", transcript.display(), index + 1)
+                    });
+                }
             };
-            declarations(&value, &mut found);
+            let kind = value
+                .get("type")
+                .or_else(|| value.get("kind"))
+                .and_then(Value::as_str);
+            match kind {
+                Some("session") if index == 0 => header = value,
+                Some("deliverables/presented" | "presented") => declarations(&value, &mut found),
+                _ => {}
+            }
         }
     } else {
-        let text = std::fs::read_to_string(&transcript)
-            .with_context(|| format!("cannot read {}", transcript.display()))?;
-        let value: Value = serde_json::from_str(&text)
+        let value: Value = serde_json::from_str(text)
             .with_context(|| format!("{} is not JSON", transcript.display()))?;
+        header = value.get("header").cloned().unwrap_or(Value::Null);
         declarations(&value, &mut found);
+    }
+    let cwd = header
+        .get("cwd")
+        .and_then(Value::as_str)
+        .map(Path::new)
+        .filter(|path| path.is_absolute());
+    for item in &mut found {
+        if item.path.is_relative() {
+            item.path = cwd
+                .context("relative deliverable has no absolute session working directory")?
+                .join(&item.path);
+        }
     }
     // Keep the last declaration of a path, like the Web UI does.
     let mut seen = std::collections::HashSet::new();
@@ -201,9 +283,17 @@ pub(crate) fn deliverables(session: Option<&str>) -> Result<(String, Vec<Deliver
     found.retain(|item| seen.insert(item.path.clone()));
     found.reverse();
     for item in &mut found {
-        item.bytes = std::fs::metadata(&item.path).ok().map(|meta| meta.len());
+        item.bytes = std::fs::metadata(&item.path)
+            .ok()
+            .filter(|meta| meta.is_file())
+            .map(|meta| meta.len());
     }
-    Ok((session_label(&transcript), found))
+    let label = header
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| session_label(&transcript));
+    Ok((label, found))
 }
 
 /// A byte count people can read.
@@ -322,6 +412,23 @@ pub(crate) fn checked_source(path: &Path, declared: &[Deliverable]) -> Result<Pa
     Ok(canonical)
 }
 
+pub(crate) fn open_source(
+    path: &Path,
+    declared: &[Deliverable],
+) -> Result<(PathBuf, std::fs::File, u64)> {
+    let canonical = checked_source(path, declared)?;
+    let parent = canonical
+        .parent()
+        .context("deliverable has no parent directory")?;
+    let file = crate::file_security::open_declared_file(parent, &canonical)
+        .with_context(|| format!("cannot read {}", canonical.display()))?;
+    let length = file.metadata()?.len();
+    if length > MAX_COPY_BYTES {
+        bail!("{} exceeds the copy byte limit", canonical.display());
+    }
+    Ok((canonical, file, length))
+}
+
 /// `rdsh files get <path> [--out <file>] [--session <id>]`
 ///
 /// Copies one declared deliverable to `--out` (stdout by default is not used
@@ -334,24 +441,62 @@ pub(crate) fn cmd_get(
     locale: crate::locale::Locale,
 ) -> Result<()> {
     let source = PathBuf::from(path);
-    let resolved = if force {
-        std::fs::canonicalize(&source)
-            .with_context(|| format!("cannot read {}", source.display()))?
+    let (resolved, source) = if force {
+        let canonical = std::fs::canonicalize(&source)
+            .with_context(|| format!("cannot read {}", source.display()))?;
+        let mut options = std::fs::File::options();
+        options.read(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW);
+        }
+        let file = options.open(&canonical)?;
+        (canonical, file)
     } else {
         let (_, declared) = deliverables(session)?;
-        checked_source(&source, &declared)?
+        let (canonical, file, _) = open_source(&source, &declared)?;
+        (canonical, file)
     };
     let destination = match out {
         Some(out) => PathBuf::from(out),
         None => std::env::current_dir()?.join(download_name(&resolved)),
     };
-    if destination.exists() && destination != resolved {
-        bail!(
-            "{} already exists; pass --out with another name",
-            destination.display()
-        );
+    let metadata = source.metadata()?;
+    if !metadata.is_file() {
+        bail!("{} is not a regular file", resolved.display());
     }
-    std::fs::copy(&resolved, &destination).with_context(|| {
+    let mut options = std::fs::File::options();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut target = options.open(&destination).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            anyhow::anyhow!(
+                "{} already exists; pass --out with another name",
+                destination.display()
+            )
+        } else {
+            anyhow::Error::new(error).context(format!("cannot create {}", destination.display()))
+        }
+    })?;
+    let result = (|| -> Result<()> {
+        let limit = if force { u64::MAX } else { MAX_COPY_BYTES + 1 };
+        let copied = std::io::copy(&mut source.take(limit), &mut target)?;
+        if !force && copied > MAX_COPY_BYTES {
+            bail!("{} exceeds the copy byte limit", resolved.display());
+        }
+        target.set_permissions(metadata.permissions())?;
+        Ok(())
+    })();
+    drop(target);
+    if result.is_err() {
+        let _ = std::fs::remove_file(&destination);
+    }
+    result.with_context(|| {
         format!(
             "cannot copy {} to {}",
             resolved.display(),
@@ -370,7 +515,7 @@ pub(crate) fn cmd_get(
         },
         destination.display()
     );
-    if !out.is_some() {
+    if out.is_none() {
         let _ = writeln!(
             stdout,
             "[rdsh] {}",
@@ -458,6 +603,13 @@ mod tests {
         let changes = json!({"changes": [{"path": "src/main.rs"}, {"path": "README.md"}]});
         let mut found = Vec::new();
         declarations(&changes, &mut found);
+        assert!(found.is_empty());
+
+        let result = json!({
+            "type": "tool/result",
+            "data": {"type": "presented", "files": [{"path": "/tmp/secret"}]},
+        });
+        declarations(&result, &mut found);
         assert!(found.is_empty());
     }
 
