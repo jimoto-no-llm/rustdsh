@@ -4,11 +4,18 @@ Separate, optional Japanese locale package for DSH. It implements the final
 ownership and packaging migration of
 [#80](https://github.com/kuraneko1/dsh-mobile-maxxing/issues/80).
 
-**This package is the only owner of `ja`.** The mobile package no longer
+**On DSH 0.2.1-rc.2 / rc.3 this package is the only owner of `ja`.** The mobile package no longer
 registers a language or injects a locale pack; its `COPY.ja` is only its own
 UI copy. This package is not installed or enabled by the mobile tarball, is
 not added to a profile automatically, and never writes the shared display
 language: the phone picker only projects the catalog for this device.
+
+**DSH 0.2.2-alpha.2 ships `ja` itself.** The peer range is
+`0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.2-alpha.2`. When `ja` is already in the
+locale catalog, the client registers nothing: a second `ja` definition or a
+second `ja` dictionary throws, and the web boot then fails as a whole. On
+0.2.2-alpha.2 the DSH translation is shown; the catalog below is used on
+0.2.1-rc.2 / rc.3 only.
 
 **Current catalog (2026-10-28):** DSH 0.2.1-rc.3, **65 namespaces / 2915
 keys**, with zero English fallback. The previous rc.2 snapshot had 64 / 2906;
@@ -92,7 +99,7 @@ install it separately from that local file:
 
 ```sh
 node scripts/pack-all.mjs            # dist/dsh-locale-ja-<version>.tgz only when complete
-dsh plugin --profile web add ./dist/dsh-locale-ja-0.1.1.tgz
+dsh plugin --profile web add ./dist/dsh-locale-ja-0.1.2.tgz
 # restart DSH to load the client half
 ```
 
@@ -110,7 +117,7 @@ path above is preparation, not a verified production install.
 ```text
 package.json                 generated from locale/package-meta.json
 index.js                     generated host half (intentionally empty)
-client.js                    generated browser half (loader registration; one addLanguage, 64 registers)
+client.js                    generated browser half (loader registration; one addLanguage, 65 registers, none when DSH defines ja)
 locale/
   upstream.json              stage-1 ownership, sources, hashes, key counts
   package-meta.json          source data for the generated manifest
@@ -164,9 +171,12 @@ either; that export is for the browser loader only. `index.js` stays the ESM
 host entry. The factory returns:
 
 - `language`: `{ id: "ja", label: "日本語", fallback: "en" }`;
-- `dictionaries`: all 64 complete `ja` dictionaries;
+- `dictionaries`: all 65 complete `ja` dictionaries;
 - `inject`: `["locale"]`;
-- `apply(ctx)`: exactly one `ctx.locale.addLanguage(language)` and 64
+- `apply(ctx)`: nothing when `ja` is already in
+  `ctx.locale.getSnapshot().locales` (DSH 0.2.2-alpha.2 defines it before the
+  locale service is provided); otherwise exactly one
+  `ctx.locale.addLanguage(language)` and 65
   `ctx.effect(() => ctx.locale.register(namespace, "ja", dictionary), label)`
   calls, so every registration has an owner-owned disposer.
 
@@ -250,11 +260,12 @@ JSON keys are hard errors.
   the generator and the incomplete fixture can exercise selection and
   namespace registration. It is not used by the current catalog and must not
   be described as translation.
-- **Sole ownership:** this package is the only `ja` language and namespace
-  owner. The mobile package no longer registers `ja`, so both may be enabled
-  together; only this package's effects add or remove the catalog entries. It
-  never sets the shared display language (the phone picker projects the catalog
-  for that device only).
+- **Sole ownership:** on DSH 0.2.1-rc.2 / rc.3 this package is the only `ja`
+  language and namespace owner. The mobile package no longer registers `ja`, so
+  both may be enabled together; only this package's effects add or remove the
+  catalog entries. DSH 0.2.2-alpha.2 defines `ja` itself, and there this
+  package registers nothing. It never sets the shared display language (the
+  phone picker projects the catalog for that device only).
 - **Optional and not auto-installed:** the mobile tarball does not contain this
   package, does not depend on it and does not enable it. Nothing is installed
   into a DSH profile until the operator runs the separate local-tarball command
