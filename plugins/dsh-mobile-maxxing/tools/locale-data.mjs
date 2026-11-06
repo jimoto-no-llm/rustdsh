@@ -496,7 +496,18 @@ export function renderClient(dictionaries, status) {
 	lines.push('');
 	lines.push('\t\tconst inject = ["locale"];');
 	lines.push('');
+	lines.push('\t\t/**');
+	lines.push('\t\t * DSH 0.2.2 and later define ja, with their own ja dictionaries, before the');
+	lines.push('\t\t * locale service is provided. Defining the language or a ja dictionary a');
+	lines.push('\t\t * second time throws, so this pack owns ja only while nothing else has');
+	lines.push('\t\t * defined it (DSH 0.2.1-rc.2 / rc.3). Locale ids compare case-insensitively.');
+	lines.push('\t\t */');
+	lines.push('\t\tfunction japaneseIsDefined(locale) {');
+	lines.push('\t\t\treturn locale.getSnapshot().locales.some((definition) => definition.id.toLowerCase() === language.id);');
+	lines.push('\t\t}');
+	lines.push('');
 	lines.push('\t\tfunction apply(ctx) {');
+	lines.push('\t\t\tif (japaneseIsDefined(ctx.locale)) return;');
 	lines.push('\t\t\tctx.effect(() => ctx.locale.addLanguage(language), "dsh-locale-ja: addLanguage(ja)");');
 	for (const namespace of Object.keys(dictionaries)) {
 		const entry = status.namespaces[namespace];

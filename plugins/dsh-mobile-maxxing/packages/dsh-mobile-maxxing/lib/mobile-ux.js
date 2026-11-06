@@ -9,6 +9,10 @@
  */
 export const inject = [];
 
+import { createReadStream } from "node:fs";
+import { realpath, stat } from "node:fs/promises";
+import path from "node:path";
+
 /** Accepted config keys (documented in README.md). */
 export const DEFAULTS = {
 	/** Extra labels to hide on phones, merged with the built-in list. */
@@ -26,6 +30,51 @@ export const DEFAULTS = {
 };
 
 const LIVE_SPEED_PATH = "/api/rdsh-mobile-ux/live-speed";
+export const DOWNLOAD_PATH = "/api/rdsh-mobile-ux/download";
+
+const DOWNLOAD_MIME = {
+	txt: "text/plain", log: "text/plain", md: "text/markdown", json: "application/json",
+	csv: "text/csv", html: "text/html", png: "image/png", jpg: "image/jpeg",
+	jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+	pdf: "application/pdf", zip: "application/zip", mp4: "video/mp4", mp3: "audio/mpeg",
+};
+
+/**
+ * Resolve one download request to a regular file inside the session's
+ * workspace. Anything else — a missing session, a path escaping the
+ * workspace (including through a symlink), a directory — is refused by
+ * returning null, so the route can answer a plain 404 for all of them.
+ *
+ * @param {object} sessions - the host sessions service.
+ * @param {string} sessionId - session the file was presented in.
+ * @param {string} requested - absolute path or workspace-relative path.
+ * @returns {Promise<{target: string, name: string, size: number} | null>}
+ */
+export async function resolveDownloadTarget(sessions, sessionId, requested) {
+	if (typeof sessionId !== "string" || sessionId === "") return null;
+	if (typeof requested !== "string" || requested === "" || requested.includes("\0")) return null;
+	const header = sessions?.get?.(sessionId)?.header;
+	const rootRaw = header?.cwd;
+	if (typeof rootRaw !== "string" || rootRaw === "") return null;
+	try {
+		const root = await realpath(rootRaw);
+		const candidate = path.isAbsolute(requested) ? requested : path.resolve(root, requested);
+		const target = await realpath(candidate);
+		const relative = path.relative(root, target);
+		if (relative === "" || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) return null;
+		const info = await stat(target);
+		if (!info.isFile()) return null;
+		return { target, name: path.basename(target), size: info.size };
+	} catch {
+		return null;
+	}
+}
+
+/** Content-Disposition for a download, with a UTF-8 filename. */
+function downloadDisposition(name) {
+	const fallback = name.replace(/[^ -~]/g, "_").replace(/["\\]/g, "_") || "download";
+	return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
 const LIVE_SPEED_WINDOW_MS = 1000;
 const LIVE_SPEED_STALE_MS = 1500;
 
@@ -133,6 +182,65 @@ export function apply(ctx, config) {
 		});
 		return () => {
 			if (typeof disposeIndex === "function") disposeIndex();
+			if (typeof disposeRoute === "function") disposeRoute();
+		};
+	});
+
+	// Presented-file downloads. A phone browser/WebView cannot be relied on
+	// to save a blob: URL created after an async read (Android hands blob
+	// downloads to the system, where they fail), so the file is also offered
+	// as a plain streamed HTTP download. Only files inside the session's
+	// own workspace are served; resolveDownloadTarget keeps this from
+	// becoming a general file-reading route.
+	ctx.inject(["webServer", "connection", "sessions"], (dlCtx) => {
+		const disposeRoute = dlCtx.webServer.register({
+			kind: "exact",
+			path: DOWNLOAD_PATH,
+			handler(req, res) {
+				void (async () => {
+					const rejection = dlCtx.connection?.requestRejection(req);
+					if (rejection !== undefined) {
+						res.writeHead(rejection);
+						res.end(rejection === 401 ? "unauthorized" : "forbidden");
+						return;
+					}
+					if (req.method !== "GET" && req.method !== "HEAD") {
+						res.writeHead(405, { allow: "GET, HEAD" });
+						res.end();
+						return;
+					}
+					const query = new URL(req.url || "/", "http://dsh.local").searchParams;
+					const found = await resolveDownloadTarget(
+						dlCtx.sessions,
+						query.get("sessionId") ?? "",
+						query.get("path") ?? "",
+					);
+					if (found === null) {
+						res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+						res.end("not found");
+						return;
+					}
+					const ext = found.name.toLowerCase().split(".").pop() ?? "";
+					res.writeHead(200, {
+						"content-type": DOWNLOAD_MIME[ext] ?? "application/octet-stream",
+						"content-length": String(found.size),
+						"content-disposition": downloadDisposition(found.name),
+						"cache-control": "no-store",
+					});
+					if (req.method === "HEAD") {
+						res.end();
+						return;
+					}
+					const stream = createReadStream(found.target);
+					stream.on("error", () => res.destroy());
+					stream.pipe(res);
+				})().catch(() => {
+					if (!res.headersSent) res.writeHead(500);
+					res.end();
+				});
+			},
+		});
+		return () => {
 			if (typeof disposeRoute === "function") disposeRoute();
 		};
 	});

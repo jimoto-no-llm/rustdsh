@@ -491,9 +491,9 @@ test("resize only drops gestures on a real width change or a rotation", () => {
 	assert.match(resize, /let gestureWidth = window\.innerWidth;/, "the boot handler does not remember the width");
 	assert.match(resize, /if \(window\.innerWidth !== gestureWidth\) \{[\s\S]{0,120}?resetGestures\(\);/, "a width change does not reset gestures");
 	assert.match(resize, /const onOrientation = \(\) => \{[\s\S]{0,120}?resetGestures\(\);/, "a rotation does not reset gestures");
-	assert.match(resize, /measureSafeArea\(\)/, "resize does not re-measure");
+	assert.match(resize, /scheduleMeasureSafeArea\(\)/, "resize does not re-measure");
 	assert.match(resize, /scheduleDecorate\(\)/, "resize does not redecorate");
-	assert.match(resize, /rotationTimer = window\.setTimeout\(\(\) => \{[\s\S]{0,200}?measureSafeArea\(\);[\s\S]{0,100}?scheduleDecorate\(\);[\s\S]{0,80}?\}, 350\)/, "no follow-up pass for the late safe-area values");
+	assert.match(resize, /rotationTimer = window\.setTimeout\(\(\) => \{[\s\S]{0,220}?scheduleMeasureSafeArea\(true\);[\s\S]{0,100}?scheduleDecorate\(\);[\s\S]{0,80}?\}, 350\)/, "no follow-up pass for the late safe-area values");
 	assert.match(CLIENT, /visualViewport\?\.addEventListener\("resize", onLayoutResize\)/, "the visual viewport is not watched");
 	assert.doesNotMatch(CLIENT, /visualViewport\?\.addEventListener\("resize", onResize\)/, "visualViewport still empties the gesture");
 	assert.match(CLIENT, /attributeFilter: \[[^\]]*"data-sidebar-collapsed"/, "drawer changes are not observed");
@@ -510,7 +510,7 @@ test("#76 keyboard-hide recovery only re-runs the existing layout pass", () => {
 	const end = CLIENT.indexOf("const scheduleKeyboardRecovery", at);
 	assert.ok(end > at, "the recovery body is unterminated");
 	const body = CLIENT.slice(at, end);
-	assert.match(body, /measureSafeArea()/, "the recovery does not re-measure");
+	assert.match(body, /scheduleMeasureSafeArea()/, "the recovery does not re-measure");
 	assert.match(body, /scheduleDecorate()/, "the recovery does not redecorate");
 	assert.match(body, /scheduleTerminalFit()/, "the recovery does not refit the terminal");
 	assert.doesNotMatch(body, /scrollTo|scrollTop|style\.(?:height|display|transform)|offsetHeight|blur\(|\.focus\(/, "the recovery fakes a reflow, scrolls or moves focus");
@@ -555,7 +555,7 @@ test("a finger drag in the terminal becomes a wheel event", () => {
 	assert.match(CLIENT, /wheel\.deltaY = -pixels \* TERMINAL_WHEEL_PER_PX/, "the wheel delta is not derived from the drag");
 	assert.match(CLIENT, /function onTouchMove\(event\) \{\s*\n\s*if \(moveTerminalDrag\(event\)\) return;/, "the bridge does not own the gesture");
 	assert.match(CLIENT, /function onTouchStart\(event\) \{\s*\n\s*startTerminalDrag\(event\);/, "no drag start");
-	assert.match(CLIENT, /function onEdgeSwipeEnd\(\) \{\s*\n\s*edgeSwipe = null;\s*\n\s*endTerminalDrag\(\);/, "the drag outlives the gesture");
+	assert.match(functionHead("onEdgeSwipeEnd", 500), /edgeSwipe = null;\s*\n\s*endTerminalDrag\(\);/, "the drag outlives the gesture");
 	// ...and the overscroll guard must stop cancelling the drags the bridge wants.
 	assert.match(CLIENT, /target\.closest\("textarea, input, \.xterm"\)\) return;/, "the overscroll guard still cancels terminal drags");
 	assert.match(CLIENT, /target\.closest\("input, textarea, \[contenteditable=true\], \.xterm/, "the back-swipe still claims terminal drags");

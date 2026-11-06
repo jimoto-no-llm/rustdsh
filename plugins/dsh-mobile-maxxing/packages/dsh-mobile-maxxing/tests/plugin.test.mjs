@@ -689,7 +689,7 @@ test("confirmed update installs only the checked release in the active profile",
     const result = await call(routes.get("/dsh-mobile-maxxing/update-plugins"), "POST", undefined, { "x-dsh-release": nextTag });
     assert.equal(result.status, 200);
     assert.deepEqual(JSON.parse(result.text), { ok: true, version: nextTag });
-    assert.deepEqual((await readFile(output, "utf8")).trim().split("\n"), ["plugin", "--profile", "test", "add", `github:kuraneko1/dsh-mobile-maxxing#${nextTag}`]);
+    assert.deepEqual((await readFile(output, "utf8")).trim().split("\n"), ["plugin", "--profile", "test", "add", `https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/${nextTag}/dsh-mobile-maxxing.tgz`, "--force"]);
     assert.equal((await call(routes.get("/dsh-mobile-maxxing/update-plugins"), "POST", undefined, { "x-dsh-release": nextTag })).status, 409);
   } finally {
     globalThis.fetch = originalFetch;
@@ -739,4 +739,63 @@ test("the service worker never caches live state", async () => {
 	assert.match(source, /BYPASS_SEGMENTS = \["\/api", "\/hmr", "\/terminal", "\/__"\]/,
 		"API answers must always come from the server");
 	assert.match(source, /request\.method !== "GET"/, "mutations are never intercepted");
+});
+
+test("a failed install reports a code, a reason and the installer detail", async () => {
+  // The Web UI localises the code and keeps the installer output secondary;
+  // `spawn dsh ENOENT` used to be the whole answer.
+  const dir = await mkdtemp(join(tmpdir(), "dsh-update-fail-"));
+  await writeFile(join(dir, "dsh"), "#!/bin/sh\necho 'fetch failed: getaddrinfo ENOTFOUND github.com' >&2\nexit 1\n", { mode: 0o755 });
+  const oldPath = process.env.PATH;
+  const originalFetch = globalThis.fetch;
+  process.env.PATH = dir + ":" + oldPath;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ tag_name: "v9.9.9" }) });
+  try {
+    const { routes } = mount({});
+    assert.equal((await call(routes.get("/dsh-mobile-maxxing/plugin-version"))).status, 200);
+    const response = await call(routes.get("/dsh-mobile-maxxing/update-plugins"), "POST", undefined, { "x-dsh-release": "v9.9.9" });
+    assert.equal(response.status, 500);
+    const body = JSON.parse(response.text);
+    assert.equal(body.code, "network", "a transient network failure was not classified");
+    assert.equal(body.ok, false);
+    assert.equal(typeof body.hint, "string");
+    assert.match(body.detail, /ENOTFOUND/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.PATH = oldPath;
+  }
+});
+
+test("a missing CLI is named as such, not as a raw spawn error", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dsh-update-empty-"));
+  const oldPath = process.env.PATH;
+  const originalFetch = globalThis.fetch;
+  process.env.PATH = dir;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ tag_name: "v9.9.9" }) });
+  try {
+    const { routes } = mount({});
+    await call(routes.get("/dsh-mobile-maxxing/plugin-version"));
+    const response = await call(routes.get("/dsh-mobile-maxxing/update-plugins"), "POST", undefined, { "x-dsh-release": "v9.9.9" });
+    assert.equal(response.status, 500);
+    assert.equal(JSON.parse(response.text).code, "cli-missing");
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.PATH = oldPath;
+  }
+});
+
+test("the versions answer without a GitHub round trip", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ tag_name: "v9.9.9" }) });
+  try {
+    const { routes } = mount({});
+    const local = await call(routes.get("/dsh-mobile-maxxing/plugin-version"), "GET", "/dsh-mobile-maxxing/plugin-version?local=1");
+    assert.equal(local.status, 200);
+    const body = JSON.parse(local.text);
+    assert.equal(typeof body.current, "string");
+    assert.equal(typeof body.dsh, "string");
+    assert.equal(body.latest, undefined, "the local answer still called GitHub");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

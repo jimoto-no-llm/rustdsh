@@ -26,6 +26,11 @@ function mount(config = {}) {
       streamHook = handler;
     },
     inject(dependencies, callback) {
+      // The download route asks for sessions as well; it is not under test here.
+      if (dependencies.includes("sessions")) {
+        callback({ webServer, connection, sessions: { get: () => undefined } });
+        return;
+      }
       assert.deepEqual(dependencies, ["webServer", "connection"]);
       callback({ webServer, connection });
     },
