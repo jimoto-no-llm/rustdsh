@@ -1278,7 +1278,7 @@ html[data-rdsh-device-mode="mobile"] .dsh-mobile-maxxing-install-actions { displ
       const [release, setRelease] = useState(doneStored);
       const dismiss = () => {
         try { sessionStorage.removeItem(UPDATE_DONE_KEY); } catch { /* private mode */ }
-        dismiss();
+        setPhase("");
       };
       // The plugin and DSH versions are shown before any check runs, so the
       // panel answers "what am I running?" without a GitHub round trip.

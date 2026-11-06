@@ -543,3 +543,14 @@ test("the updates panel shows both versions without checking GitHub", () => {
 	assert.match(CLIENT, /t\("update\.row\.plugin"\)/, "the plugin version row");
 	assert.match(CLIENT, /t\("update\.row\.dsh"\)/, "the DSH version row");
 });
+
+test("closing the update dialog actually closes it", () => {
+	// The blanket setPhase("") -> dismiss() rewrite once replaced the body of
+	// dismiss() itself: closing recursed until the stack blew, and the dialog
+	// stayed on screen.
+	const start = CLIENT.indexOf("const dismiss = () => {");
+	assert.ok(start > 0, "the dialog has no dismiss");
+	const body = CLIENT.slice(start, CLIENT.indexOf("};", start));
+	assert.match(body, /setPhase\(""\)/, "dismiss does not clear the phase");
+	assert.doesNotMatch(body, /dismiss\(\)/, "dismiss calls itself");
+});
