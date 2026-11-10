@@ -333,7 +333,12 @@ mod tests {
     async fn nested_permission_waits_for_rust_ui_and_denial_is_not_success() {
         use std::os::unix::fs::PermissionsExt;
         use std::sync::{Arc, Mutex};
-        for allow in [Some(true), Some(false), None] {
+        for (allow, full_access) in [
+            (Some(true), false),
+            (Some(false), false),
+            (None, false),
+            (Some(true), true),
+        ] {
             let root = super::super::sdk::TemporaryRoot::create().unwrap();
             let binary = root.0.join("devin-fixture");
             std::fs::write(&binary,r#"#!/usr/bin/env python3
@@ -374,34 +379,55 @@ for line in sys.stdin:
                 secrets: vec![],
                 registry: super::super::profiles::Registry::default(),
             });
+            if full_access {
+                engine.state.lock().unwrap().controls.permission =
+                    super::super::controls::Permission::FullAccess;
+            }
             let next = engine.clone();
             let task = tokio::spawn(async move {
                 execute(&next, 1, "survey", if allow.is_none() { 1 } else { 10 }).await
             });
-            let pending = tokio::time::timeout(std::time::Duration::from_secs(5), async {
-                loop {
-                    let snapshot = engine.snapshot();
-                    if snapshot["status"] == "approval" {
-                        break snapshot["pending"].clone();
+            if !full_access {
+                let pending = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                    loop {
+                        let snapshot = engine.snapshot();
+                        if snapshot["status"] == "approval" {
+                            break snapshot["pending"].clone();
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     }
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                })
+                .await
+                .unwrap();
+                assert_eq!(pending["tool"], "devin_permission");
+                assert_eq!(
+                    pending["arguments"]["toolCall"]["rawInput"]["command"],
+                    "git status"
+                );
+                assert!(!root.0.join("decision.json").exists());
+                assert!(!task.is_finished());
+                if let Some(allow) = allow {
+                    engine
+                        .approve(pending["id"].as_str().unwrap(), allow)
+                        .unwrap();
                 }
-            })
-            .await
-            .unwrap();
-            assert_eq!(pending["tool"], "devin_permission");
-            assert_eq!(
-                pending["arguments"]["toolCall"]["rawInput"]["command"],
-                "git status"
-            );
-            assert!(!root.0.join("decision.json").exists());
-            assert!(!task.is_finished());
-            if let Some(allow) = allow {
-                engine
-                    .approve(pending["id"].as_str().unwrap(), allow)
-                    .unwrap();
             }
-            let result = task.await.unwrap().unwrap();
+            let result = tokio::time::timeout(std::time::Duration::from_secs(15), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            if full_access {
+                let snapshot = engine.snapshot();
+                assert_eq!(snapshot["pending"], Value::Null);
+                assert_eq!(snapshot["status"], "running");
+                assert!(snapshot["events"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| e["name"] == "auto_allow"
+                        && e["content"].as_str().unwrap().contains("devin_permission")));
+            }
             let Some(allow) = allow else {
                 assert_eq!(result["error"], "DEVIN_ACP_TIMEOUT");
                 assert_eq!(result["completed"], false);

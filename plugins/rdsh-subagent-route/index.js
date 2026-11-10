@@ -17,14 +17,28 @@ const MAX_FIELD = 128;
 const EFFORTS = Object.freeze(['', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 export const name = 'rdsh-subagent-route';
-export const inject = ['webServer'];
+export const inject = ['webServer', 'connection'];
 
 function profileDir(env = process.env) {
   const home = env.DSH_HOME || join(homedir(), '.dsh');
   return join(home, 'profiles', env.RDSH_PROFILE || 'web');
 }
 
-const patchPath = (env) => join(profileDir(env), 'cordis.patch.yml');
+function targetDirectory(ctx, config) {
+  // Explicit fixture environments retain their isolated target. Normal Host
+  // launches use the active profile even when --profile was not mirrored into
+  // RDSH_PROFILE. ctx.get is Cordis's public optional-service lookup.
+  if (config.env === undefined) {
+    const profile = ctx.get?.('profileContext');
+    if (profile !== undefined) {
+      if (typeof profile?.dir !== 'string' || !isAbsolute(profile.dir)) throw fail('RDSH_SUBAGENT_ROUTE_INVALID_PROFILE');
+      return resolve(profile.dir);
+    }
+  }
+  return resolve(profileDir({ ...process.env, ...(config.env || {}) }));
+}
+
+const patchPath = directory => join(directory, 'cordis.patch.yml');
 
 function clean(value) {
   if (value === undefined || value === null) return '';
@@ -37,12 +51,12 @@ function fail(code) {
   return Object.assign(new Error(code), { code });
 }
 
-async function readPatch(env) {
+async function readPatch(directory) {
   try {
-    const file = await lstat(patchPath(env));
+    const file = await lstat(patchPath(directory));
     if (!file.isFile() || file.isSymbolicLink()) throw fail('RDSH_SUBAGENT_ROUTE_NOT_A_FILE');
     if (file.size > 1024 * 1024) throw fail('RDSH_SUBAGENT_ROUTE_TOO_LARGE');
-    return await readFile(patchPath(env), 'utf8');
+    return await readFile(patchPath(directory), 'utf8');
   } catch (error) {
     // A profile that never customized its patch layer starts from an empty
     // document; the first save creates it.
@@ -51,10 +65,10 @@ async function readPatch(env) {
   }
 }
 
-async function writePatch(text, env) {
-  const path = patchPath(env);
-  await mkdir(profileDir(env), { recursive: true });
-  const temporary = join(profileDir(env), `.cordis.patch.yml.${randomUUID()}.tmp`);
+async function writePatch(text, directory) {
+  const path = patchPath(directory);
+  await mkdir(directory, { recursive: true });
+  const temporary = join(directory, `.cordis.patch.yml.${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, text, { mode: 0o600 });
     await rename(temporary, path);
@@ -77,14 +91,14 @@ export function routeFromBody(body) {
   };
 }
 
-function json(res, status, value) {
+function json(res, status, value, head = false) {
   const body = JSON.stringify(value);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
     'content-length': Buffer.byteLength(body),
   });
-  res.end(body);
+  res.end(head ? undefined : body);
 }
 
 async function readBody(req) {
@@ -102,35 +116,51 @@ async function readBody(req) {
   }
 }
 
-/** Guard every mutating call with the page's own session token. */
-function authorize(ctx, req, res) {
-  if (typeof ctx.webServer?.authorize === 'function') return ctx.webServer.authorize(req, res);
-  return true;
+/** Use the same Host/Origin fence and signed browser cookie as public RPCs. */
+async function authorize(ctx, req, res) {
+  let status = 503;
+  try {
+    if (typeof ctx.connection?.admit === 'function') {
+      // Await even though the current Host contract is synchronous. A Promise
+      // is never itself evidence of authentication.
+      const admission = await ctx.connection.admit(req);
+      if (admission && typeof admission === 'object') {
+        if (!Object.hasOwn(admission, 'rejection') && admission.peer
+          && typeof admission.peer === 'object') return true;
+        if (admission.rejection === 401 || admission.rejection === 403) status = admission.rejection;
+      }
+    }
+  } catch {
+    // Service failure must not make profile contents or writes public.
+  }
+  json(res, status, { ok: false, error: status === 401 ? 'unauthorized'
+    : status === 403 ? 'forbidden' : 'authentication-unavailable' }, req.method === 'HEAD');
+  return false;
 }
 
 export function apply(ctx, config = {}) {
-  const env = { ...process.env, ...(config.env || {}) };
+  const directory = targetDirectory(ctx, config);
   return ctx.effect(() => {
     if (!ctx.webServer) return;
     const off = ctx.webServer.register({
       kind: 'exact',
       path: '/api/rdsh-subagent-route',
       handler: async (req, res) => {
-        if (!authorize(ctx, req, res)) return;
+        if (!await authorize(ctx, req, res)) return;
         try {
           if (req.method === 'GET' || req.method === 'HEAD') {
-            const patch = await readPatch(env);
+            const patch = await readPatch(directory);
             return json(res, 200, {
               ok: true,
               supported: true,
-              patch: isAbsolute(patchPath(env)) ? patchPath(env) : resolve(patchPath(env)),
+              patch: patchPath(directory),
               route: readRoute(patch),
               efforts: EFFORTS.filter(Boolean),
-            });
+            }, req.method === 'HEAD');
           }
           if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method-not-allowed' });
           const { clear, route } = routeFromBody(await readBody(req));
-          const patch = await readPatch(env);
+          const patch = await readPatch(directory);
           // Only an entry the profile declares itself can be pinned. A tool that
           // comes straight from a bundle layer is out of reach: writing a
           // top-level twin would land on the disabled base entry and change
@@ -139,7 +169,7 @@ export function apply(ctx, config = {}) {
             return json(res, 409, { ok: false, error: 'RDSH_SUBAGENT_ROUTE_NO_ENTRY' });
           }
           const next = writeRoute(patch, clear ? null : route);
-          if (next !== patch) await writePatch(next, env);
+          if (next !== patch) await writePatch(next, directory);
           return json(res, 200, { ok: true, route: readRoute(next) });
         } catch (error) {
           const code = typeof error?.code === 'string' && error.code.startsWith('RDSH_') ? error.code : 'RDSH_SUBAGENT_ROUTE_FAILED';

@@ -23,7 +23,7 @@ binary = str(Path(sys.argv[1]).resolve())
 runner = r'''import fs from 'node:fs';
 const p=JSON.parse(fs.readFileSync(0,'utf8')).prompt;
 const write=text=>process.stdout.write(JSON.stringify({text,usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:50}}}));
-if(!p.includes('History JSON:\n')) {write('DELEGATE_CHILD_PROOF');}
+if(p.startsWith('You are a delegated child model.')) {write(JSON.stringify({version:1,text:'DELEGATE_CHILD_PROOF',toolCalls:[]}));}
 else {
  const h=JSON.parse(p.split('History JSON:\n')[1]);
  const result=h.filter(m=>m.role==='tool').at(-1);
@@ -105,6 +105,22 @@ if __name__ == '__main__':
             client=Client(root)
             try:
                 client.wait('Rustdshへようこそ')
+                if not allow:
+                    client.send('/mode plan\r');client.wait('[plan · ask]')
+                    client.send('/permission\r');client.wait('モード・パーミッション');client.wait('read-only')
+                    client.dismiss('モード・パーミッション')
+                    client.send('/permission read-only\r');client.wait('パーミッション変更の確認')
+                    client.send('\x1b[200~y\n/permission ask\n\x1b[201~')
+                    client.send('\t');client.resize(41,13);client.wait('端末を42列')
+                    client.send('\t\r');client.resize(100,32);client.wait('パーミッション変更の確認')
+                    client.send('\r');client.wait_absent('パーミッション変更の確認')
+                    client.wait('[plan · ask]')
+                    client.send('/permission read-only\r');client.wait('パーミッション変更の確認')
+                    client.send('\t\r');client.wait('[plan · read-only]')
+                    client.send('/clear\r');client.wait('元の会話には戻れません');client.dismiss('元の会話には戻れません')
+                    client.send('/permission ask\r');client.wait('パーミッション変更の確認')
+                    client.send('\t\r');client.wait('[plan · ask]')
+                    client.send('/plan off\r');client.wait('[normal · ask]')
                 client.send('/');client.wait('コマンド')
                 client.send('sta');client.wait('/status')
                 client.send('\t');client.send('\r');client.wait('会話: 0')
@@ -159,14 +175,14 @@ if __name__ == '__main__':
                 assert ('TUI_READ_PROOF' if allow else 'DENIED') in client.text(),'hidden new-chat dialog erased conversation'
                 client.send('/new\r');client.wait('元の会話には戻れません')
                 client.send('\t\r');client.wait('Rustdshへようこそ')
-                client.send('/quit\r');client.restored()
+                client.send('/exit\r');client.restored()
                 print('PASS full-screen PTY: '+('allow/read' if allow else 'deny/no-read')+', slash commands, pasted model search, draft history, hidden-dialog guard, resize, terminal restoration')
             finally:client.close()
         client=Client(root)
         try:
             client.wait('Rustdshへようこそ')
             client.send('slow\r');client.wait('応答を生成')
-            client.send('\x03');client.wait('待機中')
+            client.send('/stop\r');client.wait('待機中')
             client.send('\x1b[200~日本é👨‍👩‍👧‍👦\x1b[201~');client.wait('日本')
             client.send('\x7f');client.pump(.2)
             assert '👨' not in client.text(),'backspace split the emoji grapheme'
@@ -185,4 +201,31 @@ if __name__ == '__main__':
             client.send('/diagnostics\r');client.wait('問題は報告されていません');client.dismiss('問題は報告されていません')
             client.send('/quit\r');client.restored()
             print('PASS model_call approval/result, actual token/cache counters, /usage and diagnostics')
+        finally:client.close()
+
+    with tempfile.TemporaryDirectory(prefix='rdsh-full-access-ui-') as folder:
+        root=Path(folder);(root/'dsh').mkdir();(root/'cursor-sdk-runner.mjs').write_text(runner)
+        (root/'nonce.txt').write_text('TUI_READ_PROOF')
+        client=Client(root)
+        try:
+            client.wait('Rustdshへようこそ')
+            client.send('/permission\r');client.wait('/permission full-access')
+            client.dismiss('モード・パーミッション')
+            client.send('/permission full-access\r');client.wait('パーミッション変更の確認')
+            client.wait('自動承認');client.send('\r');client.wait_absent('パーミッション変更の確認')
+            client.wait('[normal · ask]')
+            client.send('/permission full-access\r');client.wait('パーミッション変更の確認')
+            client.send('\t\r');client.wait('[normal · full-access]')
+            client.send('read nonce.txt\r');client.wait('TUI_READ_PROOF');client.wait('待機中')
+            client.send('/new\r');client.wait('元の会話には戻れません');client.send('\t\r');client.wait('Rustdshへようこそ')
+            client.wait('[normal · full-access]')
+            client.send('delegate\r');client.wait('DELEGATE_CHILD_PROOF');client.wait('待機中')
+            client.send('/logs\r');client.wait('auto_allow');client.dismiss('┌ 実行ログ')
+            client.send('/permission ask\r');client.wait('パーミッション変更の確認')
+            client.send('\t\r');client.wait('[normal · ask]')
+            client.send('/new\r');client.wait('元の会話には戻れません');client.send('\t\r');client.wait('Rustdshへようこそ')
+            client.send('read nonce.txt\r');client.wait('操作の承認')
+            client.send('\r');client.wait('DENIED');client.wait('待機中')
+            client.send('/exit\r');client.restored()
+            print('PASS full-access explicit confirmation, automatic read/model_call, audit log, /new retention and return to ask')
         finally:client.close()

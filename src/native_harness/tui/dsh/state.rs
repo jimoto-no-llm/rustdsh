@@ -49,7 +49,7 @@ impl View {
                 "provider":catalog["default"]["provider"],"model":catalog["default"]["model"],
                 "providers":catalog["groups"].as_array().cloned().unwrap_or_default(),
                 "messages":[],"events":[],"pending":null,"error":null,"diagnostics":[],
-                "status":"idle","usage":UsageStats::default().snapshot()}),
+                "status":"idle","controls":{},"usage":UsageStats::default().snapshot()}),
             records: BTreeMap::new(),
             pending: VecDeque::new(),
             tools: HashMap::new(),
@@ -665,6 +665,12 @@ impl View {
         if selection["model"].is_string() {
             self.value["model"] = selection["model"].clone();
         }
+        let plan = &self.projections["plan"];
+        self.value["controls"] = json!({
+            "mode":plan["active"].as_bool().map(|active|if active {"plan"}else{"normal"}),
+            "planPending":plan["pending"].as_bool(),
+            "permission":self.projections["permissions"]["currentValue"].as_str()
+        });
         self.value["messages"] = json!(messages.into_iter().map(|(_, m)| m).collect::<Vec<_>>());
         events.extend(self.child_events.iter().cloned());
         self.value["events"] = json!(events);

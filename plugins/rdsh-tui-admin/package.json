@@ -1,0 +1,13 @@
+{
+  "name": "rdsh-tui-admin",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Public Host administration schemas for the authenticated Rust TUI",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "files": ["index.js", "client.js", "catalog.js", "schema.js", "http-actions.js", "host-runtime.js", "settings-document.js", "cordis.patch.yml", "README.md"],
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-workspace", "@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar-right", "@deepseek-ai/dsh-client-ui-sidebar-files", "@deepseek-ai/dsh-client-ui-sidebar-documentpreview", "@deepseek-ai/dsh-api-workspace-files", "@deepseek-ai/dsh-api-session-controller"] } }
+}
