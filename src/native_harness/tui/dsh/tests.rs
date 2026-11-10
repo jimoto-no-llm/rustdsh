@@ -351,3 +351,40 @@ fn session_summary_is_mapped_and_only_nonblank_workspace_roots_are_listed() {
     assert_eq!(value["items"][0]["id"], "kept");
     assert_eq!(value["items"][0]["title"], "Saved");
 }
+
+#[test]
+fn plan_and_permission_states_follow_host_projections_without_guessing_activation() {
+    let mut v = view();
+    v.apply_follow(&opening(
+        vec![],
+        json!({"plan":{"active":false,"pending":true},"permissions":{"currentValue":"safe"}}),
+    ));
+    assert_eq!(v.value["controls"]["mode"], "normal");
+    assert_eq!(v.value["controls"]["planPending"], true);
+    assert_eq!(v.value["controls"]["permission"], "safe");
+    v.apply_follow(&opening(
+        vec![],
+        json!({"plan":{"active":true,"pending":false},"permissions":{"currentValue":"custom"}}),
+    ));
+    assert_eq!(v.value["controls"]["mode"], "plan");
+    assert_eq!(v.value["controls"]["planPending"], false);
+    assert_eq!(v.value["controls"]["permission"], "custom");
+    v.apply_follow(&opening(vec![], json!({})));
+    assert!(v.value["controls"]["mode"].is_null());
+    assert!(v.value["controls"]["permission"].is_null());
+}
+
+#[test]
+fn resume_preserves_existing_membership_and_uses_the_sessions_own_cwd() {
+    let baseline = json!({"items":[{"workspaceId":"foreign-workspace","path":"/foreign","sessionIds":["bound"]}]});
+    assert!(workspace_contains(&baseline, "bound").unwrap());
+    assert!(!workspace_contains(&baseline, "legacy").unwrap());
+    let sessions = json!({"items":[{"sessionId":"bound","cwd":"/foreign"},{"sessionId":"legacy","cwd":"/saved-session-workspace"}]});
+    assert_eq!(
+        resume_cwd(&sessions, "legacy").unwrap(),
+        "/saved-session-workspace"
+    );
+    assert!(resume_cwd(&sessions, "missing").is_err());
+    assert!(workspace_contains(&json!({"items":[{}]}), "legacy").is_err());
+    assert!(registered_workspace_id(&json!({"workspace":{}})).is_err());
+}
