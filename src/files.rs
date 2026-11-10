@@ -370,7 +370,7 @@ pub(crate) fn cmd_get(
         },
         destination.display()
     );
-    if !out.is_some() {
+    if out.is_none() {
         let _ = writeln!(
             stdout,
             "[rdsh] {}",
