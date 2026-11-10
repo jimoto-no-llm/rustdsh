@@ -412,7 +412,7 @@ test('docs describe the optional local-tarball install and never a fake release 
 	const readme = fs.readFileSync(path.join(packageDir, 'README.md'), 'utf8');
 	assert.doesNotMatch(readme, /releases\/download\/[^\s"']*dsh-locale-ja/, 'the unreleased locale must not link a release asset');
 	const { version: localeVersion } = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
-	assert.match(readme, new RegExp("dsh plugin --profile web add \\.\\/dist\\/dsh-locale-ja-" + localeVersion.replace(/\./g, '\\.') + "\\.tgz"));
+	assert.match(readme, new RegExp("dsh plugin --profile web add \\.\\/dist\\/dsh-locale-ja-" + localeVersion.replace(/[^a-zA-Z0-9]/g, '\\$&') + "\\.tgz"));
 	assert.match(readme, /REFUSED/);
 	assert.match(readme, /sole owner|only owner/i, 'the sole-owner migration must be explicit');
 	const rootReadme = fs.readFileSync(path.join(repo, 'README.md'), 'utf8');
