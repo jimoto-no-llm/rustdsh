@@ -1,0 +1,12 @@
+{
+  "name": "rdsh-tui-admin",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Public Host administration schemas for the authenticated Rust TUI",
+  "exports": { ".": "./index.js" },
+  "files": ["index.js", "catalog.js", "schema.js", "http-actions.js", "cordis.patch.yml", "README.md"],
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
