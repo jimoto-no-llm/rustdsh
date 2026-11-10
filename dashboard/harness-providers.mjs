@@ -1,3 +1,4 @@
+import { StringDecoder } from "node:string_decoder";
 import { spawnOwnedProcess } from "./process-scope.mjs";
 
 export class UnsupportedHarnessProviderError extends Error {
@@ -14,28 +15,51 @@ export class UnsupportedHarnessProviderError extends Error {
 
 function readReadyUrl(child, { timeout = 45_000, port }) {
   return new Promise((resolve, reject) => {
-    let output = "";
+    let settled = false;
     const finish = (error, url) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      child.stdout.removeListener("data", capture);
-      child.stderr.removeListener("data", capture);
+      for (const { stream, capture, end } of readers) {
+        stream.removeListener("data", capture);
+        stream.removeListener("end", end);
+      }
       child.removeListener("error", onError);
       child.removeListener("exit", onExit);
       if (error) reject(error);
       else resolve(url);
     };
-    const capture = (chunk) => {
-      output = (output + chunk.toString()).slice(-32_000);
-      const match = output.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/);
-      if (match) {
-        const url = new URL(match[1]);
-        if (url.port !== String(port)) {
-          finish(new Error(`Harness reported an unexpected port; expected ${port}`));
-          return;
-        }
-        finish(null, url);
+    const parseLine = (line) => {
+      const match = line.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/);
+      if (!match) return;
+      let url;
+      try {
+        url = new URL(match[1]);
+      } catch {
+        finish(new Error("Harness reported an invalid readiness URL"));
+        return;
       }
+      if (url.port !== String(port)) {
+        finish(new Error(`Harness reported an unexpected port; expected ${port}`));
+        return;
+      }
+      finish(null, url);
     };
+    const readers = [child.stdout, child.stderr].map((stream) => {
+      const decoder = new StringDecoder("utf8");
+      let output = "";
+      const capture = (chunk) => {
+        output = (output + decoder.write(chunk)).slice(-32_000);
+        let newline;
+        while (!settled && (newline = output.indexOf("\n")) >= 0) {
+          const line = output.slice(0, newline);
+          output = output.slice(newline + 1);
+          parseLine(line);
+        }
+      };
+      const end = () => parseLine(output + decoder.end());
+      return { stream, capture, end };
+    });
     const onError = (error) => finish(error);
     const onExit = (code) =>
       finish(
@@ -50,8 +74,10 @@ function readReadyUrl(child, { timeout = 45_000, port }) {
         ),
       timeout,
     );
-    child.stdout.on("data", capture);
-    child.stderr.on("data", capture);
+    for (const { stream, capture, end } of readers) {
+      stream.on("data", capture);
+      stream.once("end", end);
+    }
     child.once("error", onError);
     child.once("exit", onExit);
   });

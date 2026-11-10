@@ -130,7 +130,7 @@ async function fixture(t) {
       return file;
     },
   };
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  t.after(() => fs.rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }));
   return f;
 }
 async function run(f, runner, mode, options = {}) {
@@ -893,7 +893,7 @@ async function manualJob(t, mode) {
     state: "queued",
   };
   await fs.writeFile(path.join(directory, "job.json"), JSON.stringify(job));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  t.after(() => fs.rm(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }));
   return { f, directory };
 }
 // Counts sink fds still open; `fail` decides which writeJson / writeSync calls throw.
