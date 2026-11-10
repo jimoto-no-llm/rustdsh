@@ -1921,16 +1921,31 @@ export async function startDashboard(options) {
           "Owned Harness exit unverified; dashboard remains available",
         );
       closing = true;
+      let failure;
+      const cleanup = async (work) => {
+        try {
+          await work();
+        } catch (error) {
+          failure ??= error;
+        }
+      };
       if (deliveryTimer) clearInterval(deliveryTimer);
       for (const response of live.keys()) response.end();
-      await devices?.flush();
-      for (const { mcp } of sessions.values()) await mcp.server.close();
-      await updateQueue;
-      await instructionQueueWorker?.close();
-      await eventsHub?.queue;
+      await cleanup(() => devices?.flush());
+      for (const { mcp } of sessions.values())
+        await cleanup(() => mcp.server.close());
+      await cleanup(() => updateQueue);
+      await cleanup(() => instructionQueueWorker?.close());
+      await cleanup(() => eventsHub?.queue);
       for (const socket of sockets) socket.destroy();
-      await new Promise((resolve) => server.close(resolve));
-      await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
+      await cleanup(() => new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error && error.code !== "ERR_SERVER_NOT_RUNNING") reject(error);
+          else resolve();
+        });
+      }));
+      await cleanup(() => removeDashboardLockIfOwned(lockFile, lockContent));
+      if (failure) throw failure;
     });
     closePromise = attempt;
     // A failed preflight leaves the dashboard available, so let a later caller retry.
