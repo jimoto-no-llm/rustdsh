@@ -382,6 +382,21 @@ impl Registry {
             .await?
             .text)
     }
+    pub async fn generate_turn_with_usage(
+        &self,
+        provider: &str,
+        model: &str,
+        prompt: &str,
+    ) -> Result<super::usage::Generation> {
+        let (route, selected) = self
+            .find(provider, model)
+            .filter(|(_, m)| m.unavailable.is_none())
+            .ok_or_else(|| anyhow::anyhow!("NATIVE_MODEL_UNAVAILABLE"))?;
+        if route.claude {
+            return super::claude::generate_turn_with_usage(&selected.id, prompt).await;
+        }
+        self.generate_with_usage(provider, model, prompt).await
+    }
     pub async fn generate_with_usage(
         &self,
         provider: &str,

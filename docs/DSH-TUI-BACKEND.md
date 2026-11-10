@@ -10,6 +10,10 @@ DSH側のツール、プラグイン、MCP、skills、モデル登録、認証�
 そのまま使用します。DSHのTUIプラグインを呼び出すコマンドではありません。
 DSHと、そのバージョンに対応するNodeのインストールが必要です。
 
+新規会話は指定パスをDSHのworkspaceへ登録・再利用してから作成します。
+保存会話はIDと履歴、既存のworkspace所属を維持します。旧会話に所属がない場合だけ、
+保存されたcwdと一致するworkspaceへ関連付けます。確認できない場合は警告を表示します。
+
 RustXNG / SearXNGの検索連携も、通常のDSH起動と同じ初期化を使います。
 `rdsh rustxng install`、`rdsh rustxng start` で検索エンジンを用意し、
 同じプロファイルへ `rdsh-web-search-searxng` を導入すると、到達性を確認して
@@ -53,13 +57,35 @@ DSHモードでは `--sdk-dir`、`--dsh-catalog`、`--devin-bin` は指定でき
 - `/sessions`: 現在のworkspaceの保存済みセッションを表示し、Enterで再開。
 - `/new`: 旧セッションを残して、新しいセッションを開始。
 - `/plugins`、`/settings`: 現在のプロファイルのプラグインと秘匿済み設定を閲覧。
-  この画面からインストール、削除、設定変更は行いません。
+  設定変更・インストール・削除は `/manage` から操作します。
 - `/usage`、`/status`、`/logs`、`/diagnostics`: 使用量、接続情報、実行記録を閲覧。
 - Esc、Ctrl+C、`/cancel`: DSH側の実行を中止。Ctrl+Q、`/quit`: 終了。
 
 DSHの公開`session/selectModel`は、Web GUIと同じく選択したモデルを全体の既定値へ
 保存します。起動時の `--provider` と `--model` は両方指定した場合だけ選択します。
 未指定では既存の既定値を使用します。
+
+## Planと権限のコマンド
+
+`/mode`、`/permission` は現在の状態と利用可能な候補を表示します。
+`/mode plan`・`/plan on` はDSHの `/plan`、`/mode normal`・`/plan off` は
+DSHの `/plan off` へ対応します。裸の `/plan` は投影済みの現在状態から切替先を決めます。
+モードは計画・通常の切替で、DSHのAgent presetを変更する操作ではありません。
+
+`/permission <preset>` はホストが公開する候補だけを選択できます。
+内容・効果を表示した確認画面で「設定を適用」を明示的に選ぶまで変更しません。
+`custom` は現在値の表示専用です。ホストが公開する `auto` 等を選ぶ場合も確認が必要です。
+Rust独立モードの `ask`・`read-only` とDSH側のプリセット名は別の一覧です。
+
+利用可能性は公開 `commands/list` と `permissionPresets/catalog` で確認し、
+設定操作は `commands/execute` へ送ります。未対応構成・拒否・未登録応答は
+ローカルエラーとし、コマンドをモデルのメッセージへ変換しません。
+実行中・承認待ち中の設定変更は拒否します。計画の確定・切替待ちと権限現在値は
+ホストの `plan`・`permissions` 投影に追従し、成功応答だけで確定状態を作りません。
+`/new` 後は新セッションのホスト状態を使用します。
+
+`/clear`・`/exit`・`/stop`・`/resume` も、それぞれ既存の
+`/new`・`/quit`・`/cancel`・`/sessions` と同じ動作で使えます。
 
 ## 状態と使用量
 
@@ -77,13 +103,53 @@ DSHの永続セッションが持つ通常入力、キャッシュ読込、キ�
 画面の診断に表示範囲の制限を明示します。
 子セッションの承認はDSHのカタログで親子関係を確認できた対象だけ表示します。
 所有関係の投影より先に届いた要求は、この画面では引き受けず診断に記録します。画像・ファイルの履歴は添付の存在を
-テキスト表示します。TUIからの画像添付やブラウザー固有のプラグイン画面は対象外です。
-プラグインが提供するモデル向けツールは既存プロファイルのまま利用できますが、
-全プラグインの独自UIを端末へ移植するものではありません。
+テキスト表示します。添付のアップロードとbinary保存は `/manage` から利用できます。
+ブラウザー専用のDOM・canvas・メディア画面は `/webui` の文字/画像表示から操作できます。
 
 ## 接続境界
 
 専用に起動した子ホストの127.0.0.1起動URLだけを受け付けます。起動トークンと
-HTTP/WSの認証Cookieはメモリ内で扱い、ログや画面へ出しません。
+HTTP/WSの認証CookieはRust側ではメモリ内で扱い、ログや画面へ出しません。
+`/webui` の専用Chromeはアクセス制限した一時プロファイルを使い、終了時にその領域を除去します。
 既存ホストへの無断attach、既存セッションの削除、承認policyの緩和は行いません。
 終了時は自分が起動したホストだけを停止します。
+
+## ホストコマンドと管理操作
+
+`/dsh` は現在のセッションに登録されたDSHコマンドを表示します。
+`/dsh compact` のようにホストコマンドを実行できます。引数はそのまま公開APIへ渡し、
+未登録コマンドはエラーにします。モデルへの通常メッセージへは変換しません。
+`/dsh permission PRESET` も通常の権限確認画面を使います。
+
+`/manage` は稼働中ホストの公開APIを検索し、入力schemaを見ながらJSONを編集する管理画面です。
+設定・モデル・プラグイン・会話・workspace・ジョブ・音声などの公開操作と、RDSH独自HTTP操作を
+ブラウザーを開かずに実行します。操作の内容は送信前に確認し、秘密入力はマスクします。
+継続処理は結果を逐次表示し、中止できます。未知の操作はモデルのメッセージにしません。
+
+```sh
+dsh plugin --profile web add ./plugins/rdsh-tui-admin
+dsh plugin --profile web add ./plugins/rdsh-model-call
+```
+
+- `/manage settings/describe`: 設定とrevisionを取得。
+- `/manage settings/update`: `ns`、`patch`、`expectedRevision`で更新。競合はホストが拒否します。
+- `/manage pluginManager`: プラグイン一覧、インストール、切替、削除。
+  `restart-required` や `pendingBuilds` を確認し、必要な追加操作は明示的に選択します。
+- `/manage credentials/set`: credentialを登録。入力値を会話履歴や結果へ残しません。
+- `/manage fileUploads/upload`: `request.data` に `{"$file":"相対パス"}` を指定して添付をアップロード。
+  返されたreceipt/fileは `session/prompt` のcontentへ渡します。
+- `/terminal`: 確認後に現在のセッションでシェルを起動。`/terminal ID` は既存端末へ接続。
+  Ctrl+]で会話へ戻り、もう一度 `/terminal` で復帰します。Ctrl+Cはシェルへ送信します。
+- `/webui`: 同じHostのWeb画面を専用headless Chrome経由でTUI内に表示。
+  プラグイン独自画面、アップロード・ダウンロード、設定文書、確認・パス選択を操作できます。
+- `/record`: 明示確認して録音し、別途送信先を確認して文字起こし。結果は下書きへ戻ります。
+
+管理画面の操作と制限、検証範囲は [TUI管理機能](TUI-ADMIN.md) を参照してください。
+
+DSHの `subagent` は親のworkspaceとツール構成を継承し、read/write・shell・検索・MCP等を
+親の許可範囲内で利用します。子は追加の権限昇格を対話要求できないため、親で許可された
+workspace/sandboxの範囲で作業してください。モデル選択は既存のsubagent設定で管理します。
+
+`rdsh-model-call` は `model_call` をDSH既存の `subagent` に接続する別名ツールです。
+provider/modelを両方省略すると子の既定モデルを使い、指定時は既存の許可モデル一覧を使います。
+子が追加承認を要求できない制約はDSH側に従います。

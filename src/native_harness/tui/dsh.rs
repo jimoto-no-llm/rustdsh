@@ -1,7 +1,10 @@
 //! Rust terminal surface for the installed DSH Web Remote protocol.
 //! The host owns tools, persistence, credentials and its existing approval policy.
+mod admin;
+mod controls;
 mod models;
 mod state;
+mod surface;
 #[cfg(test)]
 mod tests;
 
@@ -110,6 +113,57 @@ impl Remote {
         }
         Ok(value["result"]["value"].clone())
     }
+    async fn workspace_snapshot(&self) -> Result<Value> {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let mut url = self.base.join("api/remote.mux")?;
+            url.set_scheme("ws")
+                .map_err(|_| anyhow::anyhow!("Workspace stream URLが不正です"))?;
+            let mut request = url.as_str().into_client_request()?;
+            request.headers_mut().insert("Cookie", self.cookie.parse()?);
+            let (mut socket, _) = tokio_tungstenite::connect_async(request)
+                .await
+                .map_err(|_| anyhow::anyhow!("Workspace一覧へ接続できません"))?;
+            socket
+                .send(open("workspace-baseline", "workspace/follow", json!({})))
+                .await?;
+            loop {
+                let text = match socket.next().await {
+                    Some(Ok(Message::Text(text))) => text,
+                    Some(Ok(Message::Ping(data))) => {
+                        socket.send(Message::Pong(data)).await?;
+                        continue;
+                    }
+                    Some(Ok(Message::Close(_))) | Some(Err(_)) | None => {
+                        bail!("Workspace一覧の接続が終了しました")
+                    }
+                    _ => continue,
+                };
+                if text.len() > MAX_REPLY {
+                    bail!("Workspace一覧が大きすぎます");
+                }
+                let frame: Value =
+                    serde_json::from_str(&text).context("Workspace一覧形式が不正です")?;
+                if frame["streamId"] != "workspace-baseline" {
+                    continue;
+                }
+                if frame["type"] == "error" {
+                    bail!("Workspace一覧を取得できません");
+                }
+                if frame["type"] == "item" && frame["value"]["type"] == "baseline" {
+                    let baseline = frame["value"]["value"].clone();
+                    socket
+                        .send(Message::text(
+                            json!({"type":"cancel","streamId":"workspace-baseline"}).to_string(),
+                        ))
+                        .await?;
+                    let _ = socket.close(None).await;
+                    return Ok(baseline);
+                }
+            }
+        })
+        .await
+        .context("Workspace一覧の取得が時間切れになりました")?
+    }
     async fn outcome(&self, client_id: &str, event_id: &str, outcome: Value) -> Result<Value> {
         self.rpc(
             "$events/result",
@@ -156,6 +210,10 @@ pub(super) struct DshBackend {
     child: Mutex<Child>,
     workspace: PathBuf,
     secrets: Vec<String>,
+    admin: Arc<Mutex<admin::AdminState>>,
+    surface: Mutex<Option<surface::Surface>>,
+    profile: String,
+    workspace_warning: Mutex<Option<String>>,
 }
 impl DshBackend {
     pub(super) fn start(
@@ -237,7 +295,7 @@ impl DshBackend {
                 .unwrap()
                 .1
                 .into_owned();
-            let remote = match Remote::authenticate(url).await {
+            let remote = match Remote::authenticate(url.clone()).await {
                 Ok(r) => r,
                 Err(e) => {
                     stop_child(&mut child).await;
@@ -278,6 +336,10 @@ impl DshBackend {
             child: Mutex::new(child),
             workspace,
             secrets,
+            admin: Arc::new(Mutex::new(admin::AdminState::default())),
+            surface: Mutex::new(None),
+            profile: profile.to_owned(),
+            workspace_warning: Mutex::new(None),
         };
         backend.runtime.block_on(async {
             tokio::time::timeout(Duration::from_secs(15), async {
@@ -316,10 +378,22 @@ impl DshBackend {
     }
     fn create(&self, id: Option<&str>) -> Result<()> {
         self.require_idle()?;
+        *self.workspace_warning.lock().unwrap() = None;
         let request = if let Some(id) = id {
-            json!({"sessionId":id})
+            match self.resume_request(id) {
+                Ok(request) => request,
+                Err(_) => {
+                    *self.workspace_warning.lock().unwrap() = Some("Web用の所属を確認・設定できないため、元の所属のまま再開を試みます。保存cwdと登録パスを確認してください。".into());
+                    json!({"sessionId":id})
+                }
+            }
         } else {
-            json!({"cwd":self.workspace})
+            let workspace = self.rpc(
+                "workspace/create",
+                json!({"request":{"path":self.workspace}}),
+            )?;
+            let id = registered_workspace_id(&workspace)?;
+            json!({"workspaceId":id})
         };
         let value = self.rpc("session/create", json!({"request":request}))?;
         let id = value["sessionId"]
@@ -349,7 +423,22 @@ impl DshBackend {
         if !busy {
             self.upgrade_anthropic()?;
         }
+        self.sync_surface_session();
         Ok(())
+    }
+
+    fn resume_request(&self, id: &str) -> Result<Value> {
+        let baseline = self.runtime.block_on(self.remote.workspace_snapshot())?;
+        if workspace_contains(&baseline, id)? {
+            return Ok(json!({"sessionId":id}));
+        }
+        let sessions = self.rpc("session/list", json!({"_request":{}}))?;
+        let cwd = resume_cwd(&sessions, id)?;
+        let workspace = self.rpc("workspace/create", json!({"request":{"path":cwd}}))?;
+        if workspace["workspace"]["path"].as_str() != Some(cwd) {
+            bail!("保存cwdと登録パスの表記が異なるため、既存会話を変更しませんでした");
+        }
+        Ok(json!({"sessionId":id,"workspaceId":registered_workspace_id(&workspace)?}))
     }
 
     fn upgrade_anthropic(&self) -> Result<()> {
@@ -367,10 +456,21 @@ impl DshBackend {
 impl HarnessBackend for DshBackend {
     fn snapshot(&self) -> Value {
         let mut value = self.view.lock().unwrap().snapshot();
+        if let Some(warning) = self.workspace_warning.lock().unwrap().as_ref() {
+            if let Some(notes) = value["diagnostics"].as_array_mut() {
+                notes.push(json!(warning));
+            }
+        }
         redact_value(&mut value, &self.secrets);
         value
     }
     fn request(&self, path: &str, body: Value) -> Result<Value> {
+        if path.starts_with("/api/surface/") {
+            return self.surface_request(path, body);
+        }
+        if path.starts_with("/api/admin/") {
+            return self.admin_request(path, body);
+        }
         match path {
             "/api/message"=>{
                 self.require_idle()?;
@@ -410,15 +510,18 @@ impl HarnessBackend for DshBackend {
                 let _=self.commands.send(Command::CloseWait(id.into()));
                 Ok(result)
             },
+            "/api/controls"|"/api/mode"|"/api/permission"=>self.control_request(path,body),
             "/api/sessions"=>{
                 let result=self.rpc("session/list",json!({"_request":{}}))?;
                 session_list(&result,&self.workspace)
             },
             "/api/resume"=>{self.create(Some(body["sessionId"].as_str().context("sessionIdがありません")?))?;Ok(json!({"ok":true}))},
+            "/api/host-commands"=>self.host_commands(None),
+            "/api/host-command"=>self.host_commands(Some(body["line"].as_str().context("コマンドがありません")?)),
             "/api/plugins"=>self.rpc("pluginInventory/list",json!({})),
             "/api/settings"=>self.rpc("settings/describe",json!({})),
             _=>bail!("DSH backendで未対応の要求です"),
-        }.map(|mut value|{redact_value(&mut value,&self.secrets);value})
+        }.map(|mut value|{if path != "/api/admin/catalog" {redact_value(&mut value,&self.secrets);}value})
     }
     fn cancel(&self) {
         if let Err(e) = self.rpc(
@@ -439,6 +542,8 @@ impl HarnessBackend for DshBackend {
 }
 impl Drop for DshBackend {
     fn drop(&mut self) {
+        self.close_surface();
+        self.cancel_admin_jobs();
         let _ = self.runtime.block_on(self.remote.rpc(
             "session/cancel",
             json!({"request":{"sessionId":self.session()}}),
@@ -503,6 +608,37 @@ fn redact_value(value: &mut Value, secrets: &[String]) {
         }
         _ => {}
     }
+}
+
+fn registered_workspace_id(value: &Value) -> Result<&str> {
+    value["workspace"]["workspaceId"]
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .context("DSH workspaceIdがありません")
+}
+fn workspace_contains(baseline: &Value, id: &str) -> Result<bool> {
+    let items = baseline["items"]
+        .as_array()
+        .context("Workspace一覧形式が不正です")?;
+    for workspace in items {
+        let sessions = workspace["sessionIds"]
+            .as_array()
+            .context("Workspace所属一覧が不正です")?;
+        if sessions.iter().any(|session| session.as_str() == Some(id)) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+fn resume_cwd<'a>(sessions: &'a Value, id: &str) -> Result<&'a str> {
+    sessions["items"]
+        .as_array()
+        .context("Session一覧形式が不正です")?
+        .iter()
+        .find(|session| session["sessionId"] == id)
+        .and_then(|session| session["cwd"].as_str())
+        .filter(|cwd| !cwd.is_empty() && std::path::Path::new(cwd).is_absolute())
+        .context("既存会話の保存cwdを確認できません")
 }
 
 fn session_list(result: &Value, workspace: &std::path::Path) -> Result<Value> {
