@@ -1,5 +1,6 @@
 //! Rust terminal surface for the installed DSH Web Remote protocol.
 //! The host owns tools, persistence, credentials and its existing approval policy.
+mod controls;
 mod models;
 mod state;
 #[cfg(test)]
@@ -410,6 +411,7 @@ impl HarnessBackend for DshBackend {
                 let _=self.commands.send(Command::CloseWait(id.into()));
                 Ok(result)
             },
+            "/api/controls"|"/api/mode"|"/api/permission"=>self.control_request(path,body),
             "/api/sessions"=>{
                 let result=self.rpc("session/list",json!({"_request":{}}))?;
                 session_list(&result,&self.workspace)

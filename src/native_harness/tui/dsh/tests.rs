@@ -351,3 +351,25 @@ fn session_summary_is_mapped_and_only_nonblank_workspace_roots_are_listed() {
     assert_eq!(value["items"][0]["id"], "kept");
     assert_eq!(value["items"][0]["title"], "Saved");
 }
+
+#[test]
+fn plan_and_permission_states_follow_host_projections_without_guessing_activation() {
+    let mut v = view();
+    v.apply_follow(&opening(
+        vec![],
+        json!({"plan":{"active":false,"pending":true},"permissions":{"currentValue":"safe"}}),
+    ));
+    assert_eq!(v.value["controls"]["mode"], "normal");
+    assert_eq!(v.value["controls"]["planPending"], true);
+    assert_eq!(v.value["controls"]["permission"], "safe");
+    v.apply_follow(&opening(
+        vec![],
+        json!({"plan":{"active":true,"pending":false},"permissions":{"currentValue":"custom"}}),
+    ));
+    assert_eq!(v.value["controls"]["mode"], "plan");
+    assert_eq!(v.value["controls"]["planPending"], false);
+    assert_eq!(v.value["controls"]["permission"], "custom");
+    v.apply_follow(&opening(vec![], json!({})));
+    assert!(v.value["controls"]["mode"].is_null());
+    assert!(v.value["controls"]["permission"].is_null());
+}

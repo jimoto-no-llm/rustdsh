@@ -106,6 +106,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
                     Color::Green
                 }),
             ),
+            Span::raw(controls_label(snapshot)),
             Span::raw(format!(
                 "    {} / {}",
                 text(&snapshot["provider"]),
@@ -220,13 +221,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
     } else {
         match &app.overlay {
             Overlay::Models { .. } => models(frame, app, area),
-            Overlay::Help => help(frame, area),
+            Overlay::Help => help(frame, app, area),
             Overlay::Status => status_panel(frame, app, snapshot, area),
             Overlay::Logs => log_panel(frame, app, snapshot, area),
             Overlay::Diagnostics => diagnostics(frame, app, snapshot, area),
             Overlay::Sessions { .. } => sessions(frame, app, area),
             Overlay::ReadOnly { .. } => readonly(frame, app, area),
             Overlay::New { confirm } => new_chat(frame, *confirm, snapshot, area),
+            Overlay::Permission { .. } => permission_change(frame, app, area),
             _ => {}
         }
     }
@@ -682,16 +684,9 @@ fn readonly(frame: &mut Frame, app: &mut App, area: Rect) {
     };
     let title = *title;
     let content = content.clone();
-    details(
-        frame,
-        app,
-        popup(area, 112, 30),
-        title,
-        vec![
-            Line::raw("↑↓ / PgUp/Dn / Home/End 閲覧 · Esc 閉じる"),
-            Line::raw(content),
-        ],
-    );
+    let mut rows = vec![Line::raw("↑↓ / PgUp/Dn / Home/End 閲覧 · Esc 閉じる")];
+    rows.extend(content.split('\n').map(|line| Line::raw(line.to_owned())));
+    details(frame, app, popup(area, 112, 30), title, rows);
 }
 fn usage_counter(usage: &Value, field: &str, known: &str) -> String {
     let requests = usage["requests"].as_u64().unwrap_or(0);
@@ -876,6 +871,20 @@ fn status_panel(frame: &mut Frame, app: &mut App, snapshot: &Value, area: Rect) 
             text(&snapshot["model"])
         )),
     ];
+    content.push(Line::raw(format!(
+        "モード: {}{} / パーミッション: {}",
+        snapshot["controls"]["mode"]
+            .as_str()
+            .unwrap_or("未対応／未取得"),
+        if snapshot["controls"]["planPending"] == true {
+            "（切替待ち）"
+        } else {
+            ""
+        },
+        snapshot["controls"]["permission"]
+            .as_str()
+            .unwrap_or("未対応／未取得")
+    )));
     content.extend(lines(
         &format!("作業場所: {}", text(&snapshot["workspace"])),
         area.width.saturating_sub(2),
@@ -992,8 +1001,8 @@ fn new_chat(frame: &mut Frame, confirm: bool, snapshot: &Value, area: Rect) {
         area,
     );
 }
-fn help(frame: &mut Frame, area: Rect) {
-    let area = popup(area, 86, 25);
+fn help(frame: &mut Frame, app: &mut App, area: Rect) {
+    let area = popup(area, 96, 30);
     frame.render_widget(Clear, area);
     let mut content = vec![
         Line::raw("Enter 送信 / Alt+Enter・Ctrl+J 改行 / Ctrl+U 入力クリア"),
@@ -1014,9 +1023,100 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::raw("// で文章先頭の / を送信。未知のコマンドは送信しません。"),
         Line::raw("F1 / Esc / Enter で閉じる"),
     ]);
+    details(frame, app, area, " 操作方法 · ↑↓ / PgUp/Dn / Esc ", content);
+}
+
+fn controls_label(snapshot: &Value) -> String {
+    let controls = &snapshot["controls"];
+    if controls["mode"].is_null() && controls["permission"].is_null() {
+        return String::new();
+    }
+    format!(
+        " [{}{} · {}]",
+        controls["mode"].as_str().unwrap_or("?"),
+        if controls["planPending"] == true {
+            "→待ち"
+        } else {
+            ""
+        },
+        controls["permission"].as_str().unwrap_or("?")
+    )
+}
+fn permission_change(frame: &mut Frame, app: &mut App, area: Rect) {
+    let Overlay::Permission {
+        preset,
+        description,
+        confirm,
+    } = &app.overlay
+    else {
+        return;
+    };
+    let (preset, description, confirm) = (preset.clone(), description.clone(), *confirm);
+    let area = popup(area, 86, 14);
+    frame.render_widget(Clear, area);
+    let border = block(" パーミッション変更の確認 ").border_style(Style::default().fg(APPROVAL));
+    let inner = border.inner(area);
+    frame.render_widget(border, area);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(inner);
+    let width = rows[0].width.saturating_sub(1);
+    let mut content = lines(
+        &format!("変更先: {}", clean(&preset)),
+        width,
+        Style::default(),
+    );
+    content.extend(lines(&description, width, Style::default()));
+    content.extend(lines(
+        "適用後のツール承認方法が変わります。内容を確認してください。",
+        width,
+        Style::default(),
+    ));
+    app.detail_max_scroll = content.len().saturating_sub(rows[0].height as usize);
+    app.detail_scroll = app.detail_scroll.min(app.detail_max_scroll);
+    let total = content.len();
     frame.render_widget(
-        Paragraph::new(content)
-            .block(block(" 操作方法 ").border_style(Style::default().fg(ACCENT))),
-        area,
+        Paragraph::new(
+            content
+                .into_iter()
+                .skip(app.detail_scroll)
+                .take(rows[0].height as usize)
+                .collect::<Vec<_>>(),
+        ),
+        rows[0],
+    );
+    if app.detail_max_scroll > 0 {
+        let mut state = ScrollbarState::new(total)
+            .position(app.detail_scroll)
+            .viewport_content_length(rows[0].height as usize);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight),
+            rows[0],
+            &mut state,
+        );
+    }
+    let selected = Style::default()
+        .fg(Color::Black)
+        .bg(APPROVAL)
+        .add_modifier(Modifier::BOLD);
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::from(vec![
+                Span::styled(" 戻る ", if !confirm { selected } else { Style::default() }),
+                Span::raw("    "),
+                Span::styled(
+                    " 設定を適用 ",
+                    if confirm { selected } else { Style::default() },
+                ),
+            ]),
+            Line::raw("Tab/←→ 選択 Enter確定 Esc戻る"),
+            if app.notice.is_empty() {
+                Line::raw("↑↓/PgUp/Dn 説明 Home/End")
+            } else {
+                Line::styled(clean(&app.notice), Style::default().fg(Color::Yellow))
+            },
+        ]),
+        rows[1],
     );
 }
