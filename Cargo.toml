@@ -40,6 +40,12 @@ exclude = [
 name = "rdsh"
 path = "src/main.rs"
 
+# The standalone, unpublished compaction crate shares this source target.
+# Keeping it under src/ also preserves cargo install/package without a path dependency.
+[lib]
+name = "native_compaction"
+path = "src/native_compaction/src/lib.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }

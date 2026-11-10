@@ -5,6 +5,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `features.compaction_policy`（既定はオフ）を追加しました。`$DSH_HOME/rdsh-compaction.json` に
+  書いたモデルごとの圧縮のしきい値（絶対トークン数）を、起動時の `--patch` オーバーレイで
+  DSH の `compaction-basic` に渡します。プロファイルは書き換えません。web プロファイルでは、
+  プリセットの中にある行に届くように、プリセットの `config` を書き直します。
+  `rdsh doctor` は、この機能が有効かどうかと、設定ファイルに書いた接続先としきい値を表示します。
+  要約指示、方式、費用判断を headless と Web の4プリセットへ接続し、読み取り専用の
+  `rdsh compaction report` を追加しました。`native-web` はツール結果の削減と同じモデルでの要約を
+  行い、拒否記録を保持し、失敗・キャンセル時は元の履歴を維持します。
+  通信なしの `native_compaction` ライブラリも同梱します。
+  詳細と未対応範囲は `docs/COMPACTION-POLICY.md` を参照してください。
+
 ## [0.15.1] - 2026-11-04
 
 ### Fixed

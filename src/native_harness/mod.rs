@@ -1,5 +1,6 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+mod compaction;
 mod engine;
 mod oauth;
 mod profiles;
@@ -100,6 +101,7 @@ pub fn cmd_native_web(
             .unwrap_or_else(|| PathBuf::from("devin"))
     });
     let engine = Arc::new(Engine {
+        compaction: crate::compaction_config::Options::load()?,
         state: Mutex::new(State::default()),
         workspace,
         sdk: sdk::SdkConfig {
@@ -291,7 +293,14 @@ fn dispatch(
                 bail!("実行中です");
             }
             let history_size = s.messages.iter().map(|m| m.content.len()).sum::<usize>();
-            if history_size + req.text.len() > engine::MAX_HISTORY {
+            if !engine.compaction.native_web.enabled
+                && history_size + req.text.len() > engine::MAX_HISTORY
+            {
+                bail!("会話がサイズ上限に達しています");
+            }
+            // The first loop step compacts before enforcing the hard limit. Limit
+            // admission headroom so repeated failed requests cannot grow memory.
+            if history_size > engine::MAX_HISTORY + 16 * 1024 {
                 bail!("会話がサイズ上限に達しています");
             }
             s.messages.push(Message {
@@ -398,6 +407,7 @@ mod tests {
         std::fs::write(&cli, "#!/bin/sh\n: > \"$0.started\"\n").unwrap();
         std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
         let e = Arc::new(Engine {
+            compaction: crate::compaction_config::Options::default(),
             state: Mutex::new(State::default()),
             workspace: root.clone(),
             sdk: sdk::SdkConfig {
@@ -437,6 +447,7 @@ mod tests {
     }
     fn engine() -> Arc<Engine> {
         Arc::new(Engine {
+            compaction: crate::compaction_config::Options::default(),
             state: Mutex::new(State::default()),
             workspace: std::env::temp_dir(),
             sdk: sdk::SdkConfig {

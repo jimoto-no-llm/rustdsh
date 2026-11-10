@@ -104,6 +104,7 @@ pub(crate) fn find_trusted_on_path(name: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use super::*;
 
     #[cfg(unix)]

@@ -39,7 +39,7 @@ UI_COMFORT="${UI_COMFORT:-0}"
 INTELLIGENT_UI="${INTELLIGENT_UI:-$BROWSER_PLUGINS_DEFAULT}"
 TRANSLATION="${TRANSLATION:-$BROWSER_PLUGINS_DEFAULT}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-RECOMMENDED_IDS="translation compute easy-work subagents ui-comfort subagent-route sound gitview intelligent-ui"
+RECOMMENDED_IDS="compaction translation compute easy-work subagents ui-comfort subagent-route sound gitview intelligent-ui"
 
 usage() {
   cat <<EOF
@@ -121,6 +121,7 @@ fi
 # Defaults are the per-profile set (starter for web/desktop); an explicit
 # --recommended/RECOMMENDED value replaces them.
 rec_translation="$TRANSLATION"
+rec_compaction=0
 rec_compute="$COMPUTE"
 rec_easy_work="$EASY_WORK"
 rec_subagents="$SUBAGENTS"
@@ -131,15 +132,18 @@ rec_sound="$SOUND"
 rec_gitview="$GITVIEW"
 
 recommended_all() {
+  rec_compaction=1
   rec_translation=1; rec_compute=1; rec_easy_work=1; rec_subagents=1; rec_ui_comfort=1; rec_subagent_route=1; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
 }
 # The beginner starter set: what a newcomer from Codex or Claude Code expects
 # without configuring anything. Plugins that change a familiar default (Enter
 # to send, the empty-chat preset picker) or need extra setup stay out of it.
 recommended_starter() {
+  rec_compaction=0
   rec_translation=1; rec_compute=0; rec_easy_work=0; rec_subagents=1; rec_ui_comfort=0; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
 }
 recommended_none() {
+  rec_compaction=0
   rec_translation=0; rec_compute=0; rec_easy_work=0; rec_subagents=0; rec_ui_comfort=0; rec_subagent_route=0; rec_intelligent_ui=0; rec_sound=0; rec_gitview=0
 }
 
@@ -153,6 +157,7 @@ apply_recommended_spec() {
       for _id in $(printf '%s' "$1" | tr ',' ' '); do
         case "$_id" in
           translation|rdsh-translation) rec_translation=1 ;;
+          compaction|rdsh-compaction) rec_compaction=1 ;;
           compute|rdsh-compute) rec_compute=1 ;;
           easy-work|easy_work|rdsh-easy-work) rec_easy_work=1 ;;
           subagents|subagent|rdsh-subagent-optimizer) rec_subagents=1 ;;
@@ -297,6 +302,7 @@ if feedback_feature_off; then
 fi
 
 RECOMMENDED_BUNDLED=""
+if [ "$rec_compaction" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-compaction"; fi
 if [ "$rec_translation" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-translation"; fi
 if [ "$rec_compute" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-compute"; fi
 if [ "$rec_easy_work" = "1" ]; then RECOMMENDED_BUNDLED="$RECOMMENDED_BUNDLED rdsh-easy-work"; fi

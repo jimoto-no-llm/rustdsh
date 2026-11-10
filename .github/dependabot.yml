@@ -1,6 +1,12 @@
 version: 2
 updates:
   - package-ecosystem: npm
+    directory: /plugins/rdsh-compaction
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
     directory: /plugins/rdsh-translation
     schedule:
       interval: weekly

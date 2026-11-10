@@ -90,6 +90,12 @@
   ],
   "recommended": [
     {
+      "id": "compaction",
+      "package": "rdsh-compaction",
+      "bundled": true,
+      "why": "Native Compaction policies and summary instructions for headless and Web presets"
+    },
+    {
       "id": "translation",
       "package": "rdsh-translation",
       "bundled": true,

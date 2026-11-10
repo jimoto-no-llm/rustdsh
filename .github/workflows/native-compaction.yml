@@ -1,0 +1,39 @@
+name: native-compaction
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-compaction-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compaction-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install the isolated DSH contract runtime
+        run: npm install --prefix "${{ runner.temp }}/compaction-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh@0.2.1-rc.2
+      - run: cargo test --locked --lib
+      - run: cargo test --locked --bin rdsh compaction
+      - run: cargo test --locked --test compaction_report_cli --test compaction_policy_cli
+      - run: node --test plugins/rdsh-compaction/test/*.test.mjs tests/compaction-dsh.test.mjs
+        env:
+          RDSH_BIN: ${{ github.workspace }}/target/debug/rdsh${{ runner.os == 'Windows' && '.exe' || '' }}
+          RDSH_DSH_RUNTIME: ${{ runner.temp }}/compaction-runtime
+          RDSH_DSH_COMPACTION_BASIC: ${{ runner.temp }}/compaction-runtime/node_modules/@deepseek-ai/dsh-compaction-basic/lib/index.js

@@ -652,6 +652,118 @@ fn apply_gzip_overlay(cmd: &mut std::process::Command, orig: &str, profile: &str
     true
 }
 
+/// What the compaction policy layer did for one boot.
+enum CompactionLayer {
+    /// The feature is off, or there is no policy to pass on.
+    Off,
+    /// The overlay at `path` configures `rows` compaction rows.
+    Applied { path: String, rows: usize },
+    /// The layer was left out; the reason goes into a notice.
+    Skipped(String),
+}
+
+/// Write the generated compaction policy overlay and return its path.
+///
+/// Same placement rule as the gzip overlay: beside the settings document,
+/// never in the profile. Content-addressed names isolate concurrent launches.
+fn write_compaction_overlay(body: &str) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+    let dir = format!("{}/compaction", crate::inspect::dsh_home());
+    std::fs::create_dir_all(&dir)?;
+    let digest: String = Sha256::digest(body.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let path = format!("{dir}/policy-{digest}.patch.yml");
+    if std::fs::read_to_string(&path).ok().as_deref() == Some(body) {
+        return Ok(path);
+    }
+    let temp = format!(
+        "{path}.{}.tmp",
+        crate::local_http::random_token().map_err(std::io::Error::other)?
+    );
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&temp)?;
+    let result = file
+        .write_all(body.as_bytes())
+        .and_then(|_| file.sync_all());
+    drop(file);
+    let result = result.and_then(|_| std::fs::rename(&temp, &path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+        if std::fs::read_to_string(&path).ok().as_deref() != Some(body) {
+            result?;
+        }
+    }
+    Ok(path)
+}
+
+/// Build the compaction policy overlay for `profile`.
+///
+/// Missing settings leave the command untouched. Invalid settings, a missing
+/// required plugin, and unreadable composed config reject the enabled boot.
+/// A profile without a safely configurable row or an unwritable overlay is
+/// reported as skipped rather than silently claiming the policy was applied.
+fn compaction_layer(orig: &str, profile: &str) -> anyhow::Result<CompactionLayer> {
+    if !crate::rdsh_config::feature_enabled(
+        &crate::rdsh_config::load(),
+        crate::compaction_overlay::FEATURE_ID,
+    ) {
+        return Ok(CompactionLayer::Off);
+    }
+    let file = crate::compaction_policy::FILE_NAME;
+    let options = crate::compaction_config::Options::load()?;
+    let policies = match crate::compaction_policy::load_at(&crate::compaction_policy::policy_path())
+    {
+        Ok(Some(policies)) => policies,
+        Ok(_) => return Ok(CompactionLayer::Off),
+        Err(reason) => anyhow::bail!("{file} {reason}"),
+    };
+    if policies.is_empty() && !options.needs_plugin() {
+        return Ok(CompactionLayer::Off);
+    }
+    if options.needs_plugin() {
+        let manifest = std::path::PathBuf::from(crate::inspect::dsh_home())
+            .join("profiles")
+            .join(profile)
+            .join("package.json");
+        let installed = std::fs::read_to_string(manifest)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .is_some_and(|v| v["dependencies"]["rdsh-compaction"].is_string());
+        if !installed {
+            anyhow::bail!("rdsh-compaction is required; install it with rdsh plugins install --profile {profile} --recommended compaction");
+        }
+    }
+    let Some(composed) = dump_composed_config(orig, profile) else {
+        anyhow::bail!("compaction: the profile config could not be read");
+    };
+    let overlay = if options.needs_plugin() {
+        crate::compaction_overlay::overlay_with_options(&composed, &policies, &options)
+    } else {
+        crate::compaction_overlay::overlay_for(&composed, &policies)
+    };
+    let Some(overlay) = overlay else {
+        return Ok(CompactionLayer::Skipped(
+            "the profile has no compaction row that can be configured".to_string(),
+        ));
+    };
+    Ok(match write_compaction_overlay(&overlay.body) {
+        Ok(path) => CompactionLayer::Applied {
+            path,
+            rows: overlay.rows,
+        },
+        Err(_) => CompactionLayer::Skipped("the overlay could not be written".to_string()),
+    })
+}
+
 fn base_cmd(
     orig: &str,
     dry: bool,
@@ -898,6 +1010,14 @@ pub(crate) fn assemble_boot(
     }
     // Generated layer first so every caller-supplied --patch stays authoritative.
     let overlay = !dry && apply_gzip_overlay(&mut cmd, origin, profile);
+    let compaction = if dry {
+        CompactionLayer::Off
+    } else {
+        compaction_layer(origin, profile)?
+    };
+    if let CompactionLayer::Applied { path, .. } = &compaction {
+        cmd.arg("--patch").arg(path);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
@@ -923,6 +1043,15 @@ pub(crate) fn assemble_boot(
     }
     if overlay {
         notices.push("[rdsh] web ui: gzip overlay applied".to_string());
+    }
+    match compaction {
+        CompactionLayer::Applied { rows, .. } => notices.push(format!(
+            "[rdsh] compaction: policy overlay applied ({rows} rows)"
+        )),
+        CompactionLayer::Skipped(reason) => notices.push(format!(
+            "[rdsh] compaction: policy overlay skipped: {reason}"
+        )),
+        CompactionLayer::Off => {}
     }
     Ok(crate::harness_adapter::BootedCommand {
         command: cmd,

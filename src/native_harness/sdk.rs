@@ -241,7 +241,7 @@ async fn read_bounded(
     }
 }
 
-struct ProcessGroupGuard(Option<u32>);
+struct ProcessGroupGuard(#[cfg_attr(not(unix), allow(dead_code))] Option<u32>);
 impl Drop for ProcessGroupGuard {
     fn drop(&mut self) {
         #[cfg(unix)]
@@ -264,12 +264,14 @@ impl TemporaryRoot {
         getrandom::fill(&mut random).map_err(|_| anyhow::anyhow!("SDK_TEMP_FAILED"))?;
         let suffix: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
         let path = std::env::temp_dir().join(format!("rdsh-native-sdk-{suffix}"));
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
-        {
+        let builder = {
             use std::os::unix::fs::DirBuilderExt;
+            let mut builder = builder;
             builder.mode(0o700);
-        }
+            builder
+        };
         builder
             .create(&path)
             .map_err(|_| anyhow::anyhow!("SDK_TEMP_FAILED"))?;
