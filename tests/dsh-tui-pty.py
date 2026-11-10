@@ -35,9 +35,24 @@ const root=process.cwd(), logPath=root+'/wire.jsonl';
 const log=value=>fs.appendFileSync(logPath,JSON.stringify(value)+'\n');
 const check=(ok,message)=>{if(!ok){log({kind:'assertion',message});throw new Error(message);}};
 check(JSON.stringify(process.argv.slice(2))===JSON.stringify(['--profile','web','--no-open','--port','0']),'host CLI arguments');
-const sockets=new Set(), sessions=new Map();
+const sockets=new Set(), sessions=new Map(), terminals=new Map();
+let settingsRevision=7, settingsValue={label:'ADMIN_SETTING_INITIAL'};
+const object=(properties={},required=[])=>({type:'object',properties,required});
+const action=(id,schema=object(),extra={})=>({id,label:id,description:'Loopback management fixture',transport:'rpc',mode:'unary',schema,defaults:{},...extra});
+const adminActions=[
+ action('settings/describe'),
+ action('settings/update',object({ns:{type:'string'},patch:{type:'object'},expectedRevision:{type:'integer'}},['ns','patch','expectedRevision'])),
+ action('credentials/set',object({ref:{type:'string'},value:{type:'string',writeOnly:true}},['ref','value']),{sensitive:true}),
+ action('fixture/watch',object(),{mode:'stream',uplink:true}),
+ action('fileUploads/upload',object({agentId:{type:'string'},request:{type:'object'}},['agentId','request'])),
+ action('workspaceFiles/readBytes'),
+ ...['create','follow','write','resize','close'].map(name=>action('terminal/'+name,object(),name==='follow'?{mode:'stream'}:{})),
+ {id:'GET /api/rdsh-context',label:'RDSH HTTP fixture',description:'Existing authenticated HTTP handler',transport:'http',mode:'unary',method:'GET',path:'/api/rdsh-context',schema:object(),defaults:{}},
+];
+const terminalInfo=t=>({id:t.id,title:'Fixture terminal',shell:{path:'/mock/sh',args:[],name:'Mock'},cwd:root,cols:t.cols,rows:t.rows,state:t.closed?'exited':'running',exitCode:t.closed?0:null,controllerId:t.attachment});
+const terminalOutput=(t,data)=>{t.screen+=data;const frame={type:'output',sequence:++t.seq,data};for(const ws of sockets)for(const [stream,info] of ws.terminalFollows??[])if(info.id===t.id)item(ws,stream,frame);};
 let creates=0, prompts=0, connections=0, failResume=true;
-const fresh=id=>({id,seq:0,records:[],projections:{modelSelection:{next:{provider:'demo',model:'m1'}}}});
+const fresh=id=>({id,seq:0,records:[],projections:{modelSelection:{next:{provider:'demo',model:'m1'}},plan:{active:false,pending:false},permissions:{currentValue:'safe'}}});
 const saved=fresh('saved-session');
 saved.records=[
  {type:'event',event:{seq:1,type:'assistant/message',data:{message:{content:[{type:'text',text:'RESUMED_SESSION_PROOF'}]},usage:{inputTokens:1,cacheReadTokens:0,cacheWriteTokens:0,outputTokens:1}},surfaceOp:{op:'append'}}},
@@ -115,6 +130,35 @@ function result(args){
 }
 async function rpc(method,args){
  switch(method){
+  case 'rdshTuiAdmin/catalog':check(JSON.stringify(args)==='{}','admin catalog args');return {version:1,actions:adminActions};
+  case 'settings/update':{
+   check(args.ns==='fixture'&&Number.isInteger(args.expectedRevision)&&typeof args.patch?.label==='string','settings update schema');
+   if(args.expectedRevision!==settingsRevision)return {mockError:'settings/revision-conflict'};
+   settingsValue={...settingsValue,...args.patch};settingsRevision++;log({kind:'settings-updated',revision:settingsRevision,label:settingsValue.label});
+   return {ns:'fixture',value:settingsValue,revision:settingsRevision,applies:'live'};
+  }
+  case 'credentials/set':
+   check(args.ref==='fixture-key'&&args.value==='ADMIN_SECRET_NEVER_ECHO','secret transport value');log({kind:'credential-stored',ref:args.ref});return {message:args.value};
+  case 'fileUploads/upload':{
+   check(sessions.has(args.agentId)&&args.request?.name==='attachment.txt','attachment envelope');
+   const bytes=Buffer.from(args.request.data,'base64');check(bytes.toString()==='ADMIN_ATTACHMENT_BYTES','attachment bytes');log({kind:'attachment-uploaded',bytes:bytes.length});return {receiptId:'fixture-receipt',file:{attachmentId:'fixture-attachment',name:'attachment.txt',bytes:bytes.length}};
+  }
+  case 'workspaceFiles/readBytes':return {mockBinary:true};
+  case 'terminal/create':{
+   const r=args.request;check(sessions.has(args.agentId)&&typeof r?.id==='string'&&r.cols>0&&r.rows>0,'terminal create envelope');
+   check(!terminals.has(r.id),'terminal created only once');const t={id:r.id,agentId:args.agentId,cols:r.cols,rows:r.rows,seq:0,screen:'FIXTURE_SHELL_READY\r\nfixture$ ',line:'',closed:false};terminals.set(r.id,t);log({kind:'terminal-created',id:r.id});return terminalInfo(t);
+  }
+  case 'terminal/write':{
+   const t=terminals.get(args.id);check(t&&!t.closed&&args.agentId===t.agentId&&args.attachmentId===t.attachment&&typeof args.data==='string','terminal write exact attachment');
+   log({kind:'terminal-written',id:t.id,data:args.data});
+   for(const c of args.data){if(c==='\r'||c==='\n'){terminalOutput(t,'\r\nRESULT:'+(t.line.startsWith('echo ')?t.line.slice(5):t.line)+'\r\nfixture$ ');t.line='';}else{t.line+=c;terminalOutput(t,c);}}return {};
+  }
+  case 'terminal/resize':{
+   const t=terminals.get(args.id);check(t&&!t.closed&&args.agentId===t.agentId&&args.attachmentId===t.attachment&&args.cols>0&&args.rows>0,'terminal resize exact attachment');t.cols=args.cols;t.rows=args.rows;log({kind:'terminal-resized',id:t.id,cols:t.cols,rows:t.rows});return {};
+  }
+  case 'terminal/close':{
+   const t=terminals.get(args.id);check(t&&args.agentId===t.agentId,'terminal close identity');t.closed=true;log({kind:'terminal-closed',id:t.id});for(const ws of sockets)for(const[stream,info]of ws.terminalFollows??[])if(info.id===t.id){item(ws,stream,{type:'state',info:terminalInfo(t)});ws.send(JSON.stringify({type:'end',streamId:stream}));}return {};
+  }
   case 'session/modelCatalog':
    check(JSON.stringify(args)==='{}','catalog args');
    return {default:{provider:'demo',model:'m1'},groups:[{id:'demo',models:[{id:'m1'},{id:'m2'}]}]};
@@ -149,8 +193,26 @@ async function rpc(method,args){
    const r=args.request;check(sessions.has(r?.sessionId)&&r.provider==='demo'&&r.model==='m2','model selection envelope');
    projection(r.sessionId,'modelSelection',{next:{provider:r.provider,model:r.model}});return {};
   }
+  case 'commands/list':
+   check(sessions.has(args.agentId)&&Object.keys(args).length===1,'command roster envelope');
+   return [{name:'plan',description:'Plan mode'},{name:'permission',description:'Permissions'},{name:'compact',description:'Compact context'}];
+  case 'permissionPresets/catalog':
+   check(JSON.stringify(args)==='{}','permission catalog envelope');
+   return {options:[{value:'safe',name:'Safe',description:'Every tool requires approval'},{value:'auto',name:'Auto',description:'All tools automatically approved'}],defaultOptions:[],defaultPreset:'safe'};
+  case 'commands/execute':{
+   check(sessions.has(args.agentId)&&JSON.stringify(args.submittedAttachments)==='[]'&&Object.keys(args).length===3,'command execute envelope');
+   check(['/plan','/plan off','/permission safe','/permission auto','/compact keep literal words'].includes(args.line),'exact allowed command');
+   log({kind:'control-command',line:args.line});
+   if(args.line.startsWith('/compact')) return {commandId:'compact',result:{kind:'success',text:'COMPACT_COMMAND_ACCEPTED'}};
+   if(args.line.startsWith('/plan')){
+    const on=args.line==='/plan';
+    projection(args.agentId,'plan',{active:!on,pending:true});
+    setTimeout(()=>projection(args.agentId,'plan',{active:on,pending:false}),50);
+   }else projection(args.agentId,'permissions',{currentValue:args.line.split(' ')[1]});
+   return {commandId:'fixture-command',result:{kind:'success',text:'CONTROL_COMMAND_ACCEPTED'}};
+  }
   case 'pluginInventory/list':check(JSON.stringify(args)==='{}','plugins read args');return {plugins:[{name:'FIXTURE_PLUGIN_INVENTORY',enabled:true}]};
-  case 'settings/describe':check(JSON.stringify(args)==='{}','settings read args');return {description:'FIXTURE_SETTINGS_READONLY',apiKey:'FIXTURE_PRIVATE_SETTING'};
+  case 'settings/describe':check(JSON.stringify(args)==='{}','settings read args');return {description:'FIXTURE_SETTINGS_READONLY',apiKey:'FIXTURE_PRIVATE_SETTING',namespaces:[{ns:'fixture',value:settingsValue,revision:settingsRevision,applies:'live'}]};
   default:check(false,'unexpected RPC method '+method);
  }
 }
@@ -161,12 +223,19 @@ const server=http.createServer(async(req,res)=>{
    log({kind:'authenticate'});res.writeHead(303,{'Set-Cookie':'fixture_session=fixture-cookie; HttpOnly; SameSite=Strict; Path=/','Location':'/'});res.end();return;
   }
   check(req.headers.cookie==='fixture_session=fixture-cookie','HTTP auth cookie');
+  if(req.method==='GET'&&url.pathname==='/api/rdsh-context'){log({kind:'rdsh-http'});res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,config:{label:'RDSH_HTTP_PROOF'}}));return;}
   check(req.method==='POST'&&url.pathname.startsWith('/api/'),'RPC route');
   let body='';for await(const chunk of req)body+=chunk;
   const e=JSON.parse(body),method=url.pathname.slice(5);
   check(e.type==='client-request'&&e.method===method&&typeof e.rpcId==='string'&&e.rpcId.length>0&&e.payload?.args&&typeof e.payload.args==='object','RPC envelope');
-  log({kind:'rpc',method,args:e.payload.args});
+  log({kind:'rpc',method,args:method==='credentials/set'?{ref:e.payload.args.ref,value:'[OMITTED]'}:e.payload.args});
   const value=await rpc(method,e.payload.args);
+  if(value?.mockBinary){
+   const metadata={type:'server-response',rpcId:e.rpcId,result:{ok:true,value:{bytes:null}},attachments:[{path:['bytes'],codec:'bytes',part:'bytes-0'}]};
+   const binary=Buffer.from([0,1,255,13,10,128]),boundary='rdsh-admin-fixture';
+   const prefix=`--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Disposition: form-data; name="bytes-0"; filename="blob"\r\nContent-Type: application/octet-stream\r\n\r\n`;
+   res.writeHead(200,{'Content-Type':'multipart/form-data; boundary='+boundary});res.end(Buffer.concat([Buffer.from(prefix),binary,Buffer.from(`\r\n--${boundary}--\r\n`)]));return;
+  }
   const result=value?.mockError?{ok:false,error:{code:value.mockError}}:{ok:true,value};
   res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({type:'server-response',rpcId:e.rpcId,result}));
  }catch(error){log({kind:'assertion',message:error.message});res.writeHead(500);res.end('mock failure');}
@@ -181,10 +250,16 @@ wss.on('connection',ws=>{
  ws.on('close',()=>sockets.delete(ws));
  ws.on('message',raw=>{try{
   const e=JSON.parse(raw.toString());
-  if(e.type==='cancel'){log({kind:'stream-cancel',streamId:e.streamId});return;}
+  if(e.type==='cancel'){log({kind:'stream-cancel',streamId:e.streamId});ws.terminalFollows?.delete(e.streamId);return;}
+  if(e.type==='item'){check(ws.adminStream===e.streamId,'admin uplink stream identity');check(e.value?.proof==='ADMIN_UPLINK_PROOF','admin uplink value');log({kind:'admin-uplink'});item(ws,e.streamId,{proof:'ADMIN_UPLINK_ACK'});return;}
   check(e.type==='open'&&typeof e.streamId==='string'&&e.payload?.args,'WS open envelope');
   log({kind:'open',endpoint:e.endpoint,args:e.payload.args});
-  if(e.endpoint==='$events'){
+  if(e.endpoint==='fixture/watch'){
+   check(JSON.stringify(e.payload.args)==='{}','admin stream args');ws.adminStream=e.streamId;item(ws,e.streamId,{proof:'ADMIN_STREAM_READY'});
+  }else if(e.endpoint==='terminal/follow'){
+   const r=e.payload.args,t=terminals.get(r.id);check(t&&!t.closed&&r.agentId===t.agentId&&typeof r.attachmentId==='string','terminal follow envelope');t.attachment=r.attachmentId;
+   if(!ws.terminalFollows)ws.terminalFollows=new Map();ws.terminalFollows.set(e.streamId,{id:t.id});item(ws,e.streamId,{type:'snapshot',sequence:t.seq,screen:t.screen,info:terminalInfo(t)});
+  }else if(e.endpoint==='$events'){
    check(JSON.stringify(e.payload.args)==='{}','events args');ws.events=e.streamId;
    item(ws,e.streamId,{type:'ready',clientId});
   }else if(e.endpoint==='session/control'){
@@ -297,6 +372,31 @@ def main():
         try:
             client.wait("DSH runtime")
             client.wait("待機中")
+            client.command("/mode")
+            client.wait("モード・パーミッション")
+            client.wait("safe")
+            client.dismiss("モード・パーミッション")
+            client.command("/mode plan")
+            client.wait_wire(lambda rows: any(row["kind"]=="control-command" and row["line"]=="/plan" for row in rows))
+            client.wait("[plan · safe]")
+            client.command("/plan off")
+            client.wait("[normal · safe]")
+            client.command("/permission auto")
+            client.wait("パーミッション変更の確認")
+            client.send("\x1b[200~y\n/permission auto\n\x1b[201~")
+            client.send("\t")
+            client.resize(41,13);client.wait("端末を42列")
+            client.send("\t\r")
+            client.resize(100,32);client.wait("パーミッション変更の確認")
+            client.send("\r");client.wait_absent("パーミッション変更の確認")
+            assert not any(row["kind"]=="control-command" and row["line"].startswith("/permission") for row in client.events())
+            client.command("/permission auto");client.wait("パーミッション変更の確認")
+            client.send("\t\r");client.wait("[normal · auto]")
+            client.command("/permission safe");client.wait("パーミッション変更の確認")
+            client.send("\t\r");client.wait("[normal · safe]")
+            assert not rpc_rows(client.events(), "session/prompt"), "control commands became prompts"
+            client.command("/mode auto");client.wait("使い方: /mode")
+            client.send("\x15")
             client.send("deny\r")
             client.wait("STREAM_BEFORE_APPROVAL")
             client.wait("操作の承認")
@@ -348,6 +448,12 @@ def main():
             client.command("/usage")
             client.wait("キャッシュ集計対象")
             client.dismiss("キャッシュ集計対象")
+            client.command("/dsh")
+            client.wait("/compact")
+            client.dismiss("DSHコマンド")
+            client.command("/dsh compact keep literal words")
+            client.wait("COMPACT_COMMAND_ACCEPTED")
+            client.dismiss("DSHコマンド")
             client.command("/plugins")
             client.wait("FIXTURE_PLUGIN_INVENTORY")
             client.dismiss("FIXTURE_PLUGIN_INVENTORY")
@@ -359,6 +465,10 @@ def main():
             client.wait("demo / m2")
             client.send("slow\r")
             client.wait_wire(lambda rows: any(row["kind"] == "slow" for row in rows))
+            before_controls=len([row for row in client.events() if row["kind"]=="control-command"])
+            client.command("/mode plan");client.wait("実行中は変更できません")
+            client.send("\x15")
+            assert len([row for row in client.events() if row["kind"]=="control-command"])==before_controls
             cancels = len(rpc_rows(client.events(), "session/cancel"))
             client.send("\x03")
             client.wait_wire(lambda rows: len(rpc_rows(rows, "session/cancel")) > cancels)
