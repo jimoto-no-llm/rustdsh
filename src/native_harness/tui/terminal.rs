@@ -835,6 +835,103 @@ mod tests {
         assert!(pane.paste("must-not-send", &backend).is_err());
     }
     #[test]
+    fn successful_session_switch_cleans_old_panels_while_failure_preserves_them() {
+        use super::super::{admin, App, Overlay, SessionRow};
+        use std::cell::Cell;
+        struct SwitchMock {
+            inner: Mock,
+            fail: Cell<bool>,
+        }
+        impl HarnessBackend for SwitchMock {
+            fn snapshot(&self) -> Value {
+                self.inner.snapshot()
+            }
+            fn request(&self, path: &str, body: Value) -> Result<Value> {
+                if path == "/api/resume" {
+                    if self.fail.get() {
+                        bail!("resume failed");
+                    }
+                    return Ok(json!({"ok":true}));
+                }
+                self.inner.request(path, body)
+            }
+            fn cancel(&self) {}
+            fn reset(&self) -> Result<()> {
+                if self.fail.get() {
+                    bail!("reset failed");
+                }
+                Ok(())
+            }
+            fn redact(&self, text: &str) -> String {
+                text.into()
+            }
+        }
+        for resume in [false, true] {
+            let backend = SwitchMock {
+                inner: Mock::default(),
+                fail: Cell::new(true),
+            };
+            let mut pane = Pane::new("old-session".into(), None);
+            attach(&mut pane, &backend.inner, "$ ");
+            let mut panel = admin::Panel::new(
+                json!({"actions":[{"id":"job/follow","mode":"stream","schema":{"type":"object"}}]}),
+                "job/follow",
+            )
+            .unwrap();
+            panel.key(ctrl('s'), &backend);
+            panel.key(key(KeyCode::Tab), &backend);
+            panel.key(key(KeyCode::Enter), &backend);
+            assert!(panel.running());
+            let mut app = App::new(json!([]));
+            app.set_size(100, 32);
+            app.terminal = Some(pane);
+            app.admin = Some(panel);
+            if resume {
+                app.overlay = Overlay::Sessions {
+                    items: vec![SessionRow {
+                        id: "new-session".into(),
+                        title: "next".into(),
+                        cwd: "/new".into(),
+                    }],
+                    selected: 0,
+                };
+                app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+            } else {
+                assert!(!app.new_chat(&backend));
+            }
+            assert!(app.admin.is_some());
+            assert!(app.terminal.is_some());
+            assert!(!backend
+                .inner
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(p, v)| p == "/api/admin/cancel" || v["id"] == "terminal/close"));
+            backend.fail.set(false);
+            if resume {
+                app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+            } else {
+                assert!(app.new_chat(&backend));
+            }
+            assert!(app.admin.is_none());
+            assert!(app.terminal.is_none());
+            let calls = backend.inner.calls.lock().unwrap();
+            assert_eq!(
+                calls
+                    .iter()
+                    .filter(|(p, _)| p == "/api/admin/cancel")
+                    .count(),
+                2
+            );
+            let (_, close) = calls
+                .iter()
+                .find(|(_, v)| v["id"] == "terminal/close")
+                .unwrap();
+            assert_eq!(close["args"]["agentId"], "old-session");
+        }
+    }
+    #[test]
     fn ansi_colors_unicode_cursor_and_repeated_draw_are_rendered_as_cells() {
         let backend = Mock::default();
         let mut pane = Pane::new("session".into(), Some("existing".into()));
