@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-04
+
 ### Fixed
 
 - 公開プラグインの照合表を v0.15.0 まで補完し、pin ワークフローが3台帳すべてをコミットするよう修正しました。保護付き委譲の対応版、通信の既定値、自動更新と公開インストーラの説明を実装に合わせました。
