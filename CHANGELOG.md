@@ -18,6 +18,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - GUI 環境変数に依存するセットアップテストを隔離し、回帰テストのブラウザ起動と
   固定ポートへの依存を解消しました。HarnessAdapter の文書を実装と一致させました。
 
+- 状態移行の dry-run が旧形式の state と整合性ファイルを書き換える不具合を修正し、
+  初回の移行と元データへの復元を可能にしました。移行後の schema 2 でも
+  プロジェクト移動が履歴を保ったまま使えます。
+
 ## [0.15.0] - 2026-10-31
 
 ### Added
