@@ -14,12 +14,12 @@ test("native MCP resolves the patched SDK and one shared service graph", async (
   const mcpPath = require.resolve("@deepseek-ai/dsh-mcp-client");
   const mcpRequire = createRequire(mcpPath);
   const sdkPath = mcpRequire.resolve("@modelcontextprotocol/client");
-  assert.equal((await packageInfo(sdkPath)).version, "2.3.1");
+  assert.equal((await packageInfo(sdkPath)).version, "2.4.0");
   assert.equal(sdkPath, require.resolve("@modelcontextprotocol/client"));
   const sdkRequire = createRequire(sdkPath);
   assert.equal(
     (await packageInfo(sdkRequire.resolve("@modelcontextprotocol/core"))).version,
-    "2.3.1",
+    "2.4.0",
   );
   for (const name of ["@deepseek-ai/cordis", "@deepseek-ai/schemastery"]) {
     assert.equal(mcpRequire.resolve(name), require.resolve(name));
@@ -33,7 +33,7 @@ test("native MCP resolves the patched SDK and one shared service graph", async (
       );
   }
   const runtime = await loadRuntime();
-  assert.equal(runtime.sdkVersion, "2.3.1");
+  assert.equal(runtime.sdkVersion, "2.4.0");
   assert.equal(runtime.nativeVersion, "0.2.0-rc.2");
   assert.equal(runtime.sdk, await import(pathToFileURL(sdkPath).href));
 });
@@ -51,7 +51,7 @@ test("lockfile contains one patched MCP client and core", async () => {
       1,
       `${name} must not have a second dependency graph`,
     );
-    assert.equal(entries[0][1].version, "2.3.1");
+    assert.equal(entries[0][1].version, "2.4.0");
   }
 });
 
@@ -97,8 +97,8 @@ test("an external DSH graph with an unaudited nested SDK is rejected", async (t)
     );
 });
 
-test("both audited SDK versions are accepted from an external DSH graph", async (t) => {
-  for (const version of ["2.2.0", "2.3.1"]) {
+test("all audited SDK versions are accepted from an external DSH graph", async (t) => {
+  for (const version of ["2.2.0", "2.3.1", "2.4.0"]) {
     const runtime = await loadRuntime(await versionFixture(t, version));
     assert.equal(runtime.sdk.syntheticVersion, version);
     assert.equal(runtime.sdkVersion, version);

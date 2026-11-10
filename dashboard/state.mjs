@@ -292,11 +292,12 @@ function validateStoredState(value, project) {
 }
 
 export class ProjectStore {
-  constructor(project, value, { integrityKey, instructionQueueWorker } = {}) {
+  constructor(project, value, { integrityKey, instructionQueueWorker, readOnly = false } = {}) {
     this.project = project;
     this.value = value;
     this.integrityKey = integrityKey;
     this.instructionQueueWorker = instructionQueueWorker || null;
+    this.readOnly = readOnly;
     this.historyIds = validateRestoredHistory(value);
     this.protectedHistory = freezeHistory(value.history_backups);
   }
@@ -351,9 +352,11 @@ export class ProjectStore {
       if (!keyState.existed || !verifyStateSeal(value, keyState.key))
         throw new Error("Dashboard state integrity check failed; refusing state");
       validateStoredState(value, project);
-      await writeStateIntegrityMarker(project);
-      if (migration)
-        await fs.rm(stateIntegrityMigrationPath(project), { force: true });
+      if (!options.readOnly) {
+        await writeStateIntegrityMarker(project);
+        if (migration)
+          await fs.rm(stateIntegrityMigrationPath(project), { force: true });
+      }
       return new ProjectStore(project, value, { ...options, integrityKey: keyState.key });
     }
 
@@ -367,9 +370,15 @@ export class ProjectStore {
         if (keyExists)
           throw new Error("Dashboard state integrity seal is missing; refusing state");
         validateStoredState(value, project);
-        migration = await writeIntegrityMigration(project, value);
+        if (!options.readOnly)
+          migration = await writeIntegrityMigration(project, value);
       }
       validateStoredState(value, project);
+      if (options.readOnly) {
+        if (migration)
+          throw new Error("Dashboard state integrity migration is pending; open the dashboard to finish recovery");
+        return new ProjectStore(project, value, options);
+      }
       const keyState = await loadStateIntegrityKey(project, {
         hadStateSeal: false,
         stateExists: true,
@@ -384,6 +393,10 @@ export class ProjectStore {
 
     if (migration)
       throw new Error("Dashboard state migration record has no state to recover");
+    if (options.readOnly) {
+      validateStoredState(value, project);
+      return new ProjectStore(project, value, options);
+    }
     const keyState = await loadStateIntegrityKey(project, {
       hadStateSeal: false,
       stateExists: false,
@@ -522,6 +535,7 @@ export class ProjectStore {
     return structuredClone(result);
   }
   async commit(next, operation = null, input = {}) {
+    if (this.readOnly) throw new Error("Dashboard state was opened read-only");
     try {
       await fs.access(path.join(this.project.directory, "state-migration.lock"));
       throw new Error("Dashboard state migration is in progress");

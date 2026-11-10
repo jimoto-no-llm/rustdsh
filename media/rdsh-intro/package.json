@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@react-three/fiber": "9.8.2",
-    "@remotion/cli": "4.0.538",
-    "@remotion/three": "4.0.538",
-    "@remotion/transitions": "4.0.538",
-    "@types/three": "0.186.0",
+    "@remotion/cli": "4.0.539",
+    "@remotion/three": "4.0.541",
+    "@remotion/transitions": "4.0.539",
+    "@types/three": "0.187.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.538",
-    "three": "0.186.1"
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

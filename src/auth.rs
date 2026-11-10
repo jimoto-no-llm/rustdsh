@@ -27,6 +27,8 @@
 //   - Related: provider_needs_in(&grants, &doc) detection (ok/importable/missing) excludes
 //     unusable routes in 87-2; ZDR mode is split out to 87-5 (requirements first).
 
+pub(crate) mod native_oauth;
+
 use crate::auth_sharing::{AuthArgs, SharingLock, SharingPolicy};
 use std::collections::HashMap;
 

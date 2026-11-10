@@ -7,6 +7,13 @@ without writing files. The supported migration is schema 1 to schema 2; it
 requires the `changes` array and initializes it to an empty array only when it
 is absent. Existing entries are preserved.
 
+Dry runs also leave integrity keys, markers and pending recovery records unchanged.
+Legacy unsigned state can be migrated on the first attempt; its integrity seal is
+initialized when the dashboard next opens it. Already sealed state is verified
+before planning, and the migrated payload keeps its seal.
+An interrupted integrity initialization must finish through a normal dashboard
+open before schema migration; maintenance commands leave its recovery record intact.
+
 Stop the project dashboard before applying a migration. `apply` writes the exact
 source bytes to `state-migrations/<migration-id>.before.json`, records the
 source and target hashes, writes a synced temporary state file, then replaces
@@ -32,3 +39,6 @@ process is confirmed gone and the lock contents are unchanged.
 The migration commands are local maintenance operations. They do not convert
 unknown schemas, migrate project files, or start/stop a dashboard on the
 operator's behalf.
+
+Project identity moves support both schemas. Migrating state does not require
+moving it back to schema 1 before renaming the project directory.
