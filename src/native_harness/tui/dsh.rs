@@ -1,5 +1,7 @@
 //! Rust terminal surface for the installed DSH Web Remote protocol.
 //! The host owns tools, persistence, credentials and its existing approval policy.
+mod admin;
+mod controls;
 mod models;
 mod state;
 #[cfg(test)]
@@ -156,6 +158,7 @@ pub(super) struct DshBackend {
     child: Mutex<Child>,
     workspace: PathBuf,
     secrets: Vec<String>,
+    admin: Arc<Mutex<admin::AdminState>>,
 }
 impl DshBackend {
     pub(super) fn start(
@@ -237,7 +240,7 @@ impl DshBackend {
                 .unwrap()
                 .1
                 .into_owned();
-            let remote = match Remote::authenticate(url).await {
+            let remote = match Remote::authenticate(url.clone()).await {
                 Ok(r) => r,
                 Err(e) => {
                     stop_child(&mut child).await;
@@ -278,6 +281,7 @@ impl DshBackend {
             child: Mutex::new(child),
             workspace,
             secrets,
+            admin: Arc::new(Mutex::new(admin::AdminState::default())),
         };
         backend.runtime.block_on(async {
             tokio::time::timeout(Duration::from_secs(15), async {
@@ -371,6 +375,9 @@ impl HarnessBackend for DshBackend {
         value
     }
     fn request(&self, path: &str, body: Value) -> Result<Value> {
+        if path.starts_with("/api/admin/") {
+            return self.admin_request(path, body);
+        }
         match path {
             "/api/message"=>{
                 self.require_idle()?;
@@ -410,15 +417,18 @@ impl HarnessBackend for DshBackend {
                 let _=self.commands.send(Command::CloseWait(id.into()));
                 Ok(result)
             },
+            "/api/controls"|"/api/mode"|"/api/permission"=>self.control_request(path,body),
             "/api/sessions"=>{
                 let result=self.rpc("session/list",json!({"_request":{}}))?;
                 session_list(&result,&self.workspace)
             },
             "/api/resume"=>{self.create(Some(body["sessionId"].as_str().context("sessionIdがありません")?))?;Ok(json!({"ok":true}))},
+            "/api/host-commands"=>self.host_commands(None),
+            "/api/host-command"=>self.host_commands(Some(body["line"].as_str().context("コマンドがありません")?)),
             "/api/plugins"=>self.rpc("pluginInventory/list",json!({})),
             "/api/settings"=>self.rpc("settings/describe",json!({})),
             _=>bail!("DSH backendで未対応の要求です"),
-        }.map(|mut value|{redact_value(&mut value,&self.secrets);value})
+        }.map(|mut value|{if path != "/api/admin/catalog" {redact_value(&mut value,&self.secrets);}value})
     }
     fn cancel(&self) {
         if let Err(e) = self.rpc(
@@ -439,6 +449,7 @@ impl HarnessBackend for DshBackend {
 }
 impl Drop for DshBackend {
     fn drop(&mut self) {
+        self.cancel_admin_jobs();
         let _ = self.runtime.block_on(self.remote.rpc(
             "session/cancel",
             json!({"request":{"sessionId":self.session()}}),

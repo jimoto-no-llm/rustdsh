@@ -63,9 +63,34 @@ rdsh native-tui --workspace /absolute/path/to/project \
 縮小中もEscで拒否・キャンセル、Ctrl+Cで中止、Ctrl+Qで終了できます。
 フルスクリーン、raw mode、マウス入力、Bracketed Pasteは終了時に解除します。
 
+## Planとパーミッション
+
+- `/mode` は現在のモード・権限と候補を表示します。
+- `/mode plan`、`/plan on` で計画、`/mode normal`（`act`も可）、`/plan off` で通常に戻します。
+  裸の `/plan` は切替です。実行中・承認待ち中は変更できません。
+- `/permission` で候補と効果を確認し、`/permission ask`、
+  `/permission read-only`、`/permission full-access` で変更の確認画面を開きます。初期選択は「戻る」です。
+  Tabで「設定を適用」を選んでEnterを押すまで変更しません。
+
+Rust独立モードの `plan` と `read-only` はwriteとDevinの起動をRustの実行ゲートで禁止します。
+この場合の `read`・`model_call` は毎回承認が必要です。`ask`でも自動承認は行いません。
+`normal` + `full-access` は `read`、`write`、`model_call`、`devin_cli` とDevin内部の操作を
+個別確認なしで自動承認します。ファイル内容のモデル送信や別モデルへの依頼、
+Devinによるコマンド実行・ファイル変更・ネットワーク利用も対象です。
+自動承認は `/logs` に `auto_allow` として記録します。`/permission ask` で毎回確認へ戻せます。
+Planを有効にするとフルアクセス選択中もwriteとDevinは禁止、readとmodel_callは毎回確認へ戻ります。
+通常モードへ戻すと選択中のフルアクセスが再び有効になります。
+readのワークスペース・秘密ファイル・symlink制限、引数検証、OSの権限、停止処理は維持します。
+設定は現在のプロセス内だけで有効で、`/new`でも保持します。起動時は通常・毎回確認です。
+画面上部と `/status` に現在の状態を表示します。
+
+`/clear` は `/new`（同じ確認画面）、`/exit` は `/quit`、`/stop` は `/cancel`、
+`/resume` はDSH専用の `/sessions` の別名です。`/help`は上下・PgUp/Dnで全候補を閲覧できます。
+権限確認への貼付けは操作にならず、狭い端末にした後は選択が「戻る」へ戻ります。
+
 ## 承認
 
-ツール要求が来ると、ツール名・理由・引数を専用画面に表示します。
+個別承認が必要な設定では、ツール要求が来るとツール名・理由・引数を専用画面に表示します。
 初期選択は**拒否**です。Tab / ←→で「拒否」「一度だけ許可」を選び、Enterで確定します。
 ↑↓ / PgUp / PgDnで長い引数をスクロールできます。Escは拒否です。
 承認画面への文字入力・貼り付けは許可操作になりません。
@@ -101,10 +126,17 @@ python3 tests/native-tui-pty.py /absolute/path/to/rdsh
 「未取得」です。料金・残り利用枠は推測しません。`/new` で会話単位の集計をリセットします。
 
 主モデルは `model_call {"provider":"登録済みID","model":"登録済みID","prompt":"依頼文"}`
-を提案できます。送信先と依頼文を確認し、一回だけ承認してください。相手モデルには
-表示した依頼文だけを送り、親の会話履歴やファイルを自動共有しません。相手にツールは
-与えず、回答はデータとして主モデルへ返します。拒否・中止時は新しい呼び出しを開始しません。
-主モデル、委譲先、JSON修復の再要求をすべて使用量へ含めます。
+で別モデルへ作業を委譲できます。子モデルは同じworkspaceで `read`、`write`、`devin_cli` を使い、
+ツール結果を読みながら最大8ステップ実行します。親の会話履歴は自動共有せず、
+依頼文と子自身のツール結果だけを使います。再帰的なmodel_callは実行しません。
+親と同じ権限設定・停止処理を使い、askでは委譲と各ツールを個別承認、full-accessでは自動承認です。
+Plan/read-onlyでは子のwriteとDevinも拒否します。子の待機中に取消・timeoutになれば承認表示も解除します。
+主モデル、子モデル、JSON修復を使用量へ合算し、子の操作は実行ログで確認できます。
+
+`write {"path":"相対パス","content":"内容"}` は64KiB以下のUTF-8ファイルを新規作成します。
+既存ファイルを更新する場合は先にreadし、`expected_content` にその内容を指定してください。
+競合時は更新せず再読取りを要求します。親ディレクトリは既存である必要があります。
+秘密・隠しファイル、symlink、workspace外へのパスはreadと同様に対象外です。
 
 Rust Web GUIとの機能対応は [NATIVE-PARITY.md](NATIVE-PARITY.md) を参照してください。
 

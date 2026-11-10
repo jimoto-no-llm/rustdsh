@@ -1,9 +1,13 @@
 //! Full-screen terminal client shared by harness backends.
+mod admin;
 pub(super) mod backend;
 mod commands;
 mod dsh;
 mod editor;
 mod questions;
+mod recording;
+mod surface;
+mod terminal;
 mod view;
 
 use super::create_engine;
@@ -51,6 +55,10 @@ enum Overlay {
         query: Editor,
         selected: usize,
     },
+    Admin,
+    Terminal,
+    Surface,
+    Recording,
     Help,
     Status,
     Logs,
@@ -66,10 +74,20 @@ enum Overlay {
     New {
         confirm: bool,
     },
+    Permission {
+        preset: String,
+        description: String,
+        confirm: bool,
+    },
 }
 #[derive(Default)]
 struct App {
     editor: Editor,
+    admin: Option<admin::Panel>,
+    terminal: Option<terminal::Pane>,
+    surface: Option<surface::Pane>,
+    recording: Option<recording::Pane>,
+    pending_transcript: Option<String>,
     overlay: Overlay,
     notice: String,
     scroll: usize,
@@ -119,10 +137,24 @@ impl App {
         if !self.input_visible {
             // A hidden dialog must not retain a previously selected confirmation.
             self.allow = false;
+            if let Some(panel) = &mut self.admin {
+                panel.clear_confirmation();
+            }
+            if let Some(pane) = &mut self.terminal {
+                pane.clear_confirmation();
+            }
+            if let Some(pane) = &mut self.surface {
+                pane.clear_confirmation();
+            }
+            if let Some(pane) = &mut self.recording {
+                pane.clear_confirmation();
+            }
             if let Some(form) = &mut self.question_form {
                 form.clear_answers();
             }
-            if let Overlay::New { confirm } = &mut self.overlay {
+            if let Overlay::New { confirm } | Overlay::Permission { confirm, .. } =
+                &mut self.overlay
+            {
                 *confirm = false;
             }
         }
@@ -142,6 +174,12 @@ impl App {
                 if !form.paste(value) {
                     self.notice = "自由入力は16KiB以内にしてください".into();
                 }
+            }
+            return;
+        }
+        if matches!(self.overlay, Overlay::Admin) {
+            if let Some(panel) = &mut self.admin {
+                panel.paste(value);
             }
             return;
         }
@@ -182,6 +220,12 @@ impl App {
             self.allow = false;
             self.approval_scroll = 0;
             if self.has_pending() {
+                if let Some(pane) = &mut self.surface {
+                    pane.clear_confirmation();
+                }
+                if let Some(pane) = &mut self.recording {
+                    pane.clear_confirmation();
+                }
                 self.overlay = Overlay::None;
             }
         }
@@ -204,6 +248,21 @@ impl App {
                     }
                 }
             }
+        }
+    }
+    fn clear_session_panels(&mut self, backend: &dyn HarnessBackend) {
+        self.pending_transcript = None;
+        if let Some(mut pane) = self.surface.take() {
+            pane.close(backend);
+        }
+        if let Some(mut pane) = self.recording.take() {
+            pane.cancel(backend);
+        }
+        if let Some(mut panel) = self.admin.take() {
+            panel.cancel(backend);
+        }
+        if let Some(mut pane) = self.terminal.take() {
+            pane.cancel(backend);
         }
     }
     fn open_details(&mut self, overlay: Overlay) {
@@ -319,7 +378,123 @@ impl App {
         let busy = self.has_pending()
             || matches!(snapshot["status"].as_str(), Some("running" | "approval"));
         if ctrl && key.code == KeyCode::Char('q') {
+            if let Some(pane) = &mut self.surface {
+                pane.close(backend);
+            }
+            if let Some(pane) = &mut self.recording {
+                pane.cancel(backend);
+            }
+            if let Some(panel) = &mut self.admin {
+                panel.cancel(backend);
+            }
+            if let Some(pane) = &mut self.terminal {
+                pane.cancel(backend);
+            }
             return true;
+        }
+        if !self.input_visible
+            && !self.has_pending()
+            && matches!(self.overlay, Overlay::Surface | Overlay::Recording)
+        {
+            // Shrinking the terminal must never trap a live microphone. Only
+            // close/cancel is accepted while the pane and its confirmation are hidden.
+            if key.code == KeyCode::Esc
+                || (ctrl && matches!(key.code, KeyCode::Char('c' | ']' | '5')))
+            {
+                if matches!(self.overlay, Overlay::Recording) {
+                    if let Some(mut pane) = self.recording.take() {
+                        pane.cancel(backend);
+                    }
+                } else if let Some(pane) = &mut self.surface {
+                    pane.clear_confirmation();
+                }
+                // Keep the current conversation: a hidden Web selection is not
+                // evidence for switching sessions. The private browser remains reopenable.
+                self.overlay = Overlay::None;
+            }
+            return false;
+        }
+        if matches!(self.overlay, Overlay::Surface) && !self.has_pending() {
+            let mut closed = false;
+            let mut selected = None;
+            let mut selection_error = None;
+            if let Some(pane) = &mut self.surface {
+                if self.input_visible {
+                    match pane.key(key, backend) {
+                        Ok(true) => {
+                            match pane.selected_session(backend) {
+                                Ok(value) => selected = value,
+                                Err(error) => {
+                                    selection_error = Some(backend.redact(&error.to_string()))
+                                }
+                            }
+                            closed = true;
+                        }
+                        Ok(false) => {}
+                        Err(e) => pane.report_error(backend.redact(&e.to_string())),
+                    }
+                }
+            }
+            if closed {
+                self.overlay = Overlay::None;
+                if let Some(error) = selection_error {
+                    self.notice =
+                        format!("Web側の会話を確認できないため、現在の会話を維持しました: {error}");
+                    return false;
+                }
+                match selected {
+                    Some(id) if snapshot["sessionId"]==id => {},
+                    Some(_) if busy => self.notice="実行中のためWeb側の会話切替は反映していません。停止後に /webui から戻ってください".into(),
+                    Some(id) => {
+                        if self.call("/api/resume",json!({"sessionId":id}),backend) {
+                            self.clear_session_panels(backend);self.editor.clear();self.history.clear();self.history_index=None;self.saved_draft.clear();self.scroll=0;self.follow=true;
+                            self.notice="Web側で選択した会話へ切り替えました".into();
+                        }
+                    },
+                    None => self.notice="Web側の選択会話を確認できないため、現在の会話を維持しました".into(),
+                }
+            }
+            return false;
+        }
+        if matches!(self.overlay, Overlay::Recording) && !self.has_pending() {
+            if let Some(pane) = &mut self.recording {
+                if self.input_visible {
+                    match pane.key(key, backend) {
+                        Ok(true) => {
+                            pane.cancel(backend);
+                            self.overlay = Overlay::None;
+                            self.recording = None;
+                        }
+                        Ok(false) => {}
+                        Err(e) => pane.report_error(backend.redact(&e.to_string())),
+                    }
+                }
+            }
+            return false;
+        }
+        if matches!(self.overlay, Overlay::Terminal) && !self.has_pending() {
+            if let Some(pane) = &mut self.terminal {
+                if self.input_visible {
+                    match pane.key(key, backend) {
+                        Ok(true) => self.overlay = Overlay::None,
+                        Ok(false) => {}
+                        Err(error) => self.notice = backend.redact(&error.to_string()),
+                    }
+                }
+            }
+            return false;
+        }
+        if matches!(self.overlay, Overlay::Admin) && !self.has_pending() {
+            if let Some(panel) = &mut self.admin {
+                if (self.input_visible
+                    || (ctrl && key.code == KeyCode::Char('c'))
+                    || key.code == KeyCode::Esc)
+                    && panel.key(key, backend)
+                {
+                    self.overlay = Overlay::None;
+                }
+            }
+            return false;
         }
         if ctrl && key.code == KeyCode::Char('c') {
             if busy {
@@ -404,6 +579,58 @@ impl App {
             }
             return false;
         }
+        if matches!(self.overlay, Overlay::Permission { .. }) {
+            let scrolled = match key.code {
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.scroll_details(if key.code == KeyCode::Up { -1 } else { -8 });
+                    true
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.scroll_details(if key.code == KeyCode::Down { 1 } else { 8 });
+                    true
+                }
+                KeyCode::Home => {
+                    self.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.detail_scroll = self.detail_max_scroll;
+                    true
+                }
+                _ => false,
+            };
+            if scrolled {
+                return false;
+            }
+        }
+        if let Overlay::Permission {
+            preset, confirm, ..
+        } = &mut self.overlay
+        {
+            match key.code {
+                KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
+                    *confirm = !*confirm
+                }
+                KeyCode::Esc => self.overlay = Overlay::None,
+                KeyCode::Enter if key.kind == KeyEventKind::Press => {
+                    let confirmed = *confirm;
+                    let preset = preset.clone();
+                    if !confirmed
+                        || self.change_control(
+                            "/api/permission",
+                            json!({"preset":preset,"confirmed":true}),
+                            backend,
+                        )
+                    {
+                        self.overlay = Overlay::None;
+                    } else if let Overlay::Permission { confirm, .. } = &mut self.overlay {
+                        *confirm = false;
+                    }
+                }
+                _ => {}
+            }
+            return false;
+        }
         if let Overlay::New { confirm } = &mut self.overlay {
             match key.code {
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
@@ -458,6 +685,7 @@ impl App {
                 KeyCode::Enter if key.kind == KeyEventKind::Press => {
                     if let Some(row) = items.get(*selected).cloned() {
                         if self.call("/api/resume", json!({"sessionId":row.id}), backend) {
+                            self.clear_session_panels(backend);
                             self.editor.clear();
                             self.history.clear();
                             self.history_index = None;
@@ -514,7 +742,7 @@ impl App {
             return quit;
         }
         match key.code {
-            KeyCode::F(1) => self.overlay = Overlay::Help,
+            KeyCode::F(1) => self.open_details(Overlay::Help),
             KeyCode::F(2) => {
                 if busy {
                     self.notice = "実行を中止してからモデルを変更してください（Esc）".into();
@@ -673,6 +901,41 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
     while !crate::shutdown::requested() {
         let snapshot = backend.snapshot();
         app.sync_pending(&snapshot);
+        if let Some(panel) = &mut app.admin {
+            panel.poll(backend);
+        }
+        if let Some(pane) = &mut app.terminal {
+            let size = terminal.size()?;
+            pane.resize(size.width, size.height, backend);
+            pane.poll(backend);
+        }
+        if let Some(pane) = &mut app.surface {
+            let size = terminal.size()?;
+            pane.resize(size.width, size.height, backend);
+            pane.poll(backend);
+        }
+        let transcript = if let Some(pane) = &mut app.recording {
+            pane.poll(backend);
+            pane.take_transcript()
+        } else {
+            None
+        };
+        if let Some(text) = transcript {
+            app.pending_transcript = Some(text);
+            if let Some(mut pane) = app.recording.take() {
+                pane.cancel(backend);
+            }
+        }
+        if let Some(text) = &app.pending_transcript {
+            if app.editor.insert(text) {
+                app.pending_transcript = None;
+                app.overlay = Overlay::None;
+                app.notice =
+                    "文字起こしを下書きに追加しました。送信前に内容を確認してください".into();
+            } else {
+                app.notice = "文字起こしを保持中です。下書きの文字数を減らすと追加できます".into();
+            }
+        }
         terminal.draw(|frame| view::draw(frame, &mut app, &snapshot, started.elapsed()))?;
         if !event::poll(Duration::from_millis(100))? {
             continue;
@@ -688,8 +951,42 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
                     break;
                 }
             }
+            Event::Paste(value)
+                if matches!(app.overlay, Overlay::Surface) && !app.has_pending() =>
+            {
+                if app.input_visible {
+                    if let Some(pane) = &mut app.surface {
+                        if let Err(e) = pane.paste(&value, backend) {
+                            pane.report_error(backend.redact(&e.to_string()));
+                        }
+                    }
+                }
+            }
+            Event::Paste(_) if matches!(app.overlay, Overlay::Recording) => {}
+            Event::Paste(value)
+                if matches!(app.overlay, Overlay::Terminal) && !app.has_pending() =>
+            {
+                if app.input_visible {
+                    if let Some(pane) = &mut app.terminal {
+                        if let Err(error) = pane.paste(&value, backend) {
+                            app.notice = backend.redact(&error.to_string());
+                        }
+                    }
+                }
+            }
             Event::Paste(value) => app.paste(&value),
             Event::Resize(width, height) => app.guard_input_size(width, height),
+            Event::Mouse(mouse)
+                if matches!(app.overlay, Overlay::Surface) && !app.has_pending() =>
+            {
+                if app.input_visible {
+                    if let Some(pane) = &mut app.surface {
+                        if let Err(e) = pane.mouse(mouse, backend) {
+                            pane.report_error(backend.redact(&e.to_string()));
+                        }
+                    }
+                }
+            }
             Event::Mouse(mouse) if app.pending_is_questions => {
                 if let Some(form) = &mut app.question_form {
                     let delta = match mouse.kind {
@@ -702,6 +999,15 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
                         .saturating_add_signed(delta)
                         .min(form.max_scroll);
                     form.follow_focus = false;
+                }
+            }
+            Event::Mouse(mouse) if matches!(app.overlay, Overlay::Admin) => {
+                if let Some(panel) = &mut app.admin {
+                    match mouse.kind {
+                        MouseEventKind::ScrollUp => panel.scroll(-3),
+                        MouseEventKind::ScrollDown => panel.scroll(3),
+                        _ => {}
+                    }
                 }
             }
             Event::Mouse(mouse) => match mouse.kind {
@@ -733,6 +1039,18 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
             },
             _ => {}
         }
+    }
+    if let Some(pane) = &mut app.surface {
+        pane.close(backend);
+    }
+    if let Some(pane) = &mut app.recording {
+        pane.cancel(backend);
+    }
+    if let Some(panel) = &mut app.admin {
+        panel.cancel(backend);
+    }
+    if let Some(pane) = &mut app.terminal {
+        pane.cancel(backend);
     }
     Ok(())
 }
