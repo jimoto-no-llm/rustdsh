@@ -61,6 +61,28 @@ DSHの公開`session/selectModel`は、Web GUIと同じく選択したモデル�
 保存します。起動時の `--provider` と `--model` は両方指定した場合だけ選択します。
 未指定では既存の既定値を使用します。
 
+## Planと権限のコマンド
+
+`/mode`、`/permission` は現在の状態と利用可能な候補を表示します。
+`/mode plan`・`/plan on` はDSHの `/plan`、`/mode normal`・`/plan off` は
+DSHの `/plan off` へ対応します。裸の `/plan` は投影済みの現在状態から切替先を決めます。
+モードは計画・通常の切替で、DSHのAgent presetを変更する操作ではありません。
+
+`/permission <preset>` はホストが公開する候補だけを選択できます。
+内容・効果を表示した確認画面で「設定を適用」を明示的に選ぶまで変更しません。
+`custom` は現在値の表示専用です。ホストが公開する `auto` 等を選ぶ場合も確認が必要です。
+Rust独立モードの `ask`・`read-only` とDSH側のプリセット名は別の一覧です。
+
+利用可能性は公開 `commands/list` と `permissionPresets/catalog` で確認し、
+設定操作は `commands/execute` へ送ります。未対応構成・拒否・未登録応答は
+ローカルエラーとし、コマンドをモデルのメッセージへ変換しません。
+実行中・承認待ち中の設定変更は拒否します。計画の確定・切替待ちと権限現在値は
+ホストの `plan`・`permissions` 投影に追従し、成功応答だけで確定状態を作りません。
+`/new` 後は新セッションのホスト状態を使用します。
+
+`/clear`・`/exit`・`/stop`・`/resume` も、それぞれ既存の
+`/new`・`/quit`・`/cancel`・`/sessions` と同じ動作で使えます。
+
 ## 状態と使用量
 
 画面上部の `DSH runtime` がDSH接続中の目印です。回答はホストの逐次配信を表示し、

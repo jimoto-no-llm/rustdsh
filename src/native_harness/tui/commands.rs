@@ -21,6 +21,24 @@ pub(super) const COMMANDS: &[Command] = &[
         needs_idle: true,
     },
     Command {
+        name: "mode",
+        usage: "/mode [normal|plan]",
+        description: "通常・計画モードを表示／切り替え",
+        needs_idle: true,
+    },
+    Command {
+        name: "plan",
+        usage: "/plan [on|off]",
+        description: "計画モードを切り替え",
+        needs_idle: true,
+    },
+    Command {
+        name: "permission",
+        usage: "/permission [PRESET]",
+        description: "権限候補を表示・確認して変更",
+        needs_idle: true,
+    },
+    Command {
         name: "new",
         usage: "/new",
         description: "確認して新しい会話を開始",
@@ -86,12 +104,39 @@ pub(super) const COMMANDS: &[Command] = &[
         description: "DSH: 設定情報を閲覧",
         needs_idle: false,
     },
+    Command {
+        name: "clear",
+        usage: "/clear",
+        description: "新しい会話（/new と同じ確認）",
+        needs_idle: true,
+    },
+    Command {
+        name: "exit",
+        usage: "/exit",
+        description: "終了（/quit と同じ）",
+        needs_idle: false,
+    },
+    Command {
+        name: "stop",
+        usage: "/stop",
+        description: "中止（/cancel と同じ）",
+        needs_idle: false,
+    },
+    Command {
+        name: "resume",
+        usage: "/resume",
+        description: "DSH: 保存会話を再開（/sessions）",
+        needs_idle: true,
+    },
 ];
 #[derive(Debug, PartialEq)]
 pub(super) enum Invocation {
     Help,
     Models,
     Model(String, String),
+    Mode(Option<String>),
+    Plan(Option<bool>),
+    Permission(Option<String>),
     New,
     Status,
     Diagnostics,
@@ -122,19 +167,47 @@ pub(super) fn parse(text: &str) -> Option<Result<Invocation>> {
         if command.name == "model" && parts.len() == 3 {
             return Ok(Invocation::Model(parts[1].into(), parts[2].into()));
         }
+        if command.name == "mode" && parts.len() <= 2 {
+            return match parts.get(1).copied() {
+                None => Ok(Invocation::Mode(None)),
+                Some("normal" | "act") => Ok(Invocation::Mode(Some("normal".into()))),
+                Some("plan") => Ok(Invocation::Mode(Some("plan".into()))),
+                _ => Err(anyhow::anyhow!("使い方: {}", command.usage)),
+            };
+        }
+        if command.name == "plan" && parts.len() <= 2 {
+            return match parts.get(1).copied() {
+                None => Ok(Invocation::Plan(None)),
+                Some("on") => Ok(Invocation::Plan(Some(true))),
+                Some("off") => Ok(Invocation::Plan(Some(false))),
+                _ => Err(anyhow::anyhow!("使い方: {}", command.usage)),
+            };
+        }
+        if command.name == "permission" && parts.len() <= 2 {
+            let id = parts.get(1).copied();
+            if id.is_some_and(|id| {
+                id.len() > 100
+                    || !id
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"_-.:".contains(&c))
+            }) {
+                bail!("パーミッションIDが不正です");
+            }
+            return Ok(Invocation::Permission(id.map(str::to_owned)));
+        }
         if parts.len() != 1 {
             bail!("使い方: {}", command.usage);
         }
         Ok(match command.name {
             "help" => Invocation::Help,
             "model" | "models" => Invocation::Models,
-            "new" => Invocation::New,
+            "new" | "clear" => Invocation::New,
             "status" | "usage" => Invocation::Status,
             "diagnostics" => Invocation::Diagnostics,
             "logs" => Invocation::Logs,
-            "cancel" => Invocation::Cancel,
-            "quit" => Invocation::Quit,
-            "sessions" => Invocation::Sessions,
+            "cancel" | "stop" => Invocation::Cancel,
+            "quit" | "exit" => Invocation::Quit,
+            "sessions" | "resume" => Invocation::Sessions,
             "plugins" => Invocation::Plugins,
             "settings" => Invocation::Settings,
             _ => unreachable!(),
@@ -197,7 +270,7 @@ impl App {
                     .unwrap_or(selected);
                 self.editor.text = format!("/{}", selected.name);
                 if key.code == KeyCode::Tab {
-                    if selected.name == "model" {
+                    if matches!(selected.name, "model" | "mode" | "plan" | "permission") {
                         self.editor.text.push(' ');
                     }
                     self.editor.cursor = self.editor.text.len();
@@ -229,7 +302,13 @@ impl App {
         if busy
             && matches!(
                 command,
-                Invocation::Models | Invocation::Model(..) | Invocation::New | Invocation::Sessions
+                Invocation::Models
+                    | Invocation::Model(..)
+                    | Invocation::Mode(..)
+                    | Invocation::Plan(..)
+                    | Invocation::Permission(..)
+                    | Invocation::New
+                    | Invocation::Sessions
             )
         {
             self.notice = "実行中は変更できません。/cancel で中止してから操作してください".into();
@@ -238,7 +317,7 @@ impl App {
         self.notice.clear();
         match command {
             Invocation::Quit => return Some(true),
-            Invocation::Help => self.overlay = Overlay::Help,
+            Invocation::Help => self.open_details(Overlay::Help),
             Invocation::Status => self.open_details(Overlay::Status),
             Invocation::Diagnostics => self.open_details(Overlay::Diagnostics),
             Invocation::Logs => self.open_details(Overlay::Logs),
@@ -265,6 +344,86 @@ impl App {
                 ) {
                     return None;
                 }
+            }
+            Invocation::Mode(None) | Invocation::Permission(None) => {
+                match backend.request("/api/controls", json!({})) {
+                    Ok(value) => self.open_details(Overlay::ReadOnly {
+                        title: " モード・パーミッション ",
+                        content: controls_content(&value),
+                    }),
+                    Err(error) => {
+                        self.notice = backend.redact(&error.to_string());
+                        return None;
+                    }
+                }
+            }
+            Invocation::Mode(Some(mode)) => {
+                if !self.change_control("/api/mode", json!({"mode":mode}), backend) {
+                    return None;
+                }
+            }
+            Invocation::Plan(value) => {
+                let on = if let Some(on) = value {
+                    on
+                } else {
+                    let controls = match backend.request("/api/controls", json!({})) {
+                        Ok(value) => value,
+                        Err(error) => {
+                            self.notice = backend.redact(&error.to_string());
+                            return None;
+                        }
+                    };
+                    let active = match controls["mode"].as_str() {
+                        Some("plan") => true,
+                        Some("normal") => false,
+                        _ => {
+                            self.notice="計画状態を取得できません。/mode plan または /mode normal を指定してください".into();
+                            return None;
+                        }
+                    };
+                    if controls["planPending"] == true {
+                        active
+                    } else {
+                        !active
+                    }
+                };
+                if !self.change_control(
+                    "/api/mode",
+                    json!({"mode":if on {"plan"}else{"normal"}}),
+                    backend,
+                ) {
+                    return None;
+                }
+            }
+            Invocation::Permission(Some(preset)) => {
+                let controls = match backend.request("/api/controls", json!({})) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        self.notice = backend.redact(&error.to_string());
+                        return None;
+                    }
+                };
+                let Some(row) = controls["permissions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|r| r["id"] == preset && r["selectable"] != false)
+                else {
+                    self.notice="選択可能な権限プリセットではありません。/permission で候補を確認してください".into();
+                    return None;
+                };
+                let description = format!(
+                    "{}: {}",
+                    row["name"].as_str().unwrap_or(&preset),
+                    row["description"]
+                        .as_str()
+                        .unwrap_or("権限プリセットを変更します")
+                );
+                self.open_details(Overlay::Permission {
+                    preset,
+                    description,
+                    confirm: false,
+                });
             }
             Invocation::Cancel => backend.cancel(),
             Invocation::Sessions => {
@@ -314,6 +473,27 @@ impl App {
             }
         }
         Some(false)
+    }
+    pub(super) fn change_control(
+        &mut self,
+        path: &str,
+        body: Value,
+        backend: &dyn HarnessBackend,
+    ) -> bool {
+        match backend.request(path, body) {
+            Ok(value) => {
+                self.notice = backend.redact(
+                    value["message"]
+                        .as_str()
+                        .unwrap_or("モード・パーミッションを変更しました"),
+                );
+                true
+            }
+            Err(error) => {
+                self.notice = backend.redact(&error.to_string());
+                false
+            }
+        }
     }
     pub(super) fn new_chat(&mut self, backend: &dyn HarnessBackend) -> bool {
         if let Err(error) = backend.reset() {
@@ -387,6 +567,55 @@ fn redact_json_fields(value: &mut Value) {
         _ => {}
     }
 }
+fn controls_content(value: &Value) -> String {
+    let mut lines = vec![
+        format!(
+            "動作モード: {}{}",
+            value["mode"].as_str().unwrap_or("未対応／未取得"),
+            if value["planPending"] == true {
+                "（切替待ち）"
+            } else {
+                ""
+            }
+        ),
+        format!(
+            "パーミッション: {}",
+            value["permission"].as_str().unwrap_or("未対応／未取得")
+        ),
+        String::new(),
+        "/mode normal または /mode plan、/plan [on|off] で切り替え".into(),
+    ];
+    for mode in value["modes"].as_array().into_iter().flatten() {
+        lines.push(format!(
+            "/mode {} — {}",
+            mode["id"].as_str().unwrap_or(""),
+            mode["description"].as_str().unwrap_or("")
+        ));
+    }
+    lines.push(String::new());
+    lines.push("/permission PRESET は内容を確認してから適用します".into());
+    for row in value["permissions"].as_array().into_iter().flatten() {
+        lines.push(format!(
+            "/permission {} — {}{}",
+            row["id"].as_str().unwrap_or(""),
+            row["description"].as_str().unwrap_or(""),
+            if row["selectable"] == false {
+                "（表示のみ）"
+            } else {
+                ""
+            }
+        ));
+    }
+    if value["modes"].as_array().is_none_or(Vec::is_empty) {
+        lines.push("このバックエンド構成にPlan操作はありません".into());
+    }
+    if value["permissions"].as_array().is_none_or(Vec::is_empty) {
+        lines.push("このバックエンド構成に選択可能な権限設定はありません".into());
+    }
+    lines.push("設定変更は実行停止中のみ。未知のコマンドはモデルへ送りません。".into());
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

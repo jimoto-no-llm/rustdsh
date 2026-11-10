@@ -1,5 +1,6 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+mod controls;
 #[cfg(test)]
 mod delegation_tests;
 mod devin_acp;
@@ -10,6 +11,7 @@ mod sdk;
 mod tools;
 mod tui;
 mod usage;
+mod workspace_files;
 pub use tui::cmd_native_tui;
 
 use anyhow::{bail, Result};
@@ -274,6 +276,11 @@ fn dispatch(
 ) -> Result<Value> {
     match (method, path) {
         ("GET", "/api/state") => Ok(engine.snapshot()),
+        ("POST", "/api/controls" | "/api/mode" | "/api/permission") => {
+            let value =
+                serde_json::from_str(body).map_err(|_| anyhow::anyhow!("制御指定が不正です"))?;
+            controls::request(&engine, path, value)
+        }
         ("POST", "/api/model") => {
             let mut req: ModelRequest =
                 serde_json::from_str(body).map_err(|_| anyhow::anyhow!("モデル指定が不正です"))?;

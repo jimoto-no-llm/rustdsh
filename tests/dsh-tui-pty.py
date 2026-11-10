@@ -37,7 +37,7 @@ const check=(ok,message)=>{if(!ok){log({kind:'assertion',message});throw new Err
 check(JSON.stringify(process.argv.slice(2))===JSON.stringify(['--profile','web','--no-open','--port','0']),'host CLI arguments');
 const sockets=new Set(), sessions=new Map();
 let creates=0, prompts=0, connections=0, failResume=true;
-const fresh=id=>({id,seq:0,records:[],projections:{modelSelection:{next:{provider:'demo',model:'m1'}}}});
+const fresh=id=>({id,seq:0,records:[],projections:{modelSelection:{next:{provider:'demo',model:'m1'}},plan:{active:false,pending:false},permissions:{currentValue:'safe'}}});
 const saved=fresh('saved-session');
 saved.records=[
  {type:'event',event:{seq:1,type:'assistant/message',data:{message:{content:[{type:'text',text:'RESUMED_SESSION_PROOF'}]},usage:{inputTokens:1,cacheReadTokens:0,cacheWriteTokens:0,outputTokens:1}},surfaceOp:{op:'append'}}},
@@ -148,6 +148,23 @@ async function rpc(method,args){
   case 'session/selectModel':{
    const r=args.request;check(sessions.has(r?.sessionId)&&r.provider==='demo'&&r.model==='m2','model selection envelope');
    projection(r.sessionId,'modelSelection',{next:{provider:r.provider,model:r.model}});return {};
+  }
+  case 'commands/list':
+   check(sessions.has(args.agentId)&&Object.keys(args).length===1,'command roster envelope');
+   return [{name:'plan',description:'Plan mode'},{name:'permission',description:'Permissions'}];
+  case 'permissionPresets/catalog':
+   check(JSON.stringify(args)==='{}','permission catalog envelope');
+   return {options:[{value:'safe',name:'Safe',description:'Every tool requires approval'},{value:'auto',name:'Auto',description:'All tools automatically approved'}],defaultOptions:[],defaultPreset:'safe'};
+  case 'commands/execute':{
+   check(sessions.has(args.agentId)&&JSON.stringify(args.submittedAttachments)==='[]'&&Object.keys(args).length===3,'command execute envelope');
+   check(['/plan','/plan off','/permission safe','/permission auto'].includes(args.line),'exact allowed command');
+   log({kind:'control-command',line:args.line});
+   if(args.line.startsWith('/plan')){
+    const on=args.line==='/plan';
+    projection(args.agentId,'plan',{active:!on,pending:true});
+    setTimeout(()=>projection(args.agentId,'plan',{active:on,pending:false}),50);
+   }else projection(args.agentId,'permissions',{currentValue:args.line.split(' ')[1]});
+   return {commandId:'fixture-command',result:{kind:'success',text:'CONTROL_COMMAND_ACCEPTED'}};
   }
   case 'pluginInventory/list':check(JSON.stringify(args)==='{}','plugins read args');return {plugins:[{name:'FIXTURE_PLUGIN_INVENTORY',enabled:true}]};
   case 'settings/describe':check(JSON.stringify(args)==='{}','settings read args');return {description:'FIXTURE_SETTINGS_READONLY',apiKey:'FIXTURE_PRIVATE_SETTING'};
@@ -297,6 +314,31 @@ def main():
         try:
             client.wait("DSH runtime")
             client.wait("待機中")
+            client.command("/mode")
+            client.wait("モード・パーミッション")
+            client.wait("safe")
+            client.dismiss("モード・パーミッション")
+            client.command("/mode plan")
+            client.wait_wire(lambda rows: any(row["kind"]=="control-command" and row["line"]=="/plan" for row in rows))
+            client.wait("[plan · safe]")
+            client.command("/plan off")
+            client.wait("[normal · safe]")
+            client.command("/permission auto")
+            client.wait("パーミッション変更の確認")
+            client.send("\x1b[200~y\n/permission auto\n\x1b[201~")
+            client.send("\t")
+            client.resize(41,13);client.wait("端末を42列")
+            client.send("\t\r")
+            client.resize(100,32);client.wait("パーミッション変更の確認")
+            client.send("\r");client.wait_absent("パーミッション変更の確認")
+            assert not any(row["kind"]=="control-command" and row["line"].startswith("/permission") for row in client.events())
+            client.command("/permission auto");client.wait("パーミッション変更の確認")
+            client.send("\t\r");client.wait("[normal · auto]")
+            client.command("/permission safe");client.wait("パーミッション変更の確認")
+            client.send("\t\r");client.wait("[normal · safe]")
+            assert not rpc_rows(client.events(), "session/prompt"), "control commands became prompts"
+            client.command("/mode auto");client.wait("使い方: /mode")
+            client.send("\x15")
             client.send("deny\r")
             client.wait("STREAM_BEFORE_APPROVAL")
             client.wait("操作の承認")
@@ -359,6 +401,10 @@ def main():
             client.wait("demo / m2")
             client.send("slow\r")
             client.wait_wire(lambda rows: any(row["kind"] == "slow" for row in rows))
+            before_controls=len([row for row in client.events() if row["kind"]=="control-command"])
+            client.command("/mode plan");client.wait("実行中は変更できません")
+            client.send("\x15")
+            assert len([row for row in client.events() if row["kind"]=="control-command"])==before_controls
             cancels = len(rpc_rows(client.events(), "session/cancel"))
             client.send("\x03")
             client.wait_wire(lambda rows: len(rpc_rows(rows, "session/cancel")) > cancels)

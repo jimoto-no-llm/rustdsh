@@ -31,7 +31,7 @@ fn default_timeout() -> u64 {
     60
 }
 
-fn safe_path(path: &str) -> Result<()> {
+pub(super) fn safe_path(path: &str) -> Result<()> {
     if path.is_empty() || path.len() > 4096 {
         bail!("ファイルパスが不正です");
     }
@@ -55,6 +55,7 @@ fn safe_path(path: &str) -> Result<()> {
 }
 pub fn validate(call: &Call) -> Result<()> {
     match call.name.as_str() {
+        "write" => super::workspace_files::validate_write(&call.arguments),
         "read" => {
             let args: ReadArgs = serde_json::from_value(call.arguments.clone())
                 .map_err(|_| anyhow::anyhow!("readの引数が不正です"))?;
@@ -100,6 +101,23 @@ pub fn validate_target(engine: &Engine, call: &Call) -> Result<()> {
     Ok(())
 }
 #[cfg(unix)]
+fn read_open_error(error: std::io::Error, path: Option<&str>) -> anyhow::Error {
+    let target = path
+        .map(|path| format!("ファイル {}", json!(path)))
+        .unwrap_or_else(|| "ワークスペース".into());
+    let reason = match error.raw_os_error() {
+        Some(libc::ELOOP) => "symlinkは許可されません",
+        // O_DIRECTORY | O_NOFOLLOW can report ENOTDIR for an ancestor symlink.
+        Some(libc::ENOTDIR) => "親がディレクトリではない、またはsymlinkです",
+        _ => match error.kind() {
+            std::io::ErrorKind::NotFound => "ファイルまたは親ディレクトリが見つかりません",
+            std::io::ErrorKind::PermissionDenied => "読取り権限がありません",
+            _ => "安全に開けません",
+        },
+    };
+    anyhow::anyhow!("{target}を開けません（{reason}）")
+}
+#[cfg(unix)]
 fn open_file(workspace: &Path, path: &str) -> Result<std::fs::File> {
     use std::ffi::CString;
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -114,7 +132,7 @@ fn open_file(workspace: &Path, path: &str) -> Result<std::fs::File> {
         )
     };
     if fd < 0 {
-        bail!("ワークスペースを開けません");
+        return Err(read_open_error(std::io::Error::last_os_error(), None));
     }
     let mut parent = unsafe { OwnedFd::from_raw_fd(fd) };
     let parts: Vec<_> = Path::new(path).components().collect();
@@ -134,7 +152,7 @@ fn open_file(workspace: &Path, path: &str) -> Result<std::fs::File> {
             };
         let next = unsafe { libc::openat(parent.as_raw_fd(), name.as_ptr(), flags) };
         if next < 0 {
-            bail!("ファイルを開けません（symlinkは許可されません）");
+            return Err(read_open_error(std::io::Error::last_os_error(), Some(path)));
         }
         parent = unsafe { OwnedFd::from_raw_fd(next) };
     }
@@ -162,6 +180,9 @@ fn read_file(workspace: &Path, path: &str) -> Result<Value> {
 pub async fn execute(engine: &Engine, run_id: u64, call: &Call) -> Result<Value> {
     validate_target(engine, call)?;
     match call.name.as_str() {
+        "write" => engine.with_current_run(run_id, || {
+            super::workspace_files::write_file(&engine.workspace, &call.arguments)
+        }),
         "read" => {
             let args: ReadArgs = serde_json::from_value(call.arguments.clone())?;
             engine.with_current_run(run_id, || read_file(&engine.workspace, &args.path))
@@ -237,7 +258,61 @@ mod tests {
         assert_eq!(read_file(&root, "file.txt").unwrap()["content"], "nonce");
         std::fs::write(root.join("large"), vec![b'x'; 65537]).unwrap();
         assert!(read_file(&root, "large").is_err());
-        assert!(read_file(&root, "missing").is_err());
+        let missing = read_file(&root, "missing").unwrap_err().to_string();
+        assert!(missing.contains("\"missing\""));
+        assert!(missing.contains("見つかりません"));
+        assert!(!missing.contains("symlink"));
+        std::fs::write(root.join("invalid-utf8"), [0xff]).unwrap();
+        assert!(read_file(&root, "invalid-utf8")
+            .unwrap_err()
+            .to_string()
+            .contains("UTF-8"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn open_errors_distinguish_access_path_and_link_failures() {
+        for (errno, expected) in [
+            (libc::ENOENT, "見つかりません"),
+            (libc::EACCES, "読取り権限がありません"),
+            (libc::EPERM, "読取り権限がありません"),
+            (libc::ENOTDIR, "親がディレクトリではない、またはsymlinkです"),
+            (libc::ELOOP, "symlinkは許可されません"),
+            (libc::EIO, "安全に開けません"),
+        ] {
+            let error = read_open_error(
+                std::io::Error::from_raw_os_error(errno),
+                Some("nested/package.json"),
+            )
+            .to_string();
+            assert!(error.contains("\"nested/package.json\""), "{error}");
+            assert!(error.contains(expected), "{error}");
+            assert!(!error.contains("os error"), "{error}");
+        }
+        let escaped = read_open_error(
+            std::io::Error::from_raw_os_error(libc::ENOENT),
+            Some("line\nbreak"),
+        )
+        .to_string();
+        assert!(escaped.contains("line\\nbreak"));
+        assert!(!escaped.contains('\n'));
+    }
+    #[cfg(unix)]
+    #[test]
+    fn missing_workspace_and_non_directory_parent_have_specific_errors() {
+        let root = fixture();
+        let missing = read_file(&root.join("missing"), "package.json")
+            .unwrap_err()
+            .to_string();
+        assert!(missing.contains("ワークスペースを開けません"));
+        assert!(missing.contains("見つかりません"));
+        assert!(!missing.contains(root.to_str().unwrap()));
+        std::fs::write(root.join("file"), "nonce").unwrap();
+        let non_directory = read_file(&root, "file/package.json")
+            .unwrap_err()
+            .to_string();
+        assert!(non_directory.contains("\"file/package.json\""));
+        assert!(non_directory.contains("親がディレクトリではない"));
         std::fs::remove_dir_all(root).unwrap();
     }
     #[cfg(not(unix))]
@@ -253,8 +328,12 @@ mod tests {
         let root = fixture();
         symlink("/etc/passwd", root.join("file")).unwrap();
         symlink("/etc", root.join("folder")).unwrap();
-        assert!(read_file(&root, "file").is_err());
-        assert!(read_file(&root, "folder/passwd").is_err());
+        for path in ["file", "folder/passwd"] {
+            let error = read_file(&root, path).unwrap_err().to_string();
+            assert!(error.contains(&json!(path).to_string()), "{error}");
+            assert!(error.contains("symlink"), "{error}");
+            assert!(!error.contains("/etc"), "{error}");
+        }
         std::fs::remove_dir_all(root).unwrap();
     }
 }
