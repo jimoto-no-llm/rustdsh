@@ -31,10 +31,9 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::process::Command;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, ensure, Result};
 use serde::{Deserialize, Serialize};
@@ -168,38 +167,9 @@ pub(crate) fn parse_installed_version(output: &str) -> Option<Version> {
 
 // --------------------------------------------------------------- processes
 
-/// Run a command with a hard time limit; Some((success, stdout)) when it
-/// finished in time, None when it could not start or had to be killed.
-fn run_capture(mut command: Command, timeout: Duration) -> Option<(bool, String)> {
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    let mut child = command.spawn().ok()?;
-    let mut stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
-        let mut out = Vec::new();
-        let _ = (&mut stdout).take(64 * 1024).read_to_end(&mut out);
-        out
-    });
-    let deadline = Instant::now() + timeout;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            // Timed out or lost track of the child: kill it and walk away
-            // without joining the reader, which a stray grandchild could hold.
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    };
-    let out = reader.join().ok()?;
-    Some((status.success(), String::from_utf8_lossy(&out).into_owned()))
+fn run_capture(command: Command, timeout: Duration) -> Option<String> {
+    let out = crate::dsh_env::run_bounded_capture(command, 64 * 1024, timeout)?;
+    Some(String::from_utf8_lossy(&out).into_owned())
 }
 
 /// What running `<binary> --version` told us.
@@ -214,7 +184,7 @@ fn probe_binary(path: &Path) -> Probe {
     let mut command = Command::new(path);
     command.arg("--version");
     match run_capture(command, PROBE_TIMEOUT) {
-        Some((true, out)) => Probe {
+        Some(out) => Probe {
             runs: true,
             version: parse_installed_version(&out),
         },
@@ -950,6 +920,8 @@ fn spawn_worker() {
 /// plugins updater starts its worker through the same code.
 #[cfg(not(test))]
 pub(crate) fn spawn_detached(args: &[&str]) {
+    use std::process::Stdio;
+
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
@@ -1219,6 +1191,8 @@ mod tests {
     use super::*;
     use std::cell::Cell;
     use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+    #[cfg(unix)]
+    use std::time::Instant;
 
     fn v(text: &str) -> Version {
         parse_version(text).unwrap()
@@ -1293,8 +1267,7 @@ mod tests {
     fn run_capture_returns_output_and_enforces_the_timeout() {
         let mut ok = Command::new("sh");
         ok.args(["-c", "echo RustXNG 0.4.1"]);
-        let (success, out) = run_capture(ok, Duration::from_secs(5)).unwrap();
-        assert!(success);
+        let out = run_capture(ok, Duration::from_secs(5)).unwrap();
         assert_eq!(parse_installed_version(&out), Some(v("0.4.1")));
 
         let mut slow = Command::new("sh");
@@ -1306,6 +1279,38 @@ mod tests {
         assert!(
             run_capture(Command::new("/nonexistent/rustxng"), Duration::from_secs(1)).is_none()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_capture_deadline_includes_stdout_after_the_child_exits() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf 'RustXNG 9.9.9\\n'; sleep 3 & exit 0"]);
+        let started = Instant::now();
+        let result = run_capture(command, Duration::from_millis(100));
+        assert!(
+            result.is_none(),
+            "inherited stdout must respect the deadline"
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_capture_rejects_version_output_from_a_failed_command() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf 'RustXNG 9.9.9\\n'; exit 7"]);
+        assert!(run_capture(command, Duration::from_secs(2)).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_capture_caps_successful_output() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf '%065537d' 0"]);
+        let output = run_capture(command, Duration::from_secs(2)).unwrap();
+        assert_eq!(output.len(), 64 * 1024);
+        assert!(output.bytes().all(|byte| byte == b'0'));
     }
 
     #[test]
