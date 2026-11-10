@@ -287,7 +287,8 @@ async function projectState(projectId, home = stateHome()) {
     throw error;
   }
   if (
-    value.schema !== 1 ||
+    ![1, 2].includes(value.schema) ||
+    (value.schema === 2 && !Array.isArray(value.changes)) ||
     value.project?.id !== projectId ||
     !Number.isSafeInteger(value.revision) ||
     !Array.isArray(value.tasks) ||
