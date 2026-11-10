@@ -66,6 +66,11 @@ enum Overlay {
     New {
         confirm: bool,
     },
+    Permission {
+        preset: String,
+        description: String,
+        confirm: bool,
+    },
 }
 #[derive(Default)]
 struct App {
@@ -122,7 +127,9 @@ impl App {
             if let Some(form) = &mut self.question_form {
                 form.clear_answers();
             }
-            if let Overlay::New { confirm } = &mut self.overlay {
+            if let Overlay::New { confirm } | Overlay::Permission { confirm, .. } =
+                &mut self.overlay
+            {
                 *confirm = false;
             }
         }
@@ -404,6 +411,58 @@ impl App {
             }
             return false;
         }
+        if matches!(self.overlay, Overlay::Permission { .. }) {
+            let scrolled = match key.code {
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.scroll_details(if key.code == KeyCode::Up { -1 } else { -8 });
+                    true
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.scroll_details(if key.code == KeyCode::Down { 1 } else { 8 });
+                    true
+                }
+                KeyCode::Home => {
+                    self.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.detail_scroll = self.detail_max_scroll;
+                    true
+                }
+                _ => false,
+            };
+            if scrolled {
+                return false;
+            }
+        }
+        if let Overlay::Permission {
+            preset, confirm, ..
+        } = &mut self.overlay
+        {
+            match key.code {
+                KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
+                    *confirm = !*confirm
+                }
+                KeyCode::Esc => self.overlay = Overlay::None,
+                KeyCode::Enter if key.kind == KeyEventKind::Press => {
+                    let confirmed = *confirm;
+                    let preset = preset.clone();
+                    if !confirmed
+                        || self.change_control(
+                            "/api/permission",
+                            json!({"preset":preset,"confirmed":true}),
+                            backend,
+                        )
+                    {
+                        self.overlay = Overlay::None;
+                    } else if let Overlay::Permission { confirm, .. } = &mut self.overlay {
+                        *confirm = false;
+                    }
+                }
+                _ => {}
+            }
+            return false;
+        }
         if let Overlay::New { confirm } = &mut self.overlay {
             match key.code {
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
@@ -514,7 +573,7 @@ impl App {
             return quit;
         }
         match key.code {
-            KeyCode::F(1) => self.overlay = Overlay::Help,
+            KeyCode::F(1) => self.open_details(Overlay::Help),
             KeyCode::F(2) => {
                 if busy {
                     self.notice = "実行を中止してからモデルを変更してください（Esc）".into();

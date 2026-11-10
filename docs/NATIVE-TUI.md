@@ -63,6 +63,24 @@ rdsh native-tui --workspace /absolute/path/to/project \
 縮小中もEscで拒否・キャンセル、Ctrl+Cで中止、Ctrl+Qで終了できます。
 フルスクリーン、raw mode、マウス入力、Bracketed Pasteは終了時に解除します。
 
+## Planとパーミッション
+
+- `/mode` は現在のモード・権限と候補を表示します。
+- `/mode plan`、`/plan on` で計画、`/mode normal`（`act`も可）、`/plan off` で通常に戻します。
+  裸の `/plan` は切替です。実行中・承認待ち中は変更できません。
+- `/permission` で候補と効果を確認し、`/permission ask` または
+  `/permission read-only` で変更の確認画面を開きます。初期選択は「戻る」です。
+  Tabで「設定を適用」を選んでEnterを押すまで変更しません。
+
+Rust独立モードの `plan` と `read-only` はDevinの起動をRustの実行ゲートで禁止します。
+`read`・`model_call` は引き続き毎回承認が必要です。`ask`でも自動承認は行いません。
+設定は現在のプロセス内だけで有効で、`/new`でも保持します。起動時は通常・毎回確認です。
+画面上部と `/status` に現在の状態を表示します。
+
+`/clear` は `/new`（同じ確認画面）、`/exit` は `/quit`、`/stop` は `/cancel`、
+`/resume` はDSH専用の `/sessions` の別名です。`/help`は上下・PgUp/Dnで全候補を閲覧できます。
+権限確認への貼付けは操作にならず、狭い端末にした後は選択が「戻る」へ戻ります。
+
 ## 承認
 
 ツール要求が来ると、ツール名・理由・引数を専用画面に表示します。
