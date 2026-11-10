@@ -1,9 +1,11 @@
 //! Full-screen terminal client shared by harness backends.
+mod admin;
 pub(super) mod backend;
 mod commands;
 mod dsh;
 mod editor;
 mod questions;
+mod terminal;
 mod view;
 
 use super::create_engine;
@@ -51,6 +53,8 @@ enum Overlay {
         query: Editor,
         selected: usize,
     },
+    Admin,
+    Terminal,
     Help,
     Status,
     Logs,
@@ -66,10 +70,17 @@ enum Overlay {
     New {
         confirm: bool,
     },
+    Permission {
+        preset: String,
+        description: String,
+        confirm: bool,
+    },
 }
 #[derive(Default)]
 struct App {
     editor: Editor,
+    admin: Option<admin::Panel>,
+    terminal: Option<terminal::Pane>,
     overlay: Overlay,
     notice: String,
     scroll: usize,
@@ -119,10 +130,18 @@ impl App {
         if !self.input_visible {
             // A hidden dialog must not retain a previously selected confirmation.
             self.allow = false;
+            if let Some(panel) = &mut self.admin {
+                panel.clear_confirmation();
+            }
+            if let Some(pane) = &mut self.terminal {
+                pane.clear_confirmation();
+            }
             if let Some(form) = &mut self.question_form {
                 form.clear_answers();
             }
-            if let Overlay::New { confirm } = &mut self.overlay {
+            if let Overlay::New { confirm } | Overlay::Permission { confirm, .. } =
+                &mut self.overlay
+            {
                 *confirm = false;
             }
         }
@@ -142,6 +161,12 @@ impl App {
                 if !form.paste(value) {
                     self.notice = "自由入力は16KiB以内にしてください".into();
                 }
+            }
+            return;
+        }
+        if matches!(self.overlay, Overlay::Admin) {
+            if let Some(panel) = &mut self.admin {
+                panel.paste(value);
             }
             return;
         }
@@ -204,6 +229,14 @@ impl App {
                     }
                 }
             }
+        }
+    }
+    fn clear_session_panels(&mut self, backend: &dyn HarnessBackend) {
+        if let Some(mut panel) = self.admin.take() {
+            panel.cancel(backend);
+        }
+        if let Some(mut pane) = self.terminal.take() {
+            pane.cancel(backend);
         }
     }
     fn open_details(&mut self, overlay: Overlay) {
@@ -319,7 +352,37 @@ impl App {
         let busy = self.has_pending()
             || matches!(snapshot["status"].as_str(), Some("running" | "approval"));
         if ctrl && key.code == KeyCode::Char('q') {
+            if let Some(panel) = &mut self.admin {
+                panel.cancel(backend);
+            }
+            if let Some(pane) = &mut self.terminal {
+                pane.cancel(backend);
+            }
             return true;
+        }
+        if matches!(self.overlay, Overlay::Terminal) && !self.has_pending() {
+            if let Some(pane) = &mut self.terminal {
+                if self.input_visible {
+                    match pane.key(key, backend) {
+                        Ok(true) => self.overlay = Overlay::None,
+                        Ok(false) => {}
+                        Err(error) => self.notice = backend.redact(&error.to_string()),
+                    }
+                }
+            }
+            return false;
+        }
+        if matches!(self.overlay, Overlay::Admin) && !self.has_pending() {
+            if let Some(panel) = &mut self.admin {
+                if (self.input_visible
+                    || (ctrl && key.code == KeyCode::Char('c'))
+                    || key.code == KeyCode::Esc)
+                    && panel.key(key, backend)
+                {
+                    self.overlay = Overlay::None;
+                }
+            }
+            return false;
         }
         if ctrl && key.code == KeyCode::Char('c') {
             if busy {
@@ -404,6 +467,58 @@ impl App {
             }
             return false;
         }
+        if matches!(self.overlay, Overlay::Permission { .. }) {
+            let scrolled = match key.code {
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.scroll_details(if key.code == KeyCode::Up { -1 } else { -8 });
+                    true
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.scroll_details(if key.code == KeyCode::Down { 1 } else { 8 });
+                    true
+                }
+                KeyCode::Home => {
+                    self.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.detail_scroll = self.detail_max_scroll;
+                    true
+                }
+                _ => false,
+            };
+            if scrolled {
+                return false;
+            }
+        }
+        if let Overlay::Permission {
+            preset, confirm, ..
+        } = &mut self.overlay
+        {
+            match key.code {
+                KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
+                    *confirm = !*confirm
+                }
+                KeyCode::Esc => self.overlay = Overlay::None,
+                KeyCode::Enter if key.kind == KeyEventKind::Press => {
+                    let confirmed = *confirm;
+                    let preset = preset.clone();
+                    if !confirmed
+                        || self.change_control(
+                            "/api/permission",
+                            json!({"preset":preset,"confirmed":true}),
+                            backend,
+                        )
+                    {
+                        self.overlay = Overlay::None;
+                    } else if let Overlay::Permission { confirm, .. } = &mut self.overlay {
+                        *confirm = false;
+                    }
+                }
+                _ => {}
+            }
+            return false;
+        }
         if let Overlay::New { confirm } = &mut self.overlay {
             match key.code {
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
@@ -458,6 +573,7 @@ impl App {
                 KeyCode::Enter if key.kind == KeyEventKind::Press => {
                     if let Some(row) = items.get(*selected).cloned() {
                         if self.call("/api/resume", json!({"sessionId":row.id}), backend) {
+                            self.clear_session_panels(backend);
                             self.editor.clear();
                             self.history.clear();
                             self.history_index = None;
@@ -514,7 +630,7 @@ impl App {
             return quit;
         }
         match key.code {
-            KeyCode::F(1) => self.overlay = Overlay::Help,
+            KeyCode::F(1) => self.open_details(Overlay::Help),
             KeyCode::F(2) => {
                 if busy {
                     self.notice = "実行を中止してからモデルを変更してください（Esc）".into();
@@ -673,6 +789,14 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
     while !crate::shutdown::requested() {
         let snapshot = backend.snapshot();
         app.sync_pending(&snapshot);
+        if let Some(panel) = &mut app.admin {
+            panel.poll(backend);
+        }
+        if let Some(pane) = &mut app.terminal {
+            let size = terminal.size()?;
+            pane.resize(size.width, size.height, backend);
+            pane.poll(backend);
+        }
         terminal.draw(|frame| view::draw(frame, &mut app, &snapshot, started.elapsed()))?;
         if !event::poll(Duration::from_millis(100))? {
             continue;
@@ -686,6 +810,17 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
             Event::Key(key) => {
                 if app.key(key, &snapshot, backend) {
                     break;
+                }
+            }
+            Event::Paste(value)
+                if matches!(app.overlay, Overlay::Terminal) && !app.has_pending() =>
+            {
+                if app.input_visible {
+                    if let Some(pane) = &mut app.terminal {
+                        if let Err(error) = pane.paste(&value, backend) {
+                            app.notice = backend.redact(&error.to_string());
+                        }
+                    }
                 }
             }
             Event::Paste(value) => app.paste(&value),
@@ -702,6 +837,15 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
                         .saturating_add_signed(delta)
                         .min(form.max_scroll);
                     form.follow_focus = false;
+                }
+            }
+            Event::Mouse(mouse) if matches!(app.overlay, Overlay::Admin) => {
+                if let Some(panel) = &mut app.admin {
+                    match mouse.kind {
+                        MouseEventKind::ScrollUp => panel.scroll(-3),
+                        MouseEventKind::ScrollDown => panel.scroll(3),
+                        _ => {}
+                    }
                 }
             }
             Event::Mouse(mouse) => match mouse.kind {
@@ -733,6 +877,12 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
             },
             _ => {}
         }
+    }
+    if let Some(panel) = &mut app.admin {
+        panel.cancel(backend);
+    }
+    if let Some(pane) = &mut app.terminal {
+        pane.cancel(backend);
     }
     Ok(())
 }

@@ -820,3 +820,297 @@ fn header_and_new_chat_describe_actual_backend_and_persistence() {
     native.overlay = Overlay::New { confirm: false };
     assert!(render(&mut native, &engine.snapshot(), 120, 40).contains("元の会話には戻れません"));
 }
+
+#[test]
+fn control_commands_and_aliases_parse_without_accepting_extra_actions() {
+    use commands::{parse, Invocation::*};
+    for (text, expected) in [
+        ("/mode plan", Mode(Some("plan".into()))),
+        ("/mode act", Mode(Some("normal".into()))),
+        ("/plan", Plan(None)),
+        ("/plan off", Plan(Some(false))),
+        (
+            "/permission read-only",
+            Permission(Some("read-only".into())),
+        ),
+        (
+            "/permission full-access",
+            Permission(Some("full-access".into())),
+        ),
+        ("/clear", New),
+        ("/exit", Quit),
+        ("/stop", Cancel),
+        ("/resume", Sessions),
+    ] {
+        assert_eq!(parse(text).unwrap().unwrap(), expected);
+    }
+    for text in [
+        "/mode auto",
+        "/plan execute this task",
+        "/permission auto extra",
+        "/permission ;shell",
+        "/clear now",
+        "/mode plan\n/permission auto",
+    ] {
+        assert!(parse(text).unwrap().is_err(), "{text}");
+    }
+}
+
+#[test]
+fn permission_changes_require_visible_confirmation_and_new_preserves_controls() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    app.editor.insert("/mode plan");
+    app.submit(&backend);
+    assert_eq!(engine.snapshot()["controls"]["mode"], "plan");
+    app.editor.insert("/permission read-only");
+    app.submit(&backend);
+    assert!(matches!(
+        app.overlay,
+        Overlay::Permission { confirm: false, .. }
+    ));
+    app.paste("\t\n/permission ask\n");
+    assert_eq!(engine.snapshot()["controls"]["permission"], "ask");
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.set_size(41, 13);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "ask");
+    app.set_size(100, 32);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert!(matches!(app.overlay, Overlay::None));
+    app.editor.insert("/permission read-only");
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "read-only");
+    app.editor.insert("/clear");
+    app.submit(&backend);
+    assert!(matches!(app.overlay, Overlay::New { confirm: false }));
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["mode"], "plan");
+    assert_eq!(engine.snapshot()["controls"]["permission"], "read-only");
+    assert!(render(&mut app, &engine.snapshot(), 120, 40).contains("plan"));
+    app.editor.insert("/plan off");
+    app.submit(&backend);
+    assert_eq!(engine.snapshot()["controls"]["mode"], "normal");
+}
+
+#[test]
+fn controls_are_not_changed_while_generating_or_approving() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    for status in ["running", "approval"] {
+        engine.state.lock().unwrap().status = status.into();
+        for text in [
+            "/mode plan",
+            "/plan on",
+            "/permission read-only",
+            "/permission full-access",
+        ] {
+            app.editor.clear();
+            app.editor.insert(text);
+            app.submit(&backend);
+            assert_eq!(app.editor.text, text);
+            assert!(app.notice.contains("実行中"));
+        }
+    }
+    assert_eq!(engine.snapshot()["controls"]["mode"], "normal");
+    assert_eq!(engine.snapshot()["controls"]["permission"], "ask");
+}
+
+#[test]
+fn native_full_access_requires_confirmation_and_survives_new_chat() {
+    let engine = engine();
+    let backend = backend(&engine);
+    let mut app = ready_app(&engine);
+    app.editor.insert("/permission");
+    app.submit(&backend);
+    let output = render(&mut app, &engine.snapshot(), 100, 32);
+    assert!(output.contains("/permissionfull-access"));
+    assert!(!output.contains("normalパーミッション"));
+    assert!(!output.contains("確認します/permission"));
+    app.key(key(KeyCode::Esc), &engine.snapshot(), &backend);
+    app.editor.insert("/permission full-access");
+    app.submit(&backend);
+    let output = render(&mut app, &engine.snapshot(), 100, 32);
+    assert!(output.contains("自動承認"));
+    assert!(output.contains("ネットワーク"));
+    assert!(output.contains("戻る"));
+    app.paste("\t\n");
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "ask");
+    app.editor.insert("/permission full-access");
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.set_size(41, 13);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    app.set_size(100, 32);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "ask");
+    app.editor.insert("/permission full-access");
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "full-access");
+    app.editor.insert("/new");
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &engine.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &engine.snapshot(), &backend);
+    assert_eq!(engine.snapshot()["controls"]["permission"], "full-access");
+    assert!(render(&mut app, &engine.snapshot(), 120, 40).contains("full-access"));
+}
+
+#[test]
+fn dsh_permissions_keep_host_ids_and_require_an_explicit_confirmation() {
+    let backend = TestHarness::new();
+    backend.replies.lock().unwrap().insert(
+        "/api/controls".into(),
+        json!({"mode":"normal","permission":"safe","permissions":[
+        {"id":"safe","name":"Safe","description":"Host safe rules"},
+        {"id":"auto","name":"Auto","description":"Host automatically approves tools"},
+        {"id":"custom","name":"Custom","selectable":false}]}),
+    );
+    let mut app = backend.app();
+    app.editor.insert("/permission auto");
+    app.submit(&backend);
+    assert!(matches!(
+        app.overlay,
+        Overlay::Permission { confirm: false, .. }
+    ));
+    assert!(render(&mut app, &backend.snapshot(), 100, 32).contains("automatically"));
+    app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+    assert!(!backend
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r.0 == "/api/permission"));
+    app.editor.insert("/permission auto");
+    app.submit(&backend);
+    app.key(key(KeyCode::Tab), &backend.snapshot(), &backend);
+    app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+    assert_eq!(
+        backend.requests.lock().unwrap().last().unwrap(),
+        &(
+            "/api/permission".into(),
+            json!({"preset":"auto","confirmed":true})
+        )
+    );
+    app.editor.insert("/permission custom");
+    app.submit(&backend);
+    assert_eq!(app.editor.text, "/permission custom");
+    assert!(app.notice.contains("選択可能"));
+    assert!(backend.state.lock().unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn unsupported_control_views_keep_input_and_help_lists_all_aliases() {
+    let backend = TestHarness::new();
+    *backend.fail_path.lock().unwrap() = Some("/api/controls".into());
+    let mut app = backend.app();
+    app.editor.insert("/permission");
+    app.submit(&backend);
+    assert_eq!(app.editor.text, "/permission");
+    assert!(app.notice.contains("failed"));
+    assert!(matches!(app.overlay, Overlay::None));
+    let engine = engine();
+    let native = backend::NativeBackend::new(engine.clone(), runtime());
+    app.editor.clear();
+    app.editor.insert("/help");
+    app.submit(&native);
+    render(&mut app, &engine.snapshot(), 60, 24);
+    assert!(app.detail_max_scroll > 0);
+    app.key(key(KeyCode::End), &engine.snapshot(), &native);
+    assert!(render(&mut app, &engine.snapshot(), 60, 24).contains("/resume"));
+}
+
+#[test]
+fn long_permission_explanations_scroll_above_a_visible_confirmation_footer() {
+    let backend = TestHarness::new();
+    backend.replies.lock().unwrap().insert("/api/controls".into(),json!({"permissions":[{
+        "id":"auto","name":"Auto",
+        "description":format!("全ツールを自動承認する設定です。\n{}\nLONG_PERMISSION_END", "long permission explanation 日本語\n".repeat(80))
+    }]}));
+    let mut app = backend.app();
+    app.detail_scroll = 999;
+    app.editor.insert("/permission auto");
+    app.submit(&backend);
+    assert_eq!(
+        app.detail_scroll, 0,
+        "opening the confirmation must show the initial warning"
+    );
+    let output = render(&mut app, &backend.snapshot(), 42, 14);
+    assert!(output.contains("全ツールを自動承認"));
+    assert!(output.contains("戻る"));
+    assert!(output.contains("設定を適用"));
+    assert!(app.detail_max_scroll > 8);
+    app.key(key(KeyCode::PageDown), &backend.snapshot(), &backend);
+    assert!(app.detail_scroll > 0);
+    let output = render(&mut app, &backend.snapshot(), 42, 14);
+    assert!(output.contains("戻る"));
+    assert!(output.contains("設定を適用"));
+    app.key(key(KeyCode::End), &backend.snapshot(), &backend);
+    let output = render(&mut app, &backend.snapshot(), 42, 14);
+    assert!(output.contains("LONG_PERMISSION_END"));
+    assert!(output.contains("戻る"));
+    assert!(output.contains("設定を適用"));
+    assert!(!backend
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r.0 == "/api/permission"));
+    app.key(key(KeyCode::Enter), &backend.snapshot(), &backend);
+    assert!(matches!(app.overlay, Overlay::None));
+    assert!(!backend
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r.0 == "/api/permission"));
+}
+
+#[test]
+fn host_commands_preserve_literal_arguments_and_permission_confirmation() {
+    use commands::{parse, Invocation};
+    assert_eq!(
+        parse("/dsh compact keep literal words").unwrap().unwrap(),
+        Invocation::Dsh(Some("/compact keep literal words".into()))
+    );
+    assert_eq!(
+        parse("/dsh permission full-access").unwrap().unwrap(),
+        Invocation::Permission(Some("full-access".into()))
+    );
+    assert!(parse("/dsh compact\n/permission auto").unwrap().is_err());
+    let backend = TestHarness::new();
+    backend.replies.lock().unwrap().insert(
+        "/api/host-command".into(),
+        json!({"text":"HOST_COMMAND_DONE"}),
+    );
+    let mut app = backend.app();
+    app.editor.insert("/dsh compact keep literal words");
+    app.submit(&backend);
+    assert_eq!(
+        backend.requests.lock().unwrap().last().unwrap(),
+        &(
+            "/api/host-command".into(),
+            json!({"line":"/compact keep literal words"})
+        )
+    );
+    assert!(render(&mut app, &backend.snapshot(), 100, 32).contains("HOST_COMMAND_DONE"));
+    app.key(key(KeyCode::Esc), &backend.snapshot(), &backend);
+    backend.state.lock().unwrap()["status"] = json!("running");
+    app.editor.insert("/dsh compact");
+    app.submit(&backend);
+    assert!(app.notice.contains("実行中"));
+    assert_eq!(
+        backend.requests.lock().unwrap().last().unwrap().0,
+        "/api/host-command"
+    );
+}

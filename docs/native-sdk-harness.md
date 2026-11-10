@@ -20,7 +20,7 @@ APIと画面はキャッシュされず、他サイトからのフレーム埋�
 | --- | --- |
 | 会話履歴・モデル選択・最大12ステップの推論ループ | Rust `native_harness::engine` |
 | JSON応答とツール引数の検証 | Rust、未知フィールド・未知ツール・重複IDを拒否 |
-| 承認・拒否・キャンセル | Rust、呼び出しごとの一回限りの承認ID |
+| 承認・拒否・キャンセル | Rust、個別承認IDまたは明示選択した自動承認設定 |
 | ファイル読み取り・Devin起動 | Rust `native_harness::tools` |
 | モデルの生成 | Cursor / Antigravity公式SDKの生成専用プロセス、またはRustから登録APIへの直接通信 |
 | Webサーバー・GUI API | Rust、既存のローカルHTTPフレーミングを再利用 |
@@ -31,6 +31,9 @@ SDKごとに毎回新しい隔離用一時ディレクトリを作り、SDK内�
 subagentsを無効にします。SDKからの呼び出し提案をRustが検証し、承認後に実行し、
 結果を次のSDK呼び出しへ返します。JSON形式の不正応答だけ修正要求を1回行います。
 
+Claude CLIの親ターンは`--json-schema`で構造化し、`structured_output`をRustで再検証します。
+形式違反の通常テキストへはフォールバックしません。`model_call`の子ターンも同じ構造化応答とRustのツール実行を使います。CLIのツール・MCP・hooksは無効のままです。
+
 公式SDKの依存関係は `plugins/rdsh-direct-models/README.md` に従って用意します。
 Cursorは公式SDKの既存認証ストア、または `CURSOR_API_KEY` を利用します。
 Antigravityは `GEMINI_API_KEY` / `GOOGLE_API_KEY` の環境変数、または承認済みの
@@ -40,26 +43,30 @@ Antigravityは `GEMINI_API_KEY` / `GOOGLE_API_KEY` の環境変数、または�
 
 ## ツールと承認
 
-native実装は `read`、`devin_cli`、`model_call` を持ちます。
+native実装は `read`、`write`、`devin_cli`、`model_call` を持ちます。
 DSHの既存プラグインを自動で移植・実行するものではありません。
 
 - `read {"path":"relative/file.txt"}`: 明示したワークスペース内のUTF-8通常ファイル、
   64KiB以下。絶対パス・親への移動・隠しファイル・既知の認証ファイルを拒否します。
   Unixでは各パス成分を `openat` / `O_NOFOLLOW` で開き、承認待ち中のsymlink置換も
-  追跡しません。読み取り内容を選択中のプロバイダーへ送信する前に毎回承認が必要です。
+  追跡しません。読み取り内容を選択中のプロバイダーへ送信する前にRustの権限設定を適用します。
+  読み取り失敗は、対象の相対パスと欠損・権限不足・リンク等の理由を区別して表示します。
 - `devin_cli {"prompt":"...","timeout":60}`: Rustが固定のDevin CLIを直接起動します。
   作業ディレクトリはRustのワークスペース、promptはシェルを介さずACPのJSON-RPCで渡します。
   timeoutは1〜300秒、フレーム1MiB、通信合計8MiB、回答テキスト64KiBを上限にします。通常の認証・信頼・承認を
-  維持し、承認バイパスフラグは渡しません。毎回Rust GUIまたはTUIの承認が必要です。
+  維持し、承認バイパスフラグは渡しません。Rust GUIまたはTUIの権限設定で承認します。
   CLIの場所は `--devin-bin` で明示できます。既定は `~/.local/bin/devin` です。
-  現在はACPで起動し、Devin内部の操作承認も同じRust画面へ中継します。
+  現在はACPで起動し、Devin内部の操作承認も同じRustの権限設定で処理します。
   `processStarted` と `completed` を区別します。詳細は [NATIVE-DEVIN-ACP.md](NATIVE-DEVIN-ACP.md)。
 - `model_call {"provider":"...","model":"...","prompt":"..."}`: 登録済みの利用可能な
-  モデルへ、表示して承認した依頼文だけを送信します。親履歴は自動共有せず、相手の
-  ツール実行や再帰的な委譲は行いません。結果と実測使用量を主モデルへ返します。
+  モデルへ、Rustの権限設定で承認した依頼文だけを送信します。親履歴は自動共有せず、相手の
+  read/write/Devinは親と同じ権限設定で実行します。再帰委譲は禁止し、結果と実測使用量を主モデルへ返します。
 
 拒否は未実行のツール結果として履歴に入り、永続的な許可にはなりません。
-承認は再利用できず、キャンセル後は実行開始ゲートで新たな起動を拒否します。
+個別承認は再利用できず、キャンセル後は実行開始ゲートで新たな起動を拒否します。
+起動時は毎回確認です。TUIの `/permission full-access` を確認して選ぶと、通常モードでは
+全ツールとDevin内部操作を自動承認します。ACPには要求ごとの `allow_once` を返し、
+Devin側へ永続的な許可を保存しません。PlanではwriteとDevinは禁止、readとmodel_callは個別承認です。
 実行中プロセスは時間・出力制限で停止し、Unixではキャンセル時に子孫も終了します。
 
 会話は現在のサーバープロセスのメモリーに保存されます。ディスクへのセッション保存、
@@ -144,3 +151,7 @@ Google API仕様: [GenerateContent](https://ai.google.dev/api/generate-content)�
 
 Rust TUIとWeb GUIはモデル・ツール・使用量を共有実装で処理します。
 機能対応と実測値の意味は [NATIVE-PARITY.md](NATIVE-PARITY.md) を参照してください。
+
+`write` はworkspace内の64KiB以下のUTF-8ファイルを作成します。既存更新は `expected_content`
+による内容確認を必須とし、競合やsymlinkを拒否します。原子的な置換を使い、既存hardlinkの
+別の参照先を変更しません。非協調ライターに対する完全なcompare-and-swapではありません。

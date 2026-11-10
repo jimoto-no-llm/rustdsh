@@ -1,4 +1,5 @@
 //! Claude Code is an inference-only child; Rust owns conversation and tools.
+mod schema;
 use super::sdk::{run_process, TemporaryRoot};
 use anyhow::{bail, Result};
 use serde_json::Value;
@@ -50,6 +51,15 @@ fn command(binary: &std::ffi::OsStr, model: &str, cwd: &std::path::Path) -> Comm
     command
 }
 
+fn turn_command(binary: &std::ffi::OsStr, model: &str, cwd: &std::path::Path) -> Command {
+    let mut child = command(binary, model, cwd);
+    child
+        .arg("--json-schema")
+        .arg(schema::turn().to_string())
+        .env("MAX_STRUCTURED_OUTPUT_RETRIES", "1");
+    child
+}
+
 pub(super) async fn generate_with_usage(
     model: &str,
     prompt: &str,
@@ -57,10 +67,26 @@ pub(super) async fn generate_with_usage(
     generate_with(std::ffi::OsStr::new("claude"), model, prompt).await
 }
 
+pub(super) async fn generate_turn_with_usage(
+    model: &str,
+    prompt: &str,
+) -> Result<super::usage::Generation> {
+    generate(std::ffi::OsStr::new("claude"), model, prompt, true).await
+}
+
 async fn generate_with(
     binary: &std::ffi::OsStr,
     model: &str,
     prompt: &str,
+) -> Result<super::usage::Generation> {
+    generate(binary, model, prompt, false).await
+}
+
+async fn generate(
+    binary: &std::ffi::OsStr,
+    model: &str,
+    prompt: &str,
+    structured: bool,
 ) -> Result<super::usage::Generation> {
     if model.is_empty()
         || model.starts_with('-')
@@ -72,14 +98,17 @@ async fn generate_with(
         bail!("CLAUDE_INVALID_REQUEST");
     }
     let root = TemporaryRoot::create()?;
-    let (status, stdout, _stderr) = run_process(
-        command(binary, model, &root.0),
-        prompt.as_bytes(),
-        180,
-        LIMIT,
-    )
-    .await?;
-    decode_generation(status, &stdout)
+    let child = if structured {
+        turn_command(binary, model, &root.0)
+    } else {
+        command(binary, model, &root.0)
+    };
+    let (status, stdout, _stderr) = run_process(child, prompt.as_bytes(), 180, LIMIT).await?;
+    if structured {
+        decode_output(status, &stdout, true)
+    } else {
+        decode_generation(status, &stdout)
+    }
 }
 
 #[cfg(test)]
@@ -87,6 +116,9 @@ fn decode(status: i32, bytes: &[u8]) -> Result<String> {
     Ok(decode_generation(status, bytes)?.text)
 }
 fn decode_generation(status: i32, bytes: &[u8]) -> Result<super::usage::Generation> {
+    decode_output(status, bytes, false)
+}
+fn decode_output(status: i32, bytes: &[u8], structured: bool) -> Result<super::usage::Generation> {
     let result: Value =
         serde_json::from_slice(bytes).map_err(|_| anyhow::anyhow!("CLAUDE_INVALID_RESPONSE"))?;
     if status != 0
@@ -96,12 +128,28 @@ fn decode_generation(status: i32, bytes: &[u8]) -> Result<super::usage::Generati
     {
         bail!("CLAUDE_REQUEST_FAILED");
     }
-    if result["num_turns"].as_u64() != Some(1)
+    // The CLI records its schema formatter as another turn, even with
+    // --max-turns 1. It has no execution capability; all regular tools stay off.
+    let valid_turns = if structured {
+        matches!(result["num_turns"].as_u64(), Some(1 | 2))
+    } else {
+        result["num_turns"].as_u64() == Some(1)
+    };
+    if !valid_turns
         || result
             .get("permission_denials")
             .is_some_and(|v| v.as_array().is_none_or(|a| !a.is_empty()))
     {
         bail!("CLAUDE_TOOL_DETECTED");
+    }
+    if structured {
+        let output = result["structured_output"]
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("CLAUDE_STRUCTURED_RESPONSE_MISSING"))?;
+        return Ok(super::usage::Generation {
+            text: serde_json::to_string(output)?,
+            usage: super::usage::Usage::parse("anthropic-messages", &result),
+        });
     }
     let text = result["result"]
         .as_str()
@@ -130,6 +178,72 @@ fn decode_generation(status: i32, bytes: &[u8]) -> Result<super::usage::Generati
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn structured_turn_requires_the_schema_result_and_keeps_rust_validation() {
+        let turn = json!({"version":1,"text":"RECOVERED","toolCalls":[]});
+        let mut reply = json!({"type":"result","subtype":"success","is_error":false,
+            "result":"non-JSON prose is not the structured payload","num_turns":2,
+            "permission_denials":[],"structured_output":turn});
+        let decoded = decode_output(0, &serde_json::to_vec(&reply).unwrap(), true).unwrap();
+        assert_eq!(
+            super::super::engine::parse_turn(&decoded.text)
+                .unwrap()
+                .text,
+            "RECOVERED"
+        );
+        assert!(decode_generation(0, &serde_json::to_vec(&reply).unwrap()).is_err());
+        reply["structured_output"]["extra"] = json!(true);
+        let decoded = decode_output(0, &serde_json::to_vec(&reply).unwrap(), true).unwrap();
+        assert!(super::super::engine::parse_turn(&decoded.text).is_err());
+        reply.as_object_mut().unwrap().remove("structured_output");
+        assert_eq!(
+            decode_output(0, &serde_json::to_vec(&reply).unwrap(), true)
+                .err()
+                .unwrap()
+                .to_string(),
+            "CLAUDE_STRUCTURED_RESPONSE_MISSING"
+        );
+    }
+    #[test]
+    fn schema_formatting_never_permits_cli_tools_or_unbounded_turns() {
+        let child = turn_command(
+            std::ffi::OsStr::new("claude"),
+            "test",
+            std::path::Path::new("empty"),
+        );
+        let args: Vec<_> = child
+            .as_std()
+            .get_args()
+            .map(|s| s.to_str().unwrap())
+            .collect();
+        assert!(args.windows(2).any(|a| a == ["--tools", ""]));
+        assert!(args.windows(2).any(|a| a == ["--max-turns", "1"]));
+        let schema = args.windows(2).find(|a| a[0] == "--json-schema").unwrap()[1];
+        let value: Value = serde_json::from_str(schema).unwrap();
+        let names: Vec<_> = value["properties"]["toolCalls"]["items"]["anyOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v["properties"]["name"]["const"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["read", "write", "devin_cli", "model_call"]);
+        for (turns, denials) in [
+            (3, json!([])),
+            (2, json!([{"tool_name":"Read"}])),
+            (2, json!({})),
+        ] {
+            let reply = json!({"type":"result","subtype":"success","is_error":false,
+                "result":"","num_turns":turns,"permission_denials":denials,
+                "structured_output":{"version":1,"text":"text","toolCalls":[]}});
+            assert_eq!(
+                decode_output(0, &serde_json::to_vec(&reply).unwrap(), true)
+                    .err()
+                    .unwrap()
+                    .to_string(),
+                "CLAUDE_TOOL_DETECTED"
+            );
+        }
+    }
     #[test]
     fn cli_usage_preserves_cache_read_and_write_in_total_input() {
         let reply = json!({"type":"result","subtype":"success","is_error":false,"result":"answer","num_turns":1,"permission_denials":[],"usage":{"input_tokens":10,"cache_read_input_tokens":80,"cache_creation_input_tokens":10,"output_tokens":7}});
