@@ -950,6 +950,8 @@ operation roots are rejected.
 Child processes inherit the same namespace, limits and seccomp filter. Network
 requests go through a separate HTTPS broker that pins a resolved public IPv4,
 rejects private/reserved or mixed DNS results, and does not follow redirects.
+The broker has a 10-second total deadline, including DNS, TLS and response reads.
+A timeout after sending begins reports an unknown execution outcome.
 Operation output is returned to the caller but not stored in the approval ledger.
 
 This executor applies only to operations explicitly routed through the dashboard
@@ -1072,6 +1074,8 @@ redirects, pins the checked address for TLS, and retries transient failures up t
 five times with the same event ID. Verification is cached for one minute per
 project/callback/key. Key rotation signs with both keys for five minutes. `410`
 deactivates a subscription; `413` and other permanent failures are not retried.
+Each callback has a 10-second total deadline, including DNS and response reads;
+receiving partial data does not extend it.
 The last 10,000 changes provide a bounded delivery buffer; protocol replay is not
 advertised (`cursor: null`). Feedback remains durable and readable after a missed
 notification. Review delivery failures in the QR section.

@@ -495,20 +495,19 @@ impl View {
                     }
                 }
             }
-            Some("end") => {
+            Some("end")
                 if self
                     .stream
                     .as_ref()
-                    .is_some_and(|s| s.id == id && revision >= s.revision)
+                    .is_some_and(|s| s.id == id && revision >= s.revision) =>
+            {
+                // The committed event normally precedes this frame; an abandoned attempt has no row.
+                if frame["outcome"]["kind"] == "abandoned"
+                    || frame["outcome"]["seq"]
+                        .as_u64()
+                        .is_some_and(|n| self.records.contains_key(&n))
                 {
-                    // The committed event normally precedes this frame; an abandoned attempt has no row.
-                    if frame["outcome"]["kind"] == "abandoned"
-                        || frame["outcome"]["seq"]
-                            .as_u64()
-                            .is_some_and(|n| self.records.contains_key(&n))
-                    {
-                        self.stream = None;
-                    }
+                    self.stream = None;
                 }
             }
             _ => {}

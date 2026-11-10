@@ -68,13 +68,19 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 & $f -FromRelease
 ```
 
-インストーラは次の 3 つを一度にやります。
+公開版 v0.15.0 のインストーラは `rdsh` 本体を `~/.local/bin`（Windows は
+`%LOCALAPPDATA%\rdsh\bin`）へ入れ、照合表に登録された同梱プラグインの導入を試みます。
+**Node.js・npm・pnpmをまとめて用意する処理はありません。** Unix版はDSHの導入も案内のみです。
+Windows版は、対話端末・CI外・`-NoSetup`なしで、npmがありDSHがない場合に、確認後 `npm install -g @deepseek-ai/dsh` を実行します。
+npmがない環境や非対話実行では、そのDSH導入も行いません。
+Windowsのこの確認はnpmのlatestを導入します。[現在の上流依存の監査結果](DSH-COMPATIBILITY.md#上流依存の監査)を確認し、
+導入する版・依存構成の確認が済むまでは `n` で見送ってください。不足している場合は
+[README の手順 A](../README.ja.md#手順-a-本家-dsh-の導入未導入の方)に従って別途用意してください。
+DSH の版は [機能別の対応範囲](DSH-COMPATIBILITY.md)で選びます。
 
-- `rdsh` 本体を `~/.local/bin`（Windows は `%LOCALAPPDATA%\rdsh\bin`）へ入れる
-- 無ければ DSH 本体（Node.js 版）を入れる
-- プロファイルに同梱プラグイン（設定画面・スマホ幅レイアウト・更新バナー・フィードバック無効化・視覚回答）を付ける
-
-途中で質問が出たら、**全部 Enter（既定のまま）**で構いません。
+実行環境・モデルをまとめて準備する変更は [PR #1059](https://github.com/jimoto-no-llm/rustdsh/pull/1059)
+で実装されていますが、マージとリリースが済むまで、上の公開インストーラには含まれません。
+インストーラの再実行だけで不足する DSH が入る、と案内しないでください。
 
 ---
 
@@ -91,7 +97,7 @@ rdsh doctor
 | doctor の行 | 意味 | 対応 |
 | --- | --- | --- |
 | `essential plugin(s)` | 同梱プラグインが足りない | `rdsh plugins install` |
-| `dsh` が見つからない | DSH 本体が無い | インストーラをやり直す |
+| `dsh` が見つからない | DSH 本体が無い | DSH を別途導入する（README の手順 A） |
 | `optional tools present` | 任意ツールの情報 | 何もしなくてよい |
 
 ---

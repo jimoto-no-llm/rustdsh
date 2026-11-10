@@ -1,0 +1,16 @@
+[
+  {
+    "tag": "v0.15.0",
+    "asset": "install.sh",
+    "sha256": "3453d6422f2d6cc08a6d94db52744f33f9814e914178c75dd740c0f5c75e6d21",
+    "matches_github_asset_digest": true,
+    "url": "https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.15.0/install.sh"
+  },
+  {
+    "tag": "v0.15.0",
+    "asset": "install.ps1",
+    "sha256": "7cd16f2bf8dd6c9516024e9e8ec846c1f6332363cb5a0bf64739ff638309f2e6",
+    "matches_github_asset_digest": true,
+    "url": "https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.15.0/install.ps1"
+  }
+]

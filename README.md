@@ -106,6 +106,13 @@ cargo install rdsh
 archives. Debian/Ubuntu and Fedora/RHEL users can also install the release
 [`.deb`/`.rpm`](#native-packages-deb--rpm) with `apt`/`dnf`.
 
+The released v0.15.0 installers do not prepare Node.js or pnpm. Conversations
+through the bundled DSH adapter also need an existing DSH runtime: the Unix
+installer prints guidance, while the Windows installer can offer a global npm
+install at an interactive console when npm is already available. Check the
+[feature-specific compatibility and upstream dependency audit](docs/DSH-COMPATIBILITY.md)
+before choosing a version or accepting an unpinned `latest` installation.
+
 ### 2. Verify & Setup
 
 ```sh
@@ -612,12 +619,15 @@ unsupported non-Unix platforms before accessing the requested directory.
 
 The opt-in agent tool sandbox supports Linux x86_64 with bubblewrap, prlimit,
 and unprivileged user namespaces. Its audited DSH/tool-runtime pairs are
-`0.2.0-rc.2`, `0.2.1-alpha.1`, and `0.2.1-alpha.3`, with matching versions in
+`0.2.0-rc.2`, `0.2.1-alpha.1`, `0.2.1-alpha.3`, `0.2.1-rc.3`,
+`0.2.1-rc.4`, and `0.2.2-alpha.2`, with matching versions in
 each pair. It verifies package metadata, runtime bytes and the loaded module,
 then limits inspection to explicitly shared files. Unknown, mixed, modified or
 unexpectedly resolved runtimes stop before delegation. macOS and Windows
 refuse protected delegation; ordinary delegation keeps the original tools.
-This matrix applies to the Rust launcher. Project-pinned dashboard releases
+This matrix applies to the Rust launcher. ACP, project-managed updates and
+plugins have separate [compatibility contracts](docs/DSH-COMPATIBILITY.md).
+Project-pinned dashboard releases
 retain their separate [supported tuple](docs/STAGED-UPDATES.md#capture-trusted-runtime-code).
 
 ### Extended Dashboard (`rdsh-dashboard`)

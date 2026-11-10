@@ -1,6 +1,6 @@
 [package]
 name = "rdsh"
-version = "0.15.0"
+version = "0.15.1"
 edition = "2021"
 rust-version = "1.85"
 description = "Rust micro-orchestrator for local LLM agents: process isolation, session management and native tooling with a swappable harness adapter (bundled: DeepSeek Harness)"

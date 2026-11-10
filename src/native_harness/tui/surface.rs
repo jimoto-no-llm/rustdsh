@@ -1456,14 +1456,22 @@ mod tests {
         let mut pane = Pane::start(&backend).unwrap();
         pane.receive(json!({"status":"ready","fileChooser":{"id":"f","multiple":true}}))
             .unwrap();
-        pane.paste("/tmp/a\n/tmp/b", &backend).unwrap();
+        let paths = [
+            std::env::temp_dir().join("a"),
+            std::env::temp_dir().join("b"),
+        ];
+        pane.paste(
+            &format!("{}\n{}", paths[0].display(), paths[1].display()),
+            &backend,
+        )
+        .unwrap();
         pane.key(ctrl('s'), &backend).unwrap();
         assert!(calls(&backend).is_empty());
         pane.key(key(KeyCode::Tab), &backend).unwrap();
         pane.key(key(KeyCode::Enter), &backend).unwrap();
         assert_eq!(
             calls(&backend)[0],
-            json!({"kind":"files","id":"f","paths":["/tmp/a","/tmp/b"]})
+            json!({"kind":"files","id":"f","paths":paths})
         );
         pane.receive(json!({"status":"ready","directoryChooser":{"id":"dir"}}))
             .unwrap();

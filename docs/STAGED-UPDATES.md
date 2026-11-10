@@ -45,7 +45,7 @@ Each release has a SHA-256 identity over its full manifest: file paths, lengths,
 read-only/executable permissions, checksums, tuple and change/recovery notes.
 The same version string can identify different code builds; inspect their release
 IDs and change notes. Provenance text is operator-declared, not independently
-verified publisher identity. Current supported tuple:
+verified publisher identity. This tuple is specific to project-managed releases; the [Rust launcher and plugins](DSH-COMPATIBILITY.md) have separate contracts. Current supported tuple:
 
 | Component | Contract |
 | -------------------- | -------------------------------------------- |

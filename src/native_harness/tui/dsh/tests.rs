@@ -379,11 +379,17 @@ fn resume_preserves_existing_membership_and_uses_the_sessions_own_cwd() {
     let baseline = json!({"items":[{"workspaceId":"foreign-workspace","path":"/foreign","sessionIds":["bound"]}]});
     assert!(workspace_contains(&baseline, "bound").unwrap());
     assert!(!workspace_contains(&baseline, "legacy").unwrap());
-    let sessions = json!({"items":[{"sessionId":"bound","cwd":"/foreign"},{"sessionId":"legacy","cwd":"/saved-session-workspace"}]});
+    let saved_cwd = std::env::temp_dir().join("saved-session-workspace");
+    let sessions = json!({"items":[{"sessionId":"bound","cwd":"/foreign"},{"sessionId":"legacy","cwd":saved_cwd}]});
     assert_eq!(
         resume_cwd(&sessions, "legacy").unwrap(),
-        "/saved-session-workspace"
+        saved_cwd.to_str().unwrap()
     );
+    assert!(resume_cwd(
+        &json!({"items":[{"sessionId":"relative","cwd":"relative/path"}]}),
+        "relative"
+    )
+    .is_err());
     assert!(resume_cwd(&sessions, "missing").is_err());
     assert!(workspace_contains(&json!({"items":[{}]}), "legacy").is_err());
     assert!(registered_workspace_id(&json!({"workspace":{}})).is_err());

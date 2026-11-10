@@ -3,5 +3,12 @@
 # rdsh settings tab and the update banner come from these plugins, so a
 # curl-installed profile has neither until an entry exists.
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
-latest v0.12.0
+latest v0.15.0
+v0.15.0 rdsh-plugins.tar.gz fab6b5c5afbff0a3aba24ff2c209a295fc19a47735c2854c93ba75a4c042222b
+v0.14.1 rdsh-plugins.tar.gz 63cf4aa9b93f8931a3c85b6c0952016e8e92b214a01c187b87e65aa9c1512476
+v0.14.0 rdsh-plugins.tar.gz 6f04f9f63c35794dfb56d6a268ed0bb494566beed12ae99f80d7df08e2f78aec
+v0.13.1 rdsh-plugins.tar.gz ab774d47c177bc5b16f7788104fa6bb4531620f54b524f885234c64ab2e77544
+v0.13.0 rdsh-plugins.tar.gz c3d46e8ca5d92b811b9d196469428547f10ea9ff7d2f65d07ece7acf6b043ecf
+v0.12.2 rdsh-plugins.tar.gz 28e47f7532c2a1531b8b01e4da8675f63cb6825894c92814b49699ae07779f3e
+v0.12.1 rdsh-plugins.tar.gz e0c26b9022b1c61e8479bf650eda0921d8bba64247788ed6bd3ab2653660e63f
 v0.12.0 rdsh-plugins.tar.gz acad6aeaa7914419ecdc3b7b5d24385ca16bd71ca0c1b784415eb6b47c787778

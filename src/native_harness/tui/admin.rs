@@ -449,10 +449,8 @@ impl Panel {
                 KeyCode::Enter if !self.schema_visible => {
                     self.args.insert("\n");
                 }
-                _ if !self.schema_visible => {
-                    if !edit(&mut self.args, key) {
-                        self.notice = "入力は16KiB以内にしてください".into();
-                    }
+                _ if !self.schema_visible && !edit(&mut self.args, key) => {
+                    self.notice = "入力は16KiB以内にしてください".into();
                 }
                 _ => {}
             },

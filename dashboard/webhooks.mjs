@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import ipaddr from "ipaddr.js";
 import { Webhook } from "standardwebhooks";
+import { withNetworkTimeout } from "./network-timeout.mjs";
 import { writeJson } from "./state.mjs";
 
 export function isPublicAddress(address) {
@@ -31,42 +32,44 @@ export async function validateCallback(destination, lookup = dns.lookup) {
   return { url, addresses };
 }
 export async function publicWebhookPost(destination, headers, body) {
-  const { url, addresses } = await validateCallback(destination);
-  const selected = addresses[0];
-  // Pin the checked address on the actual connection, retaining hostname/SNI for TLS verification.
-  return await new Promise((resolve, reject) => {
-    const request = https.request(
-      url,
-      {
-        method: "POST",
-        headers: { ...headers, "content-length": Buffer.byteLength(body) },
-        timeout: 10000,
-        lookup: (_host, options, callback) =>
-          options.all
-            ? callback(null, [selected])
-            : callback(null, selected.address, selected.family),
-      },
-      (response) => {
-        const chunks = [];
-        let bytes = 0;
-        response.on("data", (chunk) => {
-          bytes += chunk.length;
-          if (bytes > 8192)
-            request.destroy(new Error("Callback response exceeds limit"));
-          else chunks.push(chunk);
-        });
-        response.on("end", () =>
-          resolve({
-            status: response.statusCode,
-            body: Buffer.concat(chunks).toString("utf8"),
-          }),
-        );
-        response.on("error", reject);
-      },
-    );
-    request.on("timeout", () => request.destroy(new Error("Callback timeout")));
-    request.on("error", reject);
-    request.end(body);
+  return withNetworkTimeout(10000, "Callback timeout", async (signal) => {
+    const { url, addresses } = await validateCallback(destination);
+    signal.throwIfAborted();
+    const selected = addresses[0];
+    // Pin the checked address on the actual connection, retaining hostname/SNI for TLS verification.
+    return new Promise((resolve, reject) => {
+      const request = https.request(
+        url,
+        {
+          method: "POST",
+          headers: { ...headers, "content-length": Buffer.byteLength(body) },
+          signal,
+          lookup: (_host, options, callback) =>
+            options.all
+              ? callback(null, [selected])
+              : callback(null, selected.address, selected.family),
+        },
+        (response) => {
+          const chunks = [];
+          let bytes = 0;
+          response.on("data", (chunk) => {
+            bytes += chunk.length;
+            if (bytes > 8192)
+              request.destroy(new Error("Callback response exceeds limit"));
+            else chunks.push(chunk);
+          });
+          response.on("end", () =>
+            resolve({
+              status: response.statusCode,
+              body: Buffer.concat(chunks).toString("utf8"),
+            }),
+          );
+          response.on("error", reject);
+        },
+      );
+      request.on("error", reject);
+      request.end(body);
+    });
   });
 }
 const names = [

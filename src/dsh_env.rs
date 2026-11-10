@@ -9,7 +9,7 @@
 //! of every currently working setup stays unchanged.
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::locale::Locale;
 
@@ -25,55 +25,8 @@ const PATH_SCAN_MAX_DIRS: usize = 64;
 /// A pnpm policy file is small; anything larger is not one we understand.
 const CONFIG_MAX_BYTES: u64 = 65536;
 
-/// Run one read-only probe and return its stdout when it exits 0. A failed
-/// spawn, a non-zero exit, a timeout and a stuck reader all collapse to None,
-/// so callers never have to tell "missing" from "broken" apart.
-pub(crate) fn run_bounded_capture(
-    mut command: std::process::Command,
-    limit: u64,
-    timeout: Duration,
-) -> Option<Vec<u8>> {
-    use std::io::Read;
-    use std::process::Stdio;
-
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    let mut child = command.spawn().ok()?;
-    let stdout = child.stdout.take()?;
-    let (sender, receiver) = std::sync::mpsc::channel();
-    // A descendant can inherit the pipe and keep it open; the deadline below
-    // must not wait on this reader, so it is never joined.
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let result = stdout.take(limit).read_to_end(&mut bytes).map(|_| bytes);
-        let _ = sender.send(result);
-    });
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    return None;
-                }
-                break;
-            }
-            Ok(None) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    }
-    receiver
-        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-        .ok()?
-        .ok()
-}
+mod probe;
+pub(crate) use probe::run_bounded_capture;
 
 /// First non-empty line of a probe, trimmed. Version banners and "npm root -g"
 /// both answer on one line.

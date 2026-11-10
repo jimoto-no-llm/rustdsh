@@ -9,6 +9,7 @@ import https from "node:https";
 import { networkDenyFilter } from "../security/seccomp.mjs";
 import { contains, destination, digest, storedDirectoryUnchanged } from "./contracts.mjs";
 import { parseOperation } from "./policy.mjs";
+import { withNetworkTimeout } from "./network-timeout.mjs";
 
 const MAX_INPUT = 64 * 1024;
 const MAX_OUTPUT = 64 * 1024;
@@ -307,60 +308,64 @@ async function runNetworkRequest(operation, allowedOrigins, { resolve = lookup, 
   const url = approvedNetworkOrigin(operation.url, allowedOrigins);
   if (!isIP(url.hostname) && (url.hostname === "localhost" || url.hostname.endsWith(".localhost")))
     throw new Error("network_destination_not_public");
-  const addresses = isIP(url.hostname)
-    ? [{ address: url.hostname, family: isIP(url.hostname) }]
-    : await resolve(url.hostname, { all: true, verbatim: true });
-  const ipv4 = addresses.filter((item) => item.family === 4 && !privateIpv4(item.address));
-  if (!ipv4.length || ipv4.length !== addresses.length)
-    throw new Error("network_destination_not_public");
-  const address = ipv4[0].address;
-  return new Promise((resolveResult, reject) => {
-    let responseBytes = 0;
-    let requestStarted = false;
-    const chunks = [];
-    const fail = (error) => {
-      const failure = new Error(safeReason(error, "network_request_failed"));
-      failure.requestStarted = requestStarted;
-      reject(failure);
-    };
-    const options = {
-      hostname: url.hostname,
-      port: Number(url.port || 443),
-      path: `${url.pathname}${url.search}`,
-      method: operation.method,
-      family: 4,
-      autoSelectFamily: false,
-      servername: isIP(url.hostname) ? undefined : url.hostname,
-      lookup: (_hostname, _options, callback) => callback(null, address, 4),
-      rejectUnauthorized: true,
-      maxHeaderSize: 16 * 1024,
-    };
-    const req = request(options, (res) => {
-      res.on("error", fail);
-      res.on("data", (chunk) => {
-        responseBytes += chunk.length;
-        if (responseBytes > MAX_OUTPUT) {
-          req.destroy(new Error("network_response_too_large"));
-          return;
+  let requestStarted = false;
+  try {
+    return await withNetworkTimeout(timeoutMs, "network_request_timed_out", async (signal) => {
+      const addresses = isIP(url.hostname)
+        ? [{ address: url.hostname, family: isIP(url.hostname) }]
+        : await resolve(url.hostname, { all: true, verbatim: true });
+      signal.throwIfAborted();
+      const ipv4 = addresses.filter((item) => item.family === 4 && !privateIpv4(item.address));
+      if (!ipv4.length || ipv4.length !== addresses.length)
+        throw new Error("network_destination_not_public");
+      const address = ipv4[0].address;
+      return new Promise((resolveResult, reject) => {
+        let responseBytes = 0;
+        const chunks = [];
+        const options = {
+          hostname: url.hostname,
+          port: Number(url.port || 443),
+          path: `${url.pathname}${url.search}`,
+          method: operation.method,
+          family: 4,
+          autoSelectFamily: false,
+          servername: isIP(url.hostname) ? undefined : url.hostname,
+          lookup: (_hostname, _options, callback) => callback(null, address, 4),
+          rejectUnauthorized: true,
+          maxHeaderSize: 16 * 1024,
+          signal,
+        };
+        const req = request(options, (res) => {
+          res.on("error", reject);
+          res.on("data", (chunk) => {
+            responseBytes += chunk.length;
+            if (responseBytes > MAX_OUTPUT) {
+              req.destroy(new Error("network_response_too_large"));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          res.on("end", () => resolveResult({
+            execution: "completed",
+            status: res.statusCode || 0,
+            content_type: String(res.headers["content-type"] || "").slice(0, 200),
+            body: Buffer.concat(chunks).toString("utf8"),
+          }));
+        });
+        req.on("error", reject);
+        if (operation.body) {
+          requestStarted = true;
+          req.write(operation.body);
         }
-        chunks.push(chunk);
+        requestStarted = true;
+        req.end();
       });
-      res.on("end", () => resolveResult({
-        execution: "completed",
-        status: res.statusCode || 0,
-        content_type: String(res.headers["content-type"] || "").slice(0, 200),
-        body: Buffer.concat(chunks).toString("utf8"),
-      }));
     });
-    req.setTimeout(timeoutMs, () => req.destroy(new Error("network_request_timed_out")));
-    req.on("error", fail);
-    if (operation.body) {
-      requestStarted = true;
-      req.write(operation.body);
-    }
-    requestStarted = true;
-    req.end();
-  });
+  } catch (error) {
+    const failure = new Error(safeReason(error, "network_request_failed"));
+    failure.requestStarted = requestStarted;
+    throw failure;
+  }
 }
 
 function operationFromInput(input, evaluated = {}) {

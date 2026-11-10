@@ -1,0 +1,10 @@
+................................................................waiting for ci.yml push run for v1.2.3-rc.1 at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ci.yml succeeded for v1.2.3-rc.1 at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+.waiting for ci.yml push run for v1.2.3-rc.1 at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+waiting for ci.yml push run for v1.2.3-rc.1 at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+.........................................................................................
+----------------------------------------------------------------------
+Ran 154 tests in 4.771s
+
+OK
+Validated v1.2.3 (stable)

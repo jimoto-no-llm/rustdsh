@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin a published release's archive digests into the two installer registries.
+"""Pin a published release's archive digests into all three installer registries.
 
 The installers verify downloads against the registries pinned on main, so a
 release that is never pinned is invisible to install.sh --from-release, to the
@@ -11,6 +11,8 @@ The ledgers are separate on purpose. release-digests.tsv stays Unix-only: the
 published installers (v0.3.1-v0.3.3) read it from the fixed canonical URL and
 refuse the whole file as soon as it names any other asset. The Windows archive
 is pinned in release-digests-windows.tsv, which only install.ps1 reads.
+The bundled plugins archive has its own release-plugins-digests.tsv ledger,
+which both installers read.
 
 Usage:
     python3 scripts/pin-release-digests.py vX.Y.Z

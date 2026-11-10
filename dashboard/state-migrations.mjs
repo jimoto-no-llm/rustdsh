@@ -253,7 +253,7 @@ export async function dryRunStateMigration(project) {
       changes: [],
     };
   const source = decodeState(sourceBytes, project);
-  await ProjectStore.open(project);
+  await ProjectStore.open(project, { readOnly: true });
   const validatedBytes = await readBytes(state);
   check(
     validatedBytes !== null && digest(validatedBytes) === digest(sourceBytes),
@@ -324,7 +324,7 @@ export async function applyStateMigration(project) {
   const initialBytes = await readBytes(filePaths.state);
   check(initialBytes !== null, "state_file_missing");
   const initial = decodeState(initialBytes, project);
-  await ProjectStore.open(project);
+  await ProjectStore.open(project, { readOnly: true });
   if (initial.schema === 2)
     return {
       schema: migrationSchema,

@@ -116,6 +116,8 @@ async fn websocket_stream_uses_authenticated_gateway_and_sends_uplink_and_cancel
         let (socket, _) = listener.accept().await.unwrap();
         let mut ws = tokio_tungstenite::accept_hdr_async(
             socket,
+            // tungstenite fixes this callback's error type to an unboxed HTTP response.
+            #[allow(clippy::result_large_err)]
             |request: &tokio_tungstenite::tungstenite::handshake::server::Request, response| {
                 assert_eq!(request.uri().path(), "/api/remote.mux");
                 assert_eq!(request.headers()["cookie"], "fixture=session");
