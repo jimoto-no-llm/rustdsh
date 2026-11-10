@@ -121,7 +121,7 @@ mod worker_scopes;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|files|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|files|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
   rdsh provider detect            credentials and local servers on this machine
   rdsh provider import --dry-run  what detection would write into the profile\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh plugins status             what a profile still misses (essential tier, read-only)\n  rdsh plugins install --profile web   attach the essential plugins after an upgrade\n  rdsh --passthrough tui          no slim env; only rdsh_inspect stays isolated\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
@@ -354,6 +354,24 @@ enum Commands {
         dsh_catalog: Option<std::path::PathBuf>,
         #[arg(long = "devin-bin")]
         devin_bin: Option<std::path::PathBuf>,
+    },
+    /// Rust-owned terminal chat, model selection and per-call approvals (no DSH runtime).
+    #[command(name = "native-tui")]
+    NativeTui {
+        #[arg(long)]
+        workspace: std::path::PathBuf,
+        #[arg(long = "sdk-dir")]
+        sdk_dir: Option<std::path::PathBuf>,
+        #[arg(long = "dsh-profile")]
+        dsh_profile: Option<String>,
+        #[arg(long = "dsh-catalog")]
+        dsh_catalog: Option<std::path::PathBuf>,
+        #[arg(long = "devin-bin")]
+        devin_bin: Option<std::path::PathBuf>,
+        #[arg(long, default_value = "cursor-sdk")]
+        provider: String,
+        #[arg(long, default_value = "composer-2.5")]
+        model: String,
     },
     /// Start the local dashboard (127.0.0.1 only, read-only API)
     Serve {
@@ -1072,6 +1090,7 @@ const NATIVE_FIRST: &[&str] = &[
     "bench",
     "serve",
     "native-web",
+    "native-tui",
     "sessions",
     "profiles",
     "skills",
@@ -1332,6 +1351,24 @@ fn main() {
         Some(Commands::Logs { tail, grep, file }) => {
             inspect::cmd_logs(tail.unwrap_or(cfg.logs.tail), grep, file, locale)
         }
+        Some(Commands::NativeTui {
+            workspace,
+            sdk_dir,
+            dsh_profile,
+            dsh_catalog,
+            devin_bin,
+            provider,
+            model,
+        }) => native_harness::cmd_native_tui(
+            workspace,
+            sdk_dir,
+            dsh_profile,
+            dsh_catalog,
+            devin_bin,
+            provider,
+            model,
+            locale,
+        ),
         Some(Commands::NativeWeb {
             port,
             workspace,
@@ -2558,6 +2595,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "终止 $DSH_HOME 记录的实例",
             "$DSH_HOME に記録したインスタンスを終了",
         ),
+        "native-tui" => (
+            "启动 Rust 原生终端对话、工具与单次审批（不启动 DSH）",
+            "Rust独自の端末対話・ツール・一回限りの承認を起動（DSH起動なし）",
+        ),
         "native-web" => (
             "启动 Rust 原生推理、工具与审批的独立网页界面",
             "Rust製の推論・ツール・承認を備えた独立Web GUIを起動",
@@ -2746,8 +2787,8 @@ fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static s
         return Some(websearch::help(locale));
     }
     (name == "rdsh").then(|| match locale {
-        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
-        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
+        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
+        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
         locale::Locale::English => unreachable!(),
     })
 }

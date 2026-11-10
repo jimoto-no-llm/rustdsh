@@ -2,7 +2,6 @@
 use super::engine::{Call, Engine};
 use anyhow::{bail, Result};
 use serde::Deserialize;
-use std::future::Future;
 
 use serde_json::{json, Value};
 use std::io::Read;
@@ -138,55 +137,7 @@ pub async fn execute(engine: &Engine, run_id: u64, call: &Call) -> Result<Value>
         }
         "devin_cli" => {
             let args: DevinArgs = serde_json::from_value(call.arguments.clone())?;
-            let mut command = tokio::process::Command::new(&engine.devin);
-            command
-                .env_clear()
-                .current_dir(&engine.workspace)
-                .arg("-p")
-                .arg(&args.prompt);
-            for name in [
-                "HOME",
-                "PATH",
-                "USER",
-                "LOGNAME",
-                "LANG",
-                "LC_ALL",
-                "TMPDIR",
-                "TMP",
-                "TEMP",
-                "XDG_CONFIG_HOME",
-                "XDG_DATA_HOME",
-                "SystemRoot",
-                "APPDATA",
-                "LOCALAPPDATA",
-            ] {
-                if let Some(value) = std::env::var_os(name) {
-                    command.env(name, value);
-                }
-            }
-            let mut operation = Box::pin(super::sdk::run_process(
-                command,
-                b"",
-                args.timeout,
-                64 * 1024,
-            ));
-            // Spawn and cancellation share the run gate, so a cancelled run
-            // cannot begin a new side effect after its approval completes.
-            let first = std::future::poll_fn(|cx| {
-                std::task::Poll::Ready(
-                    engine.with_current_run(run_id, || Ok(operation.as_mut().poll(cx))),
-                )
-            })
-            .await?;
-            let result = match first {
-                std::task::Poll::Ready(result) => result,
-                std::task::Poll::Pending => operation.await,
-            };
-            let (code, out, err) =
-                result.map_err(|_| anyhow::anyhow!("Devinの起動・時間・出力制限で停止しました"))?;
-            Ok(
-                json!({"exitCode":code,"stdout":engine.redact(&String::from_utf8_lossy(&out)),"stderr":engine.redact(&String::from_utf8_lossy(&err)),"executed":true}),
-            )
+            super::devin_acp::execute(engine, run_id, &args.prompt, args.timeout).await
         }
         _ => bail!("未対応ツール"),
     }

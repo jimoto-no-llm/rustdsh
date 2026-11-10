@@ -1,10 +1,13 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+mod devin_acp;
 mod engine;
 mod oauth;
 mod profiles;
 mod sdk;
 mod tools;
+mod tui;
+pub use tui::cmd_native_tui;
 
 use anyhow::{bail, Result};
 use engine::{Engine, Event, Message, State};
@@ -34,15 +37,13 @@ struct ApprovalRequest {
     allow: bool,
 }
 
-pub fn cmd_native_web(
-    port: u16,
+fn create_engine(
     workspace: PathBuf,
     sdk_dir: Option<PathBuf>,
     dsh_profile: Option<String>,
     dsh_catalog: Option<PathBuf>,
     devin: Option<PathBuf>,
-    locale: crate::locale::Locale,
-) -> Result<()> {
+) -> Result<Arc<Engine>> {
     let workspace = workspace.canonicalize()?;
     if !workspace.is_dir() {
         bail!("--workspaceは既存のディレクトリを指定してください");
@@ -99,7 +100,7 @@ pub fn cmd_native_web(
             .map(|h| PathBuf::from(h).join(".local/bin/devin"))
             .unwrap_or_else(|| PathBuf::from("devin"))
     });
-    let engine = Arc::new(Engine {
+    Ok(Arc::new(Engine {
         state: Mutex::new(State::default()),
         workspace,
         sdk: sdk::SdkConfig {
@@ -109,7 +110,19 @@ pub fn cmd_native_web(
         devin,
         registry,
         secrets,
-    });
+    }))
+}
+
+pub fn cmd_native_web(
+    port: u16,
+    workspace: PathBuf,
+    sdk_dir: Option<PathBuf>,
+    dsh_profile: Option<String>,
+    dsh_catalog: Option<PathBuf>,
+    devin: Option<PathBuf>,
+    locale: crate::locale::Locale,
+) -> Result<()> {
+    let engine = create_engine(workspace, sdk_dir, dsh_profile, dsh_catalog, devin)?;
     let runtime = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)

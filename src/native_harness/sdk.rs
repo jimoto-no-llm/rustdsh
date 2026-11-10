@@ -241,7 +241,7 @@ async fn read_bounded(
     }
 }
 
-struct ProcessGroupGuard(Option<u32>);
+pub(super) struct ProcessGroupGuard(pub(super) Option<u32>);
 impl Drop for ProcessGroupGuard {
     fn drop(&mut self) {
         #[cfg(unix)]
