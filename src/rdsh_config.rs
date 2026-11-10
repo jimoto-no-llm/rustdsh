@@ -587,7 +587,10 @@ impl Default for RdshSettings {
 
 /// `$DSH_HOME/rdsh.json` のパス。
 pub fn settings_path() -> String {
-    format!("{}/rdsh.json", crate::inspect::dsh_home())
+    std::path::Path::new(&crate::inspect::dsh_home())
+        .join("rdsh.json")
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// 設定を読み込む。ファイル欠落は既定値、不正値は clamp/切詰めで吸収する。
@@ -1501,7 +1504,10 @@ impl RdshSettings {
 // ---- legacy (旧 rdsh-context.json: 読み取り専用) ----
 
 fn legacy_context_path() -> String {
-    format!("{}/rdsh-context.json", crate::inspect::dsh_home())
+    std::path::Path::new(&crate::inspect::dsh_home())
+        .join("rdsh-context.json")
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// context 節が未設定なら旧ファイルで項目ごとに補完する。
@@ -1973,6 +1979,23 @@ mod rdsh_config_tests {
         assert!(d.context.working_files.is_empty() && d.context.open_tasks.is_empty());
         assert_eq!((d.context.max_code_hits, d.context.max_sessions), (20, 0));
         assert!(d.context.include_git_diff);
+    }
+
+    #[test]
+    fn canonical_home_reads_settings_and_legacy_context() {
+        with_home("canonical-home", |home| {
+            let root = std::fs::canonicalize(home).unwrap();
+            std::env::set_var("DSH_HOME", &root);
+            std::fs::write(root.join("rdsh.json"), r#"{"search":{"max":23}}"#).unwrap();
+            std::fs::write(
+                root.join("rdsh-context.json"),
+                r#"{"goal":"canonical home"}"#,
+            )
+            .unwrap();
+            let settings = try_load().unwrap();
+            assert_eq!(settings.search.max, 23);
+            assert_eq!(settings.context.goal, "canonical home");
+        });
     }
 
     #[test]
