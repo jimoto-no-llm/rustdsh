@@ -33,6 +33,7 @@ JSONにはローカルパスが含まれるため、共有時には必要に応�
 | `desktop.app` / `profile_initialized` / `enabled_bundled_plugins` | Desktopアプリのパスと予約プロファイルの状態 |
 | `path_shadowed` | PATHで最初に解決した `dsh` がこのrdshか、または `dsh` として起動されたか |
 | `warnings` | 任意のプロファイルや、壊れる可能性があるラッパーへの補足。文字列の文言は解析しません |
+| `compaction_policy.enabled` / `file` / `policies` / `reason` | 圧縮のしきい値を渡す機能が有効か、`rdsh-compaction.json` の状態（`absent` / `valid` / `invalid`）、接続先の件数、使えない理由です。詳細は [COMPACTION-POLICY.md](COMPACTION-POLICY.md) を参照してください |
 
 Nodeの選択ロジックは実際の委譲処理と共通です。元のDSHを含む対応OS・CPUの
 `node-v*` ツリーを優先し、PATH、より新しい対応ツリーの順に探索します。
