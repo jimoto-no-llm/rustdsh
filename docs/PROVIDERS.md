@@ -1,4 +1,4 @@
-# Provider routes: HAI, Command Code, Sarashina, Ollama and home LLM servers
+# Provider routes: Mistral, HAI, Command Code, Sarashina, Ollama and home LLM servers
 
 `rdsh provider` registers an OpenAI-compatible endpoint as a DeepSeek Harness
 (dsh) route, so the model appears in dsh's model picker without editing YAML by
@@ -10,6 +10,7 @@ that block.
 
 ```sh
 rdsh provider list [--json]
+rdsh provider add mistral [options]
 rdsh provider add hai [options]
 rdsh provider add commandcode [options]
 rdsh provider add sarashina [options]
@@ -115,7 +116,7 @@ discovery over https passes it to `curl` through a config on stdin, not argv.
   as above, or with the setup UI's key endpoint: it accepts the well-known
   names and any profile-declared `apiKeyEnv` that matches
   `^[A-Z][A-Z0-9_]+$`, and refuses everything else before writing.
-- An exported route key (`HAI_API_KEY`, `LOCAL_OPENAI_API_KEY`,
+- An exported route key (`MISTRAL_API_KEY`, `HAI_API_KEY`, `LOCAL_OPENAI_API_KEY`,
   `SARASHINA_API_KEY`, `COMMANDCODE_API_KEY`) alone does not count as a
   connection in `rdsh setup` or the first-run banner: it counts only when a
   profile's default model uses a registered route that declares exactly that
@@ -124,6 +125,37 @@ discovery over https passes it to `curl` through a config on stdin, not argv.
   the YAML to add by hand: appending another entry could replace the inserted
   definition's config. A model id or prompt mentioning that text does not
   identify a plugin.
+
+## Mistral
+
+```sh
+rdsh provider add mistral --profile web --key-stdin
+rdsh provider add mistral --profile web --discover --key-stdin --replace
+```
+
+Enter the key on stdin, or export `MISTRAL_API_KEY` before running the command.
+The preset writes route `mistral`, `api: openai-completions`, base URL
+`https://api.mistral.ai/v1` and the credential ref `MISTRAL_API_KEY`. This explicit
+Chat Completions route works in DSH and the Rust native harness; it does not use
+the bundled catalog's `mistral-conversations` transport.
+
+With no model source, it starts with `mistral-small-latest`, a 262,144-token
+context window and a conservative 4,096-token output budget. `--model <id>` can
+select another model, and `--discover` reads the account's current `/models`
+catalog. Entries declaring `capabilities.completion_chat: false` (such as
+embeddings, OCR or FIM-only models) are excluded; malformed declared chat flags
+are excluded too. A boolean `capabilities.vision: true` declares image input.
+Other models' unspecified limits are left to dsh rather than invented.
+
+The compatibility block uses `max_tokens` and omits OpenAI's `store` and
+`stream_options` fields, which the Mistral Chat API does not document.
+It preserves the `system` message role instead of rewriting it to OpenAI's
+unsupported `developer` role.
+Restart the Web GUI or TUI after registration. The default model selection is
+left as it was; choose the `mistral` provider in the model picker.
+
+Sources: [Mistral Chat API](https://docs.mistral.ai/api/endpoint/chat) and
+[Mistral model catalog](https://docs.mistral.ai/api/endpoint/models).
 
 ## HAI
 
