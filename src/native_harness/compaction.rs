@@ -86,7 +86,9 @@ fn kind(message: &Message) -> Option<ItemKind> {
     })
 }
 
-fn cut(messages: &[Message], limits: &Limits) -> Option<Range<usize>> {
+/// `active_turn` is false when the newest user message is still held back at
+/// admission: every message in the history then belongs to a finished turn.
+fn cut(messages: &[Message], limits: &Limits, active_turn: bool) -> Option<Range<usize>> {
     let items: Vec<Item> = messages
         .iter()
         .map(|m| {
@@ -101,7 +103,9 @@ fn cut(messages: &[Message], limits: &Limits) -> Option<Range<usize>> {
         retain: limits.bytes.retain,
         keep_first_user: true,
     })?;
-    let mut end = selected.range.end.min(messages.len().saturating_sub(1));
+    // The newest message is the active request, unless it is still held back.
+    let newest = messages.len().saturating_sub(usize::from(active_turn));
+    let mut end = selected.range.end.min(newest);
     if let Some(t) = limits.tokens {
         let token_items: Vec<_> = items
             .iter()
@@ -122,7 +126,11 @@ fn cut(messages: &[Message], limits: &Limits) -> Option<Range<usize>> {
         );
     }
     // Keep the active user turn and move any split tool group to the retained side.
-    if let Some(last_user) = messages.iter().rposition(|m| m.role == "user") {
+    if let Some(last_user) = messages
+        .iter()
+        .rposition(|m| m.role == "user")
+        .filter(|_| active_turn)
+    {
         if last_user >= selected.range.start {
             end = end.min(last_user);
         }
@@ -197,6 +205,25 @@ fn denied(messages: &[Message]) -> String {
 
 impl Engine {
     pub(super) async fn compact_history(&self, run_id: u64) -> Result<()> {
+        self.compact(run_id, true).await
+    }
+
+    /// Admit a user message that did not fit when it arrived: compact the
+    /// finished turns, then append it only if the history now has room.
+    pub(super) async fn admit_after_compaction(&self, run_id: u64, message: Message) -> Result<()> {
+        self.compact(run_id, false).await?;
+        let mut state = self.state.lock().unwrap();
+        if state.run_id != run_id || state.status != "running" {
+            bail!("cancelled");
+        }
+        if !super::engine::fits_with(&state.messages, &message) {
+            bail!("会話がサイズ上限に達しています");
+        }
+        state.messages.push(message);
+        Ok(())
+    }
+
+    async fn compact(&self, run_id: u64, active_turn: bool) -> Result<()> {
         if !self.compaction.native_web.enabled {
             return Ok(());
         }
@@ -215,7 +242,7 @@ impl Engine {
         if !limits.exceeded(&original) {
             return Ok(());
         }
-        let Some(range) = cut(&original, &limits) else {
+        let Some(range) = cut(&original, &limits, active_turn) else {
             return Ok(());
         };
         let mut candidate = original.clone();

@@ -452,3 +452,197 @@ fn doctor_reports_a_policy_file_a_boot_would_ignore() {
     );
     assert!(!fixture.composed_a_profile());
 }
+
+/// The headless dump with the adapter plugin attached and one model that has
+/// a provider-side compaction trigger.
+fn native_dump() -> String {
+    format!(
+        "{HEADLESS_DUMP}# == rdsh-llm-native\n\
+         - id: rdsh-llm-native\n\
+         \x20 name: rdsh-llm-native\n\
+         \x20 config:\n\
+         \x20   providers:\n\
+         \x20     native:\n\
+         \x20       baseURL: https://api.example/v1\n\
+         \x20       models:\n\
+         \x20         - id: big-model\n\
+         \x20           contextWindow: 400000\n\
+         \x20           compactAtTokens: 150000\n"
+    )
+}
+
+const NATIVE_POLICY: &str = r#"{
+  "schema": 1,
+  "policies": [],
+  "routes": [{"provider": "native", "model": "big-model", "method": "openai_standalone"}]
+}"#;
+
+fn install_compaction_plugin(fixture: &Fixture) {
+    let profile = fixture.dsh_home().join("profiles/headless");
+    fs::create_dir_all(&profile).unwrap();
+    fs::write(
+        profile.join("package.json"),
+        r#"{"dependencies":{"rdsh-compaction":"file:/plugins/rdsh-compaction"}}"#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_provider_native_route_boots_when_the_profile_serves_it() {
+    let fixture = Fixture::new(&native_dump(), true);
+    install_compaction_plugin(&fixture);
+    fixture.write_policy(NATIVE_POLICY);
+    let output = fixture.boot("headless", &[]);
+    if no_node_runtime(&output) {
+        return;
+    }
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("[rdsh] compaction: policy overlay applied (1 rows)"),
+        "{}",
+        stderr(&output)
+    );
+    // The DSH backend is told to leave the route to the adapter.
+    let dir = fixture.dsh_home().join("compaction");
+    let overlays: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| fs::read_to_string(entry.unwrap().path()).unwrap())
+        .collect();
+    assert!(
+        overlays
+            .iter()
+            .any(|text| text.contains(r#""method":"openai_standalone""#)),
+        "{overlays:?}"
+    );
+    assert!(fixture.boot_args().is_some());
+}
+
+#[test]
+fn a_provider_native_route_the_profile_does_not_serve_blocks_boot() {
+    for dump in [
+        HEADLESS_DUMP.to_string(),
+        native_dump().replace("big-model", "another-model"),
+        native_dump().replace("            compactAtTokens: 150000\n", ""),
+    ] {
+        let fixture = Fixture::new(&dump, true);
+        install_compaction_plugin(&fixture);
+        fixture.write_policy(NATIVE_POLICY);
+        let output = fixture.boot("headless", &[]);
+        if no_node_runtime(&output) {
+            return;
+        }
+        assert!(!output.status.success(), "{}", stderr(&output));
+        assert!(fixture.boot_args().is_none());
+        assert!(
+            stderr(&output).contains(
+                "rdsh-compaction.json routes[0] names a provider-native method this profile does not serve"
+            ),
+            "{}",
+            stderr(&output)
+        );
+        // The reason never echoes the route.
+        assert!(
+            !stderr(&output).contains("big-model"),
+            "{}",
+            stderr(&output)
+        );
+    }
+}
+
+/// A headless dump whose default model goes to `provider`.
+fn dump_with_default_route(provider: &str) -> String {
+    format!(
+        "{HEADLESS_DUMP}- id: agent-default-model\n\
+         \x20 name: '@deepseek-ai/dsh-agent-default-model'\n\
+         \x20 config:\n\
+         \x20   provider: {provider}\n\
+         \x20   model: m\n"
+    )
+}
+
+#[test]
+fn zdr_mode_refuses_a_boot_whose_summaries_go_to_an_unverified_route() {
+    // Feature off, mode forced by the environment: the default route decides.
+    let fixture = Fixture::new(&dump_with_default_route("hai"), false);
+    let output = fixture
+        .rdsh()
+        .env("RDSH_ZDR", "1")
+        .args(["--no-slim", "--profile", "headless"])
+        .output()
+        .unwrap();
+    if no_node_runtime(&output) {
+        return;
+    }
+    assert!(!output.status.success(), "{}", stderr(&output));
+    assert!(fixture.boot_args().is_none());
+    assert!(
+        stderr(&output).contains("ZDR mode: compaction would send conversation content to a route that is not verified as zero data retention (the default model route)"),
+        "{}",
+        stderr(&output)
+    );
+    // The route's name is not echoed.
+    assert!(!stderr(&output).contains("hai"), "{}", stderr(&output));
+
+    // Without the mode the same profile boots as before.
+    let output = fixture.boot("headless", &[]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(!stderr(&output).contains("ZDR"), "{}", stderr(&output));
+}
+
+#[test]
+fn zdr_mode_lets_a_self_hosted_route_boot_and_checks_the_settings_file_too() {
+    let fixture = Fixture::new(&dump_with_default_route("local-openai"), true);
+    let output = fixture
+        .rdsh()
+        .env("RDSH_ZDR", "1")
+        .args(["--no-slim", "--profile", "headless"])
+        .output()
+        .unwrap();
+    if no_node_runtime(&output) {
+        return;
+    }
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("[rdsh] ZDR mode: compaction destinations verified (1 routes)"),
+        "{}",
+        stderr(&output)
+    );
+    assert!(fixture.boot_args().is_some());
+
+    // A policy for an unknown route is a destination of its own.
+    fixture.write_policy(POLICY);
+    let output = fixture
+        .rdsh()
+        .env("RDSH_ZDR", "1")
+        .args(["--no-slim", "--profile", "headless"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("(policies[0])"),
+        "{}",
+        stderr(&output)
+    );
+    // RDSH_ZDR=0 wins over everything and restores the plain boot.
+    let output = fixture
+        .rdsh()
+        .env("RDSH_ZDR", "0")
+        .args(["--no-slim", "--profile", "headless"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", stderr(&output));
+
+    let doctor = fixture
+        .rdsh()
+        .env("RDSH_ZDR", "1")
+        .arg("doctor")
+        .output()
+        .unwrap();
+    let text = stdout(&doctor);
+    assert!(text.contains("[rdsh] ZDR mode: on;"), "{text}");
+    assert!(
+        text.contains("local-openai: available (self-hosted)"),
+        "{text}"
+    );
+    assert!(!stdout(&fixture.doctor(&[])).contains("ZDR mode"));
+}

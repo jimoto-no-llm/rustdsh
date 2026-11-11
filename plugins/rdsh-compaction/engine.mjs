@@ -96,7 +96,9 @@ export function withInstructions(Base, services = {}) {
     async compactIfNeeded(agent, trigger, signal) {
       const target = agent.session.requestHeader()?.config;
       const route = this.rdshPolicy?.routes.find(r => r.provider === target?.provider && r.model === target?.model);
-      if (route?.method === 'off') return null;
+      // Anything but the DSH summary leaves the route alone: `off`, or a
+      // provider-native method whose compaction the adapter performs.
+      if (route && route.method !== 'dsh_summary') return null;
       if (trigger === 'pressure' && this.rdshPolicy?.early) {
         let config;
         try { config = await earlyConfig(this, agent, signal, services); }

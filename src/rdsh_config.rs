@@ -230,6 +230,11 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "pass per-model compaction thresholds from rdsh-compaction.json to DSH at boot",
     },
     FeatureDef {
+        id: "zdr",
+        default: false,
+        summary: "refuse a boot whose compaction would send content to a route not verified as zero data retention",
+    },
+    FeatureDef {
         id: "slim_lazy_plugins",
         default: true,
         summary: "ask DSH to load plugins lazily in slim mode",

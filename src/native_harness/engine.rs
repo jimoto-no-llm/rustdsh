@@ -11,6 +11,17 @@ use tokio::sync::oneshot;
 pub const MAX_STEPS: usize = 12;
 pub const MAX_HISTORY: usize = 512 * 1024;
 
+/// Whether `messages` plus `next` still serialize within [`MAX_HISTORY`], the
+/// same measure the loop enforces before each model call.
+pub fn fits_with(messages: &[Message], next: &Message) -> bool {
+    // A value that cannot be serialized counts as too large.
+    let size = |bytes: serde_json::Result<Vec<u8>>| bytes.map_or(usize::MAX, |b| b.len());
+    size(serde_json::to_vec(messages))
+        .saturating_add(size(serde_json::to_vec(next)))
+        .saturating_add(usize::from(!messages.is_empty()))
+        <= MAX_HISTORY
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Message {
     pub role: String,
@@ -202,8 +213,18 @@ impl Engine {
             .map_err(|_| anyhow::anyhow!("承認が取り消されました"))?;
         Ok(allowed)
     }
-    pub async fn run(self: Arc<Self>, run_id: u64) {
-        let result = self.run_loop(run_id).await;
+    /// Run a turn. `deferred` is a user message that did not fit at admission:
+    /// it joins the history only if compacting the finished turns makes room,
+    /// so a refused request leaves the history exactly as it was.
+    pub async fn run_admitting(self: Arc<Self>, run_id: u64, deferred: Option<Message>) {
+        let admitted = match deferred {
+            Some(message) => self.admit_after_compaction(run_id, message).await,
+            None => Ok(()),
+        };
+        let result = match admitted {
+            Ok(()) => self.run_loop(run_id).await,
+            Err(error) => Err(error),
+        };
         let mut state = self.state.lock().unwrap();
         if state.run_id != run_id {
             return;
@@ -442,7 +463,7 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
                 registry: profiles::Registry::default(),
                 secrets: vec![],
             });
-            let task = tokio::spawn(e.clone().run(1));
+            let task = tokio::spawn(e.clone().run_admitting(1, None));
             // The runner is a Node child process. A loaded or instrumented
             // runner (coverage builds start it far slower) can take well over
             // 5 s to reach the approval, so wait long enough that only a real
@@ -543,7 +564,7 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
                 registry: profiles::tests::registry("openai-completions", &url),
             });
             let next = e.clone();
-            let task = tokio::spawn(async move { next.run(1).await });
+            let task = tokio::spawn(async move { next.run_admitting(1, None).await });
             let id = tokio::time::timeout(std::time::Duration::from_secs(5), async {
                 loop {
                     if let Some(pending) = e.state.lock().unwrap().pending.clone() {

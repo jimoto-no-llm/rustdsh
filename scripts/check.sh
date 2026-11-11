@@ -82,6 +82,7 @@ case "$mode" in
     rust=1 node=1 dashboard=1 release=1 markdown=1 shell=1 devtools=1 installer=1 ps1=1 e2e=1
     [ -n "$headless_tests" ] && headless=1
     for d in plugins/*/; do plugins=$(add_word "$plugins" "${d%/}"); done
+    for d in tools/*/; do [ -d "$d" ] && plugins=$(add_word "$plugins" "${d%/}"); done
     for t in tests/*.test.mjs tests/*/*.test.mjs; do [ -f "$t" ] && classify_test "$t"; done ;;
   changed)
     files=$(changed_files | sort -u)
@@ -104,6 +105,8 @@ case "$mode" in
 '
       case "$f" in
         plugins/*/*) d=${f#plugins/}; plugins=$(add_word "$plugins" "plugins/${d%%/*}"); node=1 m=1 ;;
+        # Development tools carry their own npm test, run like a plugin's.
+        tools/*/*) d=${f#tools/}; plugins=$(add_word "$plugins" "tools/${d%%/*}"); node=1 m=1 ;;
       esac
       case "$f" in
         install.sh|install-banner.sh|sync-dsh.sh|release-digests.tsv|tests/install-isolated*|tests/installer-*) installer=1 m=1 ;;

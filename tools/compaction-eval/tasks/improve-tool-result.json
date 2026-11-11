@@ -1,0 +1,31 @@
+{
+  "id": "improve-tool-result",
+  "split": "improve",
+  "kind": "tool_result",
+  "required": true,
+  "tools": true,
+  "files": {
+    "data/config.txt": "token = QX-4471-ZETA\n"
+  },
+  "turns": [
+    "Read the file data/config.txt with your file tool and remember the token in it for later. Reply only with: noted.",
+    "Do not use any tools. In about 400 words, explain how a hash table works, including collisions and resizing.",
+    "Do not use any tools. In about 400 words, explain how a B-tree works and why databases use it.",
+    "Do not use any tools. In about 400 words, explain TCP congestion control, including slow start.",
+    "Do not use any tools. In about 400 words, explain public-key cryptography and digital signatures.",
+    "Do not use any tools. In about 400 words, explain how garbage collection works in managed runtimes.",
+    "Do not use any tools. In about 400 words, explain how DNS resolution works, including caching."
+  ],
+  "question": "Do not use any tools. Return the token you read from data/config.txt earlier as {\"token\": string}. Reply with one JSON object only.",
+  "expect": {
+    "equals": {
+      "token": "QX-4471-ZETA"
+    },
+    "tool_calls": [
+      {
+        "name": "read",
+        "min": 1
+      }
+    ]
+  }
+}

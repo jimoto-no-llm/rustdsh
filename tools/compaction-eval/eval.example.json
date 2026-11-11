@@ -1,0 +1,15 @@
+{
+  "rdsh": "../../target/debug/rdsh",
+  "dshRuntime": "/path/to/dsh/runtime",
+  "provider": {
+    "name": "evalroute",
+    "baseUrl": "http://127.0.0.1:8000/v1",
+    "apiKeyEnv": "RDSH_EVAL_KEY",
+    "model": "your-model",
+    "contextWindow": 65536,
+    "outputReserve": 2048
+  },
+  "thresholds": { "trigger_tokens": 4000, "retain_tokens": 1000, "max_tokens": 4096 },
+  "budget": { "rounds": 2, "candidates": 2, "concurrency": 1, "maxRuns": 60, "maxCallsPerRun": 30, "runTimeoutMs": 900000 },
+  "stateDir": "compaction-eval-state"
+}

@@ -90,6 +90,10 @@ pub fn decide(value: &Value) -> Result<Value> {
 
 pub fn report(text: &str) -> Result<Value> {
     let mut records: BTreeMap<String, Value> = BTreeMap::new();
+    // Provider-side compaction results the adapter stored beside assistant
+    // messages, keyed by the hash of the opaque item. The item itself and the
+    // messages it replaced are never copied into the report.
+    let mut windows: BTreeMap<String, Value> = BTreeMap::new();
     let mut prunes = 0u64;
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         if line.len() > 8 * 1024 * 1024 {
@@ -100,6 +104,42 @@ pub fn report(text: &str) -> Result<Value> {
         let kind = event["type"].as_str().unwrap_or_default();
         if kind == "compaction/prune" {
             prunes += 1;
+        }
+        if kind == "assistant/message" {
+            let state = &event["data"]["message"]["source"]["replayState"]["response"];
+            if state["kind"] == "rdsh-llm-native" {
+                if let Some(items) = state["window"]["items"].as_array() {
+                    // OpenAI and xAI: a compaction item with an opaque value.
+                    // Anthropic: a compaction block inside a message, signed.
+                    let mut opaque: Vec<&str> = Vec::new();
+                    for item in items {
+                        if item["type"] == "compaction" {
+                            opaque.extend(item["encrypted_content"].as_str());
+                        }
+                        for block in item["content"].as_array().into_iter().flatten() {
+                            if block["type"] == "compaction" {
+                                opaque.extend(block["signature"].as_str());
+                            }
+                        }
+                    }
+                    let mut hasher = Sha256::new();
+                    for part in &opaque {
+                        hasher.update(part.as_bytes());
+                        hasher.update([0]);
+                    }
+                    let hash: String = hasher
+                        .finalize()
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect();
+                    let row = windows.entry(hash.clone()).or_insert_with(|| {
+                        json!({"sha256":hash,"items":items.len(),
+                            "opaque_bytes":opaque.iter().map(|part| part.len()).sum::<usize>(),
+                            "replaced_messages":state["window"]["covered"].as_u64(),"carried_by":0})
+                    });
+                    row["carried_by"] = json!(row["carried_by"].as_u64().unwrap_or(0) + 1);
+                }
+            }
         }
         if !["compaction/start", "compaction/summary", "compaction/end"].contains(&kind) {
             continue;
@@ -153,13 +193,26 @@ pub fn report(text: &str) -> Result<Value> {
                 && row["failed"] == false
         );
     }
-    Ok(json!({"schema":1,"count":rows.len(),"prune_events":prunes,"compactions":rows}))
+    let provider_windows: Vec<_> = windows.into_values().collect();
+    Ok(
+        json!({"schema":1,"count":rows.len(),"prune_events":prunes,"compactions":rows,
+        "provider_windows":provider_windows}),
+    )
 }
 
 pub fn capabilities() -> Value {
-    json!({"default_method":"dsh_summary","methods":["dsh_summary","off"],
+    json!({"default_method":"dsh_summary","methods":["dsh_summary","off","openai_standalone","xai_standalone","anthropic_on_demand","anthropic_threshold"],
         "triggers":["threshold","manual","after_overflow","explicit_range"],
-        "unsupported":["provider_native","background","pause_after","model_tool"],
+        "adapter_methods":{
+            "openai_standalone":{"plugin":"rdsh-llm-native","triggers":["threshold","background","pause_after"],
+                "result":"opaque, stored in the session log beside the response","verified_against":"local emulator only"},
+            "xai_standalone":{"plugin":"rdsh-llm-native","triggers":["threshold","background","pause_after"],
+                "result":"opaque, stored in the session log beside the response","verified_against":"local emulator only"},
+            "anthropic_on_demand":{"plugin":"rdsh-llm-native","triggers":["threshold","background","pause_after"],
+                "result":"readable and signed, stored in the session log beside the response","verified_against":"local emulator only"},
+            "anthropic_threshold":{"plugin":"rdsh-llm-native","triggers":["threshold","pause_after"],
+                "result":"readable and signed, stored in the session log beside the response","verified_against":"local emulator only"}},
+        "unsupported":["openai_in_stream","model_tool"],
         "retention":"not_guaranteed","source_url":"https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/compaction.md",
         "checked_at":"2026-11-10","backend":"@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2"})
 }

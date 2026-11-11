@@ -15,6 +15,13 @@ export function decideWithRust(binary, input, signal) {
   });
 }
 
+// `off` and the provider-native methods both mean: this backend does not
+// compact the route. For a provider-native route the adapter owns compaction;
+// rdsh has already checked that the profile serves it.
+export const NATIVE_METHODS = Object.freeze(['openai_in_stream', 'openai_standalone', 'anthropic_threshold',
+  'anthropic_on_demand', 'xai_standalone']);
+const METHODS = ['dsh_summary', 'off', ...NATIVE_METHODS];
+
 export function policyOptions(config = {}) {
   const { rdshRoutes = [], rdshEarly, rdshBinary, ...base } = config;
   if (!Array.isArray(rdshRoutes) || rdshRoutes.length > 200) throw new TypeError('invalid rdshRoutes');
@@ -22,7 +29,7 @@ export function policyOptions(config = {}) {
   for (const route of rdshRoutes) {
     if (!route || typeof route.provider !== 'string' || !route.provider.trim()
       || typeof route.model !== 'string' || !route.model.trim()
-      || !['dsh_summary', 'off'].includes(route.method)) {
+      || !METHODS.includes(route.method)) {
       throw new TypeError('rdsh-compaction: unsupported route or native compaction method');
     }
     const key = JSON.stringify([route.provider, route.model]);

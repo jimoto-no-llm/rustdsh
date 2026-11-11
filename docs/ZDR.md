@@ -1,6 +1,6 @@
 # ZDR モード（保持しないルートだけを使う）の要件
 
-Status: 要件定義（実装なし）。親 [#87](https://github.com/jimoto-no-llm/rustdsh/issues/87)（closed）、
+Status: 要件定義。実装は圧縮の分だけ（ZDR モードで、圧縮の送り先が確認できない時に起動を断る。[COMPACTION-POLICY.md](COMPACTION-POLICY.md) の受入範囲を参照）。ほかは実装なし。親 [#87](https://github.com/jimoto-no-llm/rustdsh/issues/87)（closed）、
 子 [#484](https://github.com/jimoto-no-llm/rustdsh/issues/484)。関連する提案は
 [provider-quota-routing.md](proposals/provider-quota-routing.md)（PR [#513](https://github.com/jimoto-no-llm/rustdsh/pull/513)、merged）。
 

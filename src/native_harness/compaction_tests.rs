@@ -173,7 +173,7 @@ fn cuts_keep_complete_tool_groups_and_exact_denials() {
     ]);
     let e = engine(messages.clone(), profiles::Registry::default());
     let limits = Limits::resolve(&e.compaction, None).unwrap();
-    let range = cut(&messages, &limits).unwrap();
+    let range = cut(&messages, &limits, true).unwrap();
     assert!(range.contains(&2) && range.contains(&3));
     let record = denied(&messages[range]);
     assert!(record.contains("USER_DENIED") && record.contains("private.txt"));
@@ -183,7 +183,7 @@ fn cuts_keep_complete_tool_groups_and_exact_denials() {
     );
     // An unresolved proposal is never summarized.
     messages.remove(3);
-    assert!(cut(&messages, &limits).unwrap().end <= 2);
+    assert!(cut(&messages, &limits, true).unwrap().end <= 2);
 }
 
 #[test]
@@ -193,4 +193,73 @@ fn known_capacity_clamps_tokens_unknown_capacity_uses_bytes_only() {
     assert_eq!(limits.tokens.unwrap().trigger, 70_000);
     assert_eq!(limits.tokens.unwrap().retain, 16_000);
     assert!(Limits::resolve(&options, None).unwrap().tokens.is_none());
+}
+
+/// Finished turns that no longer leave room for one more user message.
+fn full_history() -> Vec<Message> {
+    vec![
+        message("user", "original goal"),
+        message("assistant", &"first long reply. ".repeat(16_000)),
+        message("user", "continue"),
+        message("assistant", &"second long reply. ".repeat(14_000)),
+    ]
+}
+
+#[tokio::test]
+async fn a_message_that_does_not_fit_is_admitted_after_compaction() {
+    let (url, server) = profiles::tests::mock(vec![(
+        200,
+        json!({"choices":[{"message":{"content":"kept facts"}}]}),
+    )]);
+    let e = engine(
+        full_history(),
+        profiles::tests::registry("openai-completions", &url),
+    );
+    let next = message("user", "next request");
+    assert!(!crate::native_harness::engine::fits_with(
+        &e.state.lock().unwrap().messages,
+        &next
+    ));
+    e.admit_after_compaction(1, next.clone()).await.unwrap();
+    assert_eq!(server.join().unwrap().len(), 1);
+    let s = e.state.lock().unwrap();
+    assert_eq!(s.messages[0].content, "original goal");
+    assert!(s.messages.iter().any(|m| m.role == "summary"));
+    assert_eq!(s.messages.last(), Some(&next));
+    assert!(bytes(&s.messages) <= MAX_HISTORY);
+}
+
+#[tokio::test]
+async fn a_message_that_still_does_not_fit_is_refused_and_history_is_unchanged() {
+    let (url, server) = profiles::tests::mock(vec![(
+        500,
+        json!({"choices":[{"message":{"content":"bad"}}]}),
+    )]);
+    let e = engine(
+        full_history(),
+        profiles::tests::registry("openai-completions", &url),
+    );
+    let before = e.state.lock().unwrap().messages.clone();
+    let error = e
+        .admit_after_compaction(1, message("user", "next request"))
+        .await
+        .unwrap_err();
+    server.join().unwrap();
+    assert_eq!(error.to_string(), "会話がサイズ上限に達しています");
+    assert_eq!(e.state.lock().unwrap().messages, before);
+}
+
+#[test]
+fn a_held_back_message_lets_the_newest_finished_turn_be_cut() {
+    let limits = Limits::resolve(
+        &engine(vec![], profiles::Registry::default()).compaction,
+        None,
+    )
+    .unwrap();
+    let messages = full_history();
+    // With an active request the newest message is never part of the cut.
+    assert!(cut(&messages, &limits, true).unwrap().end < messages.len());
+    assert!(cut(&messages, &limits, true).unwrap().end <= 2);
+    // Held back at admission: the turn after the last user message is finished too.
+    assert!(cut(&messages, &limits, false).unwrap().end > 2);
 }

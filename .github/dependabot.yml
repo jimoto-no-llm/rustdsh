@@ -1,6 +1,24 @@
 version: 2
 updates:
   - package-ecosystem: npm
+    directory: /plugins/rdsh-llm-native
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /tools/compaction-eval
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /tools/responses-emulator
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
     directory: /plugins/rdsh-compaction
     schedule:
       interval: weekly

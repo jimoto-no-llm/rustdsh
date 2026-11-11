@@ -57,6 +57,7 @@ mod cloud;
 mod compact;
 mod compaction_cli;
 mod compaction_config;
+mod compaction_native;
 mod compaction_overlay;
 mod compaction_policy;
 mod compute;
@@ -119,6 +120,7 @@ mod webui_assets;
 mod webui_gzip;
 mod worker_git;
 mod worker_scopes;
+mod zdr;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -3590,6 +3592,12 @@ fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
     // Compaction policy layer: the feature switch and the policy file as a
     // boot would read them. Read-only; no profile is composed here.
     for line in compaction_policy::doctor_lines(&compaction_policy::report(), locale) {
+        say(line);
+    }
+    for line in zdr::doctor_lines(zdr::mode_on(
+        &rdsh_config::load(),
+        std::env::var("RDSH_ZDR").ok().as_deref(),
+    )) {
         say(line);
     }
     say(format!(

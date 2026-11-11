@@ -10,6 +10,25 @@ test('unsupported methods and malformed early policies fail at construction', ()
   assert.throws(() => policyOptions({ rdshEarly: { expected_turns: 4, min_tokens: 100 } }));
 });
 
+test('a provider-native route is left to the adapter, and unknown methods are refused', async () => {
+  class Base {
+    constructor(_ctx, config) { this.config = config; }
+    compactIfNeeded() { return 'automatic'; }
+    compactNow() { return 'manual'; }
+  }
+  const Engine = withInstructions(Base);
+  const engine = new Engine({}, { rdshRoutes: [{ provider: 'p', model: 'm', method: 'openai_standalone' },
+    { provider: 'p', model: 'summary', method: 'dsh_summary' }] });
+  const agent = { session: { requestHeader: () => ({ config: { provider: 'p', model: 'm' } }) } };
+  assert.equal(await engine.compactIfNeeded(agent, 'pressure'), null);
+  assert.equal(await engine.compactIfNeeded(agent, 'context-overflow'), null);
+  assert.equal(engine.compactNow(), 'manual');
+  agent.session.requestHeader = () => ({ config: { provider: 'p', model: 'summary' } });
+  assert.equal(await engine.compactIfNeeded(agent, 'pressure'), 'automatic');
+  assert.throws(() => new Engine({}, { rdshRoutes: [{ provider: 'p', model: 'm', method: 'provider_native' }] }),
+    /unsupported route or native compaction method/);
+});
+
 test('off suppresses both automatic triggers and preserves manual compaction', async () => {
   class Base {
     constructor(_ctx, config) { this.config = config; }

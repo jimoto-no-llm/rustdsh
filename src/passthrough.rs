@@ -711,6 +711,44 @@ fn write_compaction_overlay(body: &str) -> std::io::Result<String> {
 /// required plugin, and unreadable composed config reject the enabled boot.
 /// A profile without a safely configurable row or an unwritable overlay is
 /// reported as skipped rather than silently claiming the policy was applied.
+/// With ZDR mode on, refuse a boot whose compaction would send conversation
+/// content to a route that is not verified as zero data retention (RQ-10).
+/// Returns the notice for a boot that passed, or `None` while the mode is off.
+fn zdr_compaction_guard(orig: &str, profile: &str) -> anyhow::Result<Option<String>> {
+    let cfg = crate::rdsh_config::load();
+    if !crate::zdr::mode_on(&cfg, std::env::var("RDSH_ZDR").ok().as_deref()) {
+        return Ok(None);
+    }
+    let Some(composed) = dump_composed_config(orig, profile) else {
+        anyhow::bail!("ZDR mode: the profile config could not be read, so compaction routes cannot be verified");
+    };
+    // The settings file only matters while its feature passes it to DSH.
+    let mut named = Vec::new();
+    if crate::rdsh_config::feature_enabled(&cfg, crate::compaction_overlay::FEATURE_ID) {
+        if let Ok(text) = std::fs::read_to_string(crate::compaction_policy::policy_path()) {
+            if let Ok(policies) = crate::compaction_policy::parse(&text) {
+                for (index, policy) in policies.iter().enumerate() {
+                    named.push((format!("policies[{index}]"), policy.provider.clone()));
+                }
+            }
+        }
+        if let Ok(options) = crate::compaction_config::Options::load() {
+            for (index, route) in options.routes.iter().enumerate() {
+                // `off` sends nothing for that route.
+                if route.method != "off" {
+                    named.push((format!("routes[{index}]"), route.provider.clone()));
+                }
+            }
+        }
+    }
+    match crate::zdr::check_compaction(&named, &composed) {
+        Ok(routes) => Ok(Some(format!(
+            "[rdsh] ZDR mode: compaction destinations verified ({routes} routes)"
+        ))),
+        Err(reason) => anyhow::bail!("{reason}"),
+    }
+}
+
 fn compaction_layer(orig: &str, profile: &str) -> anyhow::Result<CompactionLayer> {
     if !crate::rdsh_config::feature_enabled(
         &crate::rdsh_config::load(),
@@ -745,6 +783,9 @@ fn compaction_layer(orig: &str, profile: &str) -> anyhow::Result<CompactionLayer
     let Some(composed) = dump_composed_config(orig, profile) else {
         anyhow::bail!("compaction: the profile config could not be read");
     };
+    if let Err(reason) = crate::compaction_native::check_routes(&options, &composed) {
+        anyhow::bail!("{file} {reason}");
+    }
     let overlay = if options.needs_plugin() {
         crate::compaction_overlay::overlay_with_options(&composed, &policies, &options)
     } else {
@@ -1015,6 +1056,11 @@ pub(crate) fn assemble_boot(
     } else {
         compaction_layer(origin, profile)?
     };
+    let zdr_notice = if dry {
+        None
+    } else {
+        zdr_compaction_guard(origin, profile)?
+    };
     if let CompactionLayer::Applied { path, .. } = &compaction {
         cmd.arg("--patch").arg(path);
     }
@@ -1053,6 +1099,7 @@ pub(crate) fn assemble_boot(
         )),
         CompactionLayer::Off => {}
     }
+    notices.extend(zdr_notice);
     Ok(crate::harness_adapter::BootedCommand {
         command: cmd,
         notices,

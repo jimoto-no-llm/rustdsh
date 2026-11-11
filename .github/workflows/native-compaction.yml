@@ -32,7 +32,7 @@ jobs:
       - run: cargo test --locked --lib
       - run: cargo test --locked --bin rdsh compaction
       - run: cargo test --locked --test compaction_report_cli --test compaction_policy_cli
-      - run: node --test plugins/rdsh-compaction/test/*.test.mjs tests/compaction-dsh.test.mjs
+      - run: node --test plugins/rdsh-compaction/test/*.test.mjs tests/compaction-dsh.test.mjs tools/compaction-eval/test/*.test.mjs plugins/rdsh-llm-native/test/*.test.mjs tools/responses-emulator/test/*.test.mjs
         env:
           RDSH_BIN: ${{ github.workspace }}/target/debug/rdsh${{ runner.os == 'Windows' && '.exe' || '' }}
           RDSH_DSH_RUNTIME: ${{ runner.temp }}/compaction-runtime

@@ -1,0 +1,9 @@
+# The row registers no route until a profile gives it providers:
+#   - id: rdsh-llm-native
+#     config:
+#       providers:
+#         my-route: { baseURL: ..., apiKeyEnv: ..., models: [...] }
+- insert:
+    - id: rdsh-llm-native
+      name: rdsh-llm-native
+      config: {}

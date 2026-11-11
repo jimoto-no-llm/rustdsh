@@ -16,6 +16,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `rdsh compaction report` を追加しました。`native-web` はツール結果の削減と同じモデルでの要約を
   行い、拒否記録を保持し、失敗・キャンセル時は元の履歴を維持します。
   通信なしの `native_compaction` ライブラリも同梱します。
+  `native-web` は、入力を足すと上限を超える場合に、終わったターンを圧縮してから入力を受け付けます。
+  圧縮しても入らない場合は、履歴を変えずにエラーを返します。
+  `routes.method` は `native_compaction` の対応表で検査します。
+  要約指示を評価して改善する開発用の道具 `tools/compaction-eval/` を追加しました。実行時の処理には含まれません。
+  プロバイダ側の圧縮を使う任意プラグイン `rdsh-llm-native`（OpenAI の Responses の形）と、試し用の代役 `tools/responses-emulator/` を追加しました。
+  `routes.method` の `openai_standalone` は、プロファイルがその接続先を持つ時だけ受け付けます。本物の API では未確認です。
+  `rdsh-llm-native` は裏での圧縮（`compactInBackground`）に対応し、`rdsh compaction report` はプロバイダ側の圧縮結果をハッシュと件数で出します。
+  `rdsh-llm-native` は xAI と Anthropic（要約だけを頼む形と、しきい値の形）にも対応し、圧縮の直後に止まる設定（`pauseAfterCompaction`）を持ちます。
+  `features.zdr`（既定はオフ）と `RDSH_ZDR` を追加しました。ZDR モードでは、圧縮の送り先を同梱の表で確かめ、確認できない時は起動を断ります。
+  ZDR のほかの要件は未実装です。
   詳細と未対応範囲は `docs/COMPACTION-POLICY.md` を参照してください。
 
 ## [0.15.1] - 2026-11-04
