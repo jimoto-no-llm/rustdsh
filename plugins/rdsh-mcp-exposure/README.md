@@ -1,13 +1,13 @@
 # Optional MCP exposure bundle
 
-For an authorized original DSH **0.2.0-rc.2 or 0.2.1-alpha.3** composition, register MCP tools
+For an authorized original DSH **0.2.0-rc.2, 0.2.1-alpha.3, 0.2.1-rc.3 or 0.2.1-rc.4** composition, register MCP tools
 through the existing MCP client and control which declarations the model sees.
 The original client owns transports, namespaces, instructions, resources,
 reconnection and disposal; the original ToolRuntime owns execution, validation,
 approvals, scope restrictions and PTC. This bundle uses public Cordis
 `Context.extend`, `register`, `get`, `schemas`, guards and prompt waterfalls.
 
-The four DSH peers must all be exact `0.2.0-rc.2` or all exact `0.2.1-alpha.3`; mixed, unknown and future releases fail before registration or connection. Cordis peers are exact `4.0.4` or `4.0.5-alpha.2`. The owned configuration schema uses Schemastery `3.18.5-alpha.2`, also checked with the original rc.2 MCP schema.
+The four DSH peers must all use the same supported exact release: `0.2.0-rc.2`, `0.2.1-alpha.3`, `0.2.1-rc.3` or `0.2.1-rc.4`. Mixed, unknown and future releases fail before registration or connection. Development dependencies are pinned together to the audited `0.2.1-rc.4` graph; update them as a group and verify the guarded runtime before adopting a new release. Cordis peers are exact `4.0.4`, `4.0.5-alpha.2` or `4.0.5`. The owned configuration schema uses Schemastery `3.18.5`, also checked with the original rc.2 MCP schema.
 
 ## Updating an older configuration
 

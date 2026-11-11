@@ -1,20 +1,20 @@
 # Remote MCP OAuth for DSH
 
 Optional Cordis bundle for Issue [#77](https://github.com/jimoto-no-llm/rustdsh/issues/77).
-Requires Node 24, DSH MCP/credentials `0.2.0-rc.2`, MCP SDK `2.3.1`
-(or previously audited external `2.2.0`) and an explicitly installed HTTP option seam. The Rust launcher, agent loop, profile
+Requires Node 24, DSH MCP/credentials `0.2.0-rc.2`, MCP SDK `2.4.0`
+(or previously audited external `2.2.0` / `2.3.1`) and an explicitly installed HTTP option seam. The Rust launcher, agent loop, profile
 boot, native MCP supervisor, tool policy and resource handling remain native.
 This bundle is an opt-in candidate; it is not enabled by an installer or profile.
 
-The SDK must resolve to `2.3.1` from the native `@deepseek-ai/dsh-mcp-client`
+The SDK must resolve to `2.4.0` from the native `@deepseek-ai/dsh-mcp-client`
 dependency graph. This bundle's targeted npm override removes that package's
 otherwise nested `2.0.0` dependency. Cordis and the native credentials services
 continue to come from the same DSH installation. Previously audited external
-`2.2.0` installations remain accepted; only exact `2.2.0` and `2.3.1` are allowed,
+`2.2.0` / `2.3.1` installations remain accepted; only exact `2.2.0`, `2.3.1` and `2.4.0` are allowed,
 not a semver range. No installed DSH package or profile is updated automatically.
 
-SDK `2.3.1` retains the native Client/HTTP transport and the discovery, PKCE,
-registration, exchange and refresh APIs used here ([public API](https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v2.3.1/packages/client/src/index.ts)).
+SDK `2.4.0` retains the native Client/HTTP transport and the discovery, PKCE,
+registration, exchange and refresh APIs used here ([public API](https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v2.4.0/packages/client/src/index.ts)).
 Its [redirect hardening](https://github.com/modelcontextprotocol/typescript-sdk/commit/433eb413dc305ebeb93b8ebcde0095a8fc0d5fa0)
 does not relax this bundle's stricter policy: both fetch seams still force
 `redirect: "error"`, including same-origin 307/308. Never set `redirectPolicy:
@@ -57,7 +57,7 @@ Use the package file of the **same DSH installation** that will load the bundle:
 
 When using `RDSH_DSH_PACKAGE`, first apply the following override in the owning
 installation project's root `package.json`, regenerate and review its lockfile
-so the native client resolves to `2.3.1`, then run
+so the native client resolves to `2.4.0`, then run
 `npm ci --ignore-scripts --no-audit --no-fund` in that project. npm can retain an
 old nested resolution when updating an existing lockfile: verify with
 `npm ls @modelcontextprotocol/client @modelcontextprotocol/core --all` that no
@@ -70,14 +70,14 @@ instead of mixing the bundle's SDK with that installation's services.
 {
   "overrides": {
     "@deepseek-ai/dsh-mcp-client@0.2.0-rc.2": {
-      "@modelcontextprotocol/client": "2.3.1"
+      "@modelcontextprotocol/client": "2.4.0"
     }
   }
 }
 ```
 
 Merge this entry into any existing `overrides`; retain the DSH MCP/credentials
-versions above. A `2.3.1` direct dependency alone does not replace the native
+versions above. A `2.4.0` direct dependency alone does not replace the native
 client's exact `2.0.0` dependency. The source hashes below remain the audited
 DSH MCP source; the SDK update does not change that source or install the seam.
 
@@ -103,7 +103,7 @@ shipped. Future package updates fail closed until a new seam is reviewed.
 `revert-seam` だけは SDK や資格情報サービスを読み込まず、指定した DSH の
 監査済みファイルを復元します。旧 SDK `2.0.0` が残っている場合や SDK を
 削除した場合も、依存の再インストールなしで復元できます。インストール、
-検証、OAuth 操作には SDK `2.3.1`（既存の外部環境では `2.2.0` も可）と同じ DSH のサービスが必要です。
+検証、OAuth 操作には SDK `2.4.0`（既存の外部環境では `2.2.0` も可）と同じ DSH のサービスが必要です。
 明示するパスは JSON object を記述した `package.json` に限ります。DSH を
 所有するプロジェクトの manifest も使え、特定の package 名は要求しません。
 

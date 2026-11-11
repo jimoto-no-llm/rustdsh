@@ -97,8 +97,8 @@ test("an external DSH graph with an unaudited nested SDK is rejected", async (t)
     );
 });
 
-test("both audited SDK versions are accepted from an external DSH graph", async (t) => {
-  for (const version of ["2.2.0", "2.3.1"]) {
+test("all audited SDK versions are accepted from an external DSH graph", async (t) => {
+  for (const version of ["2.2.0", "2.3.1", "2.4.0"]) {
     const runtime = await loadRuntime(await versionFixture(t, version));
     assert.equal(runtime.sdk.syntheticVersion, version);
     assert.equal(runtime.sdkVersion, version);

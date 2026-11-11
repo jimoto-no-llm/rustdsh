@@ -60,6 +60,14 @@ hyper-util = { version = "0.1", features = ["service", "tokio"] }
 reqwest = { version = "0.12.9", default-features = false, features = ["rustls-tls", "stream"] }
 tokio = { version = "1.48", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tower = { version = "0.5", features = ["util"] }
+ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
+crossterm = "0.28.1"
+unicode-segmentation = "=1.12.0"
+unicode-width = "=0.2.0"
+vt100 = "=0.15.2"
+png = "=0.18.1"
+base64 = "=0.22.1"
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "handshake"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

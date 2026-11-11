@@ -34,12 +34,12 @@ fn sdk_python_path(bridge_dir: &Path, is_windows: bool) -> PathBuf {
 /// Receives a model JSON envelope as plain text. No SDK tool is exposed.
 /// Credentials come exclusively from inherited allowlisted environment variables
 /// or Cursor's official store under HOME. No credential file is parsed here.
-pub async fn generate(
+pub async fn generate_with_usage(
     config: &SdkConfig,
     provider: &str,
     model: &str,
     prompt: &str,
-) -> Result<String> {
+) -> Result<super::usage::Generation> {
     if model.is_empty()
         || prompt.is_empty()
         || prompt.len() > LIMIT
@@ -117,10 +117,14 @@ pub async fn generate(
     command.env("RDSH_SDK_TMPDIR", &workspace.0);
     command.current_dir(&config.bridge_dir);
     let (status, stdout, _stderr) = run_process(command, &input, 120, LIMIT).await?;
-    decode_sdk_response(status, &stdout)
+    decode_generation(status, &stdout)
 }
 
+#[cfg(test)]
 fn decode_sdk_response(status: i32, bytes: &[u8]) -> Result<String> {
+    Ok(decode_generation(status, bytes)?.text)
+}
+fn decode_generation(status: i32, bytes: &[u8]) -> Result<super::usage::Generation> {
     let value: Value =
         serde_json::from_slice(bytes).map_err(|_| anyhow::anyhow!("SDK_INVALID_RESPONSE"))?;
     if let Some(error) = value.get("error") {
@@ -152,7 +156,10 @@ fn decode_sdk_response(status: i32, bytes: &[u8]) -> Result<String> {
     if text.len() > LIMIT || text.is_empty() {
         bail!("SDK_INVALID_RESPONSE");
     }
-    Ok(text.to_owned())
+    Ok(super::usage::Generation {
+        text: text.to_owned(),
+        usage: super::usage::Usage::parse("openai-responses", &value),
+    })
 }
 
 /// Bounded child transport shared by inference and the explicitly approved Devin
@@ -241,7 +248,7 @@ async fn read_bounded(
     }
 }
 
-struct ProcessGroupGuard(Option<u32>);
+pub(super) struct ProcessGroupGuard(pub(super) Option<u32>);
 impl Drop for ProcessGroupGuard {
     fn drop(&mut self) {
         #[cfg(unix)]

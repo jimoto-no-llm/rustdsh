@@ -1,10 +1,19 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+mod controls;
+mod delegation;
+#[cfg(test)]
+mod delegation_tests;
+mod devin_acp;
 mod engine;
 mod oauth;
 mod profiles;
 mod sdk;
 mod tools;
+mod tui;
+mod usage;
+mod workspace_files;
+pub use tui::cmd_native_tui;
 
 use anyhow::{bail, Result};
 use engine::{Engine, Event, Message, State};
@@ -34,15 +43,13 @@ struct ApprovalRequest {
     allow: bool,
 }
 
-pub fn cmd_native_web(
-    port: u16,
+fn create_engine(
     workspace: PathBuf,
     sdk_dir: Option<PathBuf>,
     dsh_profile: Option<String>,
     dsh_catalog: Option<PathBuf>,
     devin: Option<PathBuf>,
-    locale: crate::locale::Locale,
-) -> Result<()> {
+) -> Result<Arc<Engine>> {
     let workspace = workspace.canonicalize()?;
     if !workspace.is_dir() {
         bail!("--workspaceは既存のディレクトリを指定してください");
@@ -99,7 +106,7 @@ pub fn cmd_native_web(
             .map(|h| PathBuf::from(h).join(".local/bin/devin"))
             .unwrap_or_else(|| PathBuf::from("devin"))
     });
-    let engine = Arc::new(Engine {
+    Ok(Arc::new(Engine {
         state: Mutex::new(State::default()),
         workspace,
         sdk: sdk::SdkConfig {
@@ -109,7 +116,19 @@ pub fn cmd_native_web(
         devin,
         registry,
         secrets,
-    });
+    }))
+}
+
+pub fn cmd_native_web(
+    port: u16,
+    workspace: PathBuf,
+    sdk_dir: Option<PathBuf>,
+    dsh_profile: Option<String>,
+    dsh_catalog: Option<PathBuf>,
+    devin: Option<PathBuf>,
+    locale: crate::locale::Locale,
+) -> Result<()> {
+    let engine = create_engine(workspace, sdk_dir, dsh_profile, dsh_catalog, devin)?;
     let runtime = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -258,9 +277,17 @@ fn dispatch(
 ) -> Result<Value> {
     match (method, path) {
         ("GET", "/api/state") => Ok(engine.snapshot()),
+        ("POST", "/api/controls" | "/api/mode" | "/api/permission") => {
+            let value =
+                serde_json::from_str(body).map_err(|_| anyhow::anyhow!("制御指定が不正です"))?;
+            controls::request(&engine, path, value)
+        }
         ("POST", "/api/model") => {
-            let req: ModelRequest =
+            let mut req: ModelRequest =
                 serde_json::from_str(body).map_err(|_| anyhow::anyhow!("モデル指定が不正です"))?;
+            if req.provider == "dsh:anthropic" {
+                req.provider = "dsh:claude-cli".into();
+            }
             if !engine.model_allowed(&req.provider, &req.model) {
                 bail!("登録済みモデルを選択してください");
             }

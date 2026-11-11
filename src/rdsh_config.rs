@@ -18,6 +18,16 @@ const URL_CHARS: usize = 2000;
 /// An upstream provider id (`DSH_WEB_SEARCH_PROVIDER`), not free text.
 const PROVIDER_CHARS: usize = 100;
 
+/// Profiles supported by the RustXNG CLI. Exact values avoid silent overrides.
+pub(crate) fn canonical_rustxng_profile(value: &str) -> Option<&'static str> {
+    match value {
+        "standard" => Some("standard"),
+        "full" => Some("full"),
+        "clean" => Some("clean"),
+        _ => None,
+    }
+}
+
 // ---- top-level ----
 
 /// rdsh.json 全体 (schema v1)。
@@ -397,6 +407,8 @@ pub struct SearchSection {
     pub max: usize,
     pub web_limit: usize,
     pub searxng_url: String,
+    /// Profile passed to managed RustXNG launches; explicit RUSTXNG_PROFILE wins.
+    pub rustxng_profile: String,
     /// Upstream provider id exported as `DSH_WEB_SEARCH_PROVIDER` for
     /// delegated DSH runs. Empty (the default) leaves the child env alone.
     pub dsh_search_provider: String,
@@ -497,6 +509,7 @@ impl Default for SearchSection {
             max: 100,
             web_limit: 10,
             searxng_url: String::new(),
+            rustxng_profile: "standard".into(),
             dsh_search_provider: String::new(),
         }
     }
@@ -861,6 +874,11 @@ impl RdshSettings {
                 max: clamp_u64(num(&s, "max"), 100, 1, 100) as usize,
                 web_limit: clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize,
                 searxng_url: text(&s, "searxng_url", URL_CHARS),
+                rustxng_profile: canonical_rustxng_profile(
+                    s["rustxng_profile"].as_str().unwrap_or(""),
+                )
+                .unwrap_or("standard")
+                .into(),
                 dsh_search_provider: text(&s, "dsh_search_provider", PROVIDER_CHARS),
             },
             compact: CompactSection {
@@ -967,6 +985,10 @@ impl RdshSettings {
         out.search.max = clamp_u64(num(&s, "max"), 100, 1, 100) as usize;
         out.search.web_limit = clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize;
         out.search.searxng_url = text(&s, "searxng_url", URL_CHARS);
+        out.search.rustxng_profile =
+            canonical_rustxng_profile(s["rustxng_profile"].as_str().unwrap_or(""))
+                .unwrap_or("standard")
+                .into();
         out.search.dsh_search_provider = text(&s, "dsh_search_provider", PROVIDER_CHARS);
         let c = v.get("compact").cloned().unwrap_or(serde_json::Value::Null);
         out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize;
@@ -1065,6 +1087,7 @@ impl RdshSettings {
                 "max": self.search.max,
                 "web_limit": self.search.web_limit,
                 "searxng_url": self.search.searxng_url,
+                "rustxng_profile": self.search.rustxng_profile,
                 "dsh_search_provider": self.search.dsh_search_provider,
             },
             "compact": { "max_tokens": self.compact.max_tokens },
@@ -1196,6 +1219,13 @@ impl RdshSettings {
             "search.max" => self.search.max = parse_usize(raw, 100, locale)? as usize,
             "search.web_limit" => self.search.web_limit = parse_usize(raw, 10, locale)? as usize,
             "search.searxng_url" => self.search.searxng_url = parse_string(raw, URL_CHARS),
+            "search.rustxng_profile" => {
+                self.search.rustxng_profile = canonical_rustxng_profile(&parse_string(raw, 32))
+                    .ok_or_else(|| anyhow::anyhow!("{}", settings_text(locale,
+                        "search.rustxng_profile must be standard, full, or clean",
+                        "search.rustxng_profile 必须为 standard、full 或 clean",
+                        "search.rustxng_profile は standard、full、clean のいずれかである必要があります")))?.into();
+            }
             "search.dsh_search_provider" => {
                 self.search.dsh_search_provider = parse_string(raw, PROVIDER_CHARS)
             }
@@ -1431,6 +1461,7 @@ impl RdshSettings {
             "search.max(1-100)",
             "search.web_limit(1-100)",
             "search.searxng_url(string)",
+            "search.rustxng_profile(standard|full|clean, default standard)",
             "search.dsh_search_provider(string, DSH_WEB_SEARCH_PROVIDER for delegated runs)",
             "compact.max_tokens(500-200000)",
             "subagents.max_parallel(1-16, default 3)",
@@ -1957,6 +1988,7 @@ mod rdsh_config_tests {
         assert_eq!(d.search.dir, ".");
         assert_eq!((d.search.max, d.search.web_limit), (100, 10));
         assert_eq!(d.search.searxng_url, "");
+        assert_eq!(d.search.rustxng_profile, "standard");
         assert_eq!(d.search.dsh_search_provider, "");
         assert_eq!(d.compact.max_tokens, 8000);
         assert_eq!((d.sessions.limit, d.sessions.with_tokens), (20, false));
@@ -2305,6 +2337,33 @@ mod rdsh_config_tests {
         c.reset_dotted("all").unwrap();
         assert_eq!(c, RdshSettings::default());
         assert!(c.reset_dotted("unknown.key").is_err());
+    }
+
+    #[test]
+    fn rustxng_profile_round_trips_and_validates_settings_mutations() {
+        let mut cfg = RdshSettings::default();
+        for profile in ["standard", "full", "clean"] {
+            cfg.set_dotted("search.rustxng_profile", profile).unwrap();
+            assert_eq!(cfg.search.rustxng_profile, profile);
+            assert_eq!(RdshSettings::from_value(&cfg.to_value()), cfg);
+        }
+        let previous = cfg.clone();
+        for invalid in ["", "custom", "FULL", "standard full", "full --bind 0.0.0.0"] {
+            assert!(cfg.set_dotted("search.rustxng_profile", invalid).is_err());
+            assert_eq!(cfg, previous);
+        }
+        cfg.reset_dotted("search.rustxng_profile").unwrap();
+        assert_eq!(cfg.search.rustxng_profile, "standard");
+        for raw in [
+            serde_json::json!({}),
+            serde_json::json!({"search":{"rustxng_profile":"custom"}}),
+            serde_json::json!({"search":{"rustxng_profile":true}}),
+        ] {
+            assert_eq!(
+                RdshSettings::from_value(&raw).search.rustxng_profile,
+                "standard"
+            );
+        }
     }
 
     #[test]

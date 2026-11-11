@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-tui-admin
+      name: rdsh-tui-admin
+      config: {}
