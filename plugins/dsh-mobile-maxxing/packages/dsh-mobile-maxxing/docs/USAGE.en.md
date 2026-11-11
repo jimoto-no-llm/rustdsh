@@ -28,6 +28,7 @@ separate because it changes the PC renderer.
 | Notifications | In-app banner while the app is on screen, Web Push otherwise |
 | Notification sounds | Five synthesised presets, volume, no audio files |
 | Mobile layout | Sidebar becomes a drawer, settings open in one tap, code wraps by default (toggle available) |
+| Presented files | Long-press a delivered file card for Download / Share / Preview / Copy path. Downloads read through the session's workspace-files API (up to 64 MiB); Share appears only where the browser can share files |
 | CJK rendering (optional) | Only with the separate `rdsh-markdown-cjk` package; this package leaves the Markdown renderer stock to avoid changing the PC |
 
 ## Screenshots
@@ -123,11 +124,13 @@ service-worker offline page and the notification text follow the same value
 browser half, the service worker, the manifest and notifications all English;
 untranslated dictionary keys fall back to English.
 
-This package does not add a `ja` language pack. The picker lists only the `en` /
-`zh` locales the host registers, and a stored `ja` choice is ignored while no owner
-registers it (nothing is guessed). Japanese requires the optional separate
-`dsh-locale-ja` package, installed from its local tarball. It is not part of the
-mobile tarball and is never enabled automatically. Both packages may be enabled
+This package does not add a `ja` language pack. The picker lists only the locales
+the host registers (`en` / `zh` on DSH 0.2.1-rc.2 / rc.3), and a stored `ja` choice
+is ignored while no owner registers it (nothing is guessed). DSH 0.2.2-alpha.2 ships
+`ja` itself and needs no extra package. On 0.2.1-rc.2 / rc.3, Japanese requires the
+optional separate `dsh-locale-ja` package, installed from its local tarball. It is
+not part of the mobile tarball and is never enabled automatically; on 0.2.2-alpha.2
+it registers nothing. Both packages may be enabled
 together without a duplicate registration (the mobile half never calls
 `addLanguage`), and the shared display language is never rewritten: only this
 device's view is projected. See

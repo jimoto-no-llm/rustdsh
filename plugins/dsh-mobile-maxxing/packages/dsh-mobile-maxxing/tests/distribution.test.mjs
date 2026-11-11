@@ -27,7 +27,7 @@ test("the manifest is a DSH bundle with a client half", async () => {
 	await stat(join(repo, manifest.dsh.bundle.patch));
 
 	const client = await readFile(join(packageDir, "client.js"), "utf8");
-	assert.match(client, new RegExp(`id: "${manifest.name}"`),
+	assert.match(client, new RegExp(`id: "${manifest.name.replace(/[^a-zA-Z0-9._/-]/g, '\\$&')}"`),
 		"the browser module id has to equal the package name");
 });
 

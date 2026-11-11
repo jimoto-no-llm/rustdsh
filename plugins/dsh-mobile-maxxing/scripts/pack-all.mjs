@@ -14,7 +14,7 @@
  *   release must never quietly ship an English fallback pack as Japanese.
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -203,4 +203,4 @@ function main() {
 	}
 }
 
-if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) main();
+if (process.argv[1] !== undefined && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) main();
