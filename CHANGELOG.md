@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-12
+
 ### Added
 
 - `features.compaction_policy`（既定はオフ）を追加しました。`$DSH_HOME/rdsh-compaction.json` に
