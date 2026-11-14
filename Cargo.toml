@@ -32,7 +32,6 @@ exclude = [
   "/strix_runs/**",
   "/tests/**",
   "/tools/**",
-  "/install.ps1",
   "/preview-*",
   "/sync-dsh.sh",
 ]
