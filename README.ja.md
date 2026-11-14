@@ -732,7 +732,7 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 - 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)、[cyrne1-7208](https://github.com/cyrne1-7208)
 - AI 提供: [StudioYebisu](https://github.com/yebisu0529-ship-it)、Eureka（[@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM)）
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
-- モバイル UI・PWA・Web Push 通知: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) の作者 [Ryu（kuraneko1）](https://github.com/kuraneko1) さん（X: [`@_ryu15_`](https://x.com/_ryu15_)）。[公開版 v1.0.0](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) を Web/desktop の必須プラグインとして同梱しています（[第三者表示](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)）。
+- モバイル UI・PWA・Web Push 通知: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) の作者 [Ryu（kuraneko1）](https://github.com/kuraneko1) さん（X: [`@_ryu15_`](https://x.com/_ryu15_)）。[v1.0.4](https://github.com/kuraneko1/dsh-mobile-maxxing/tree/4c7c1d675cdf7e7e084ab77fb580d43ceb999162) を Web/desktop の必須プラグインとして同梱しています（[第三者表示](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)）。
 - 標準搭載の Web UI プラグイン（許諾済み、MIT）：[cwd514](https://github.com/cwd514) さんの [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（(c) 2026、効果音・デスクトップ通知）、[yugapor](https://github.com/yugapor) さんの [dsh-gitview](https://github.com/yugapor/dsh-gitview)（(c) 2026、差分・履歴・CI付き Git パネル）。どちらもインストール時に上流 GitHub から取得します（詳細は `plugins/recommended.md`）。
 
 rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）。
@@ -740,7 +740,7 @@ rdsh が利用・改変・推薦している第三者製 DSH プラグインで�
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）:
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
 - [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing)（[Ryu / kuraneko1](https://github.com/kuraneko1)、X: [`@_ryu15_`](https://x.com/_ryu15_)）:
-  v1.0.0 を必須プラグインとして同梱（PWA・スマホ/タブレット向け UI・アプリ内通知・Web Push 通知）。
+  v1.0.4 を必須プラグインとして同梱（PWA・スマホ/タブレット向け UI・アプリ内通知・Web Push 通知）。
   同梱の `dsh-md-rendering` と `dsh-locale-ja` は別パッケージで、標準で自動登録されるわけではありません
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）:
   推奨プラグイン `sound`（効果音とデスクトップ通知）。web/desktop では既定で導入し、
@@ -758,7 +758,7 @@ MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ラ�
 
 ## 保護付き起動に対応しているバージョン
 
-明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2` です。この一覧は Rust ランチャーの保護付き委譲だけに適用されます。ACP やプラグインは[機能別の対応範囲](docs/DSH-COMPATIBILITY.md)を確認してください。未知のバージョン、バージョンの混在、改変されたランタイム、または別の依存先へ解決されたランタイムのいずれかに該当する場合は、実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
+明示的な共有ファイルだけを扱う隔離機能を利用するには、Linux x86_64 環境と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みの DSH とツールランタイムの同一バージョンの組み合わせは `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2`、`0.2.2-alpha.3`、`0.2.2-rc.1`、`0.2.2-rc.2`、`0.2.2-rc.3` です。この一覧は Rust ランチャーの保護付き委譲だけに適用されます。ACP やプラグインは[機能別の対応範囲](docs/DSH-COMPATIBILITY.md)を確認してください。未知のバージョン、バージョンの混在、改変されたランタイム、または別の依存先へ解決されたランタイムのいずれかに該当する場合は、実行を拒否します。macOS と Windows 環境では保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)には別の対応バージョン一覧があります。
 
 ### 外部エージェントのジョブ
 

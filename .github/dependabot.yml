@@ -1,6 +1,30 @@
 version: 2
 updates:
   - package-ecosystem: npm
+    directory: /plugins/rdsh-llm-native
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /tools/compaction-eval
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /tools/responses-emulator
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-compaction
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
     directory: /plugins/rdsh-translation
     schedule:
       interval: weekly
@@ -63,6 +87,11 @@ updates:
     open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /plugins/rdsh-mcp-exposure
+    # DSH peers require matching exact releases; partial bumps break npm ci.
+    groups:
+      dsh-runtime:
+        patterns:
+          - "@deepseek-ai/dsh-*"
     schedule:
       interval: weekly
       day: monday

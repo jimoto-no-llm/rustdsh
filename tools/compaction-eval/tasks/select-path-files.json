@@ -1,0 +1,25 @@
+{
+  "id": "select-path-files",
+  "split": "select",
+  "kind": "path",
+  "required": true,
+  "turns": [
+    "Files to remember for later: the config is at deploy/prod/app.toml, the migration is db/migrations/0042_add_index.sql, and the runbook is docs/ops/rollback.md. Reply only with: noted.",
+    "Do not use any tools. In about 400 words, explain how a hash table works, including collisions and resizing.",
+    "Do not use any tools. In about 400 words, explain how a B-tree works and why databases use it.",
+    "Do not use any tools. In about 400 words, explain TCP congestion control, including slow start.",
+    "Do not use any tools. In about 400 words, explain public-key cryptography and digital signatures.",
+    "Do not use any tools. In about 400 words, explain how garbage collection works in managed runtimes.",
+    "Do not use any tools. In about 400 words, explain how DNS resolution works, including caching."
+  ],
+  "question": "Do not use any tools. Return the three paths I gave earlier as {\"paths\": [string, string, string]}. Reply with one JSON object only.",
+  "expect": {
+    "same_set": {
+      "paths": [
+        "deploy/prod/app.toml",
+        "db/migrations/0042_add_index.sql",
+        "docs/ops/rollback.md"
+      ]
+    }
+  }
+}

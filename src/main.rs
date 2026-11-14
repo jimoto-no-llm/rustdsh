@@ -55,6 +55,11 @@ mod auth_sharing;
 mod budget_admission;
 mod cloud;
 mod compact;
+mod compaction_cli;
+mod compaction_config;
+mod compaction_native;
+mod compaction_overlay;
+mod compaction_policy;
 mod compute;
 mod context;
 mod context_hook;
@@ -115,13 +120,14 @@ mod webui_assets;
 mod webui_gzip;
 mod worker_git;
 mod worker_scopes;
+mod zdr;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|files|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|deps|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|models|files|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status
   rdsh provider detect            credentials and local servers on this machine
   rdsh provider import --dry-run  what detection would write into the profile\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh plugins status             what a profile still misses (essential tier, read-only)\n  rdsh plugins install --profile web   attach the essential plugins after an upgrade\n  rdsh --passthrough tui          no slim env; only rdsh_inspect stays isolated\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
@@ -178,7 +184,7 @@ enum ProviderAction {
     },
     /// Add a route to a profile's cordis.patch.yml (llm-pi-ai providers)
     Add {
-        /// Preset: hai, sarashina or local-openai
+        /// Preset: mistral, hai, sarashina or local-openai
         preset: String,
         #[arg(long = "profile")]
         profile: Option<String>,
@@ -305,6 +311,11 @@ enum Commands {
         #[arg(long = "max-tokens")]
         max_tokens: Option<usize>,
     },
+    /// Inspect Native Compaction metadata and evaluate compaction costs.
+    Compaction {
+        #[command(subcommand)]
+        action: compaction_cli::Action,
+    },
     /// Diagnose the local DSH installation without changing settings.
     Doctor {
         /// Metadata-only JSON; does not read credentials or launch DSH/Node.
@@ -392,7 +403,7 @@ enum Commands {
     /// Inventory, select and import only explicitly shared credentials
     Auth(auth_sharing::AuthArgs),
     /// Register an OpenAI-compatible endpoint (HAI, a home LLM server) as a
-    /// dsh route in a profile: `provider list`, `provider add hai|sarashina|local-openai`
+    /// dsh route in a profile: `provider list`, `provider add mistral|hai|sarashina|local-openai`
     Provider {
         #[command(subcommand)]
         action: ProviderAction,
@@ -1098,6 +1109,7 @@ const NATIVE_FIRST: &[&str] = &[
     "subagents",
     "task-outcomes",
     "budget-admission",
+    "compaction",
     "question-contracts",
     "answer-applications",
     "instruction-queue",
@@ -1241,6 +1253,7 @@ fn main() {
             action: SettingsAction::Init { force: true }
         }) | Some(Commands::TaskOutcomes { .. })
             | Some(Commands::BudgetAdmission { .. })
+            | Some(Commands::Compaction { .. })
             | Some(Commands::QuestionContracts { .. })
             | Some(Commands::AnswerApplications { .. })
             | Some(Commands::InstructionQueue { .. })
@@ -1312,6 +1325,7 @@ fn main() {
         Some(Commands::Compact { file, max_tokens }) => {
             compact::cmd_compact(&file, max_tokens.unwrap_or(cfg.compact.max_tokens), locale)
         }
+        Some(Commands::Compaction { action }) => compaction_cli::run(action),
         Some(Commands::Doctor { json: true }) => doctor_json(),
         Some(Commands::Doctor { json: false }) => doctor(DoctorMode::from_terminal(locale), locale),
         Some(Commands::Sessions {
@@ -2320,6 +2334,7 @@ fn settings_independent_invocation() -> bool {
                 } | Commands::TaskOutcomes { .. }
                     | Commands::Subagents { .. }
                     | Commands::BudgetAdmission { .. }
+                    | Commands::Compaction { .. }
                     | Commands::QuestionContracts { .. }
                     | Commands::AnswerApplications { .. }
                     | Commands::InstructionQueue { .. }
@@ -2713,6 +2728,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         ),
         "prune" => ("将文本裁剪到令牌预算", "テキストをトークン予算まで切り詰め"),
         "compact" => ("压缩文本文件", "テキストファイルを圧縮"),
+        "compaction" => ("检查会话压缩与费用", "履歴圧縮の記録と費用を確認"),
+        "report" => ("只读汇总压缩记录", "圧縮記録を読み取り専用で集計"),
+        "decide" => ("计算提前压缩的费用", "早期圧縮の費用を計算"),
+        "capabilities" => ("显示支持的压缩方式", "対応する圧縮方式を表示"),
         "doctor" => ("显示诊断摘要", "診断サマリーを表示"),
         "bench" => ("运行启动基准测试", "起動ベンチマークを実行"),
         "boot" => ("启动 dsh 配置文件", "dshプロファイルを起動"),
@@ -2746,8 +2765,8 @@ fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static s
         return Some(websearch::help(locale));
     }
     (name == "rdsh").then(|| match locale {
-        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
-        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
+        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
+        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
         locale::Locale::English => unreachable!(),
     })
 }
@@ -2865,8 +2884,8 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "key_ref" => ("凭据引用名称", "認証情報参照名"),
         "open" => ("打开设置目录", "設定ディレクトリを開く"),
         "preset" => (
-            "提供方预设：hai、sarashina、local-openai、ollama",
-            "プロバイダープリセット: hai、sarashina、local-openai、ollama",
+            "提供方预设：mistral、hai、sarashina、local-openai、ollama",
+            "プロバイダープリセット: mistral、hai、sarashina、local-openai、ollama",
         ),
         "model" => (
             "要声明的模型标识（可重复）",
@@ -3360,6 +3379,8 @@ fn doctor_json() -> anyhow::Result<()> {
         warnings.push("local profiles directory is unreadable or absent".to_string());
     }
     warnings.extend(tmp_guard::doctor_lines(locale::Locale::English));
+    let compaction = compaction_policy::report();
+    warnings.extend(compaction_policy::doctor_warnings(&compaction));
     let report = serde_json::json!({
         "schema": 1,
         "ok": ok,
@@ -3376,6 +3397,8 @@ fn doctor_json() -> anyhow::Result<()> {
         "path_shadowed": shadowed,
         "warnings": warnings,
         "environment": dsh_env::json(&dsh_env::diagnose()),
+        "compaction_policy": compaction_policy::doctor_json(&compaction),
+        "compaction_capabilities": compaction_cli::capabilities(),
     });
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -3565,6 +3588,17 @@ fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
     // leftover orphan directories. Read-only; doctor never deletes.
     for w in tmp_guard::doctor_lines(locale) {
         say(w);
+    }
+    // Compaction policy layer: the feature switch and the policy file as a
+    // boot would read them. Read-only; no profile is composed here.
+    for line in compaction_policy::doctor_lines(&compaction_policy::report(), locale) {
+        say(line);
+    }
+    for line in zdr::doctor_lines(zdr::mode_on(
+        &rdsh_config::load(),
+        std::env::var("RDSH_ZDR").ok().as_deref(),
+    )) {
+        say(line);
     }
     say(format!(
         "[rdsh] {}: {}",

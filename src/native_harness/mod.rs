@@ -1,5 +1,6 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod claude;
+mod compaction;
 mod engine;
 mod oauth;
 mod profiles;
@@ -100,6 +101,7 @@ pub fn cmd_native_web(
             .unwrap_or_else(|| PathBuf::from("devin"))
     });
     let engine = Arc::new(Engine {
+        compaction: crate::compaction_config::Options::load()?,
         state: Mutex::new(State::default()),
         workspace,
         sdk: sdk::SdkConfig {
@@ -290,21 +292,28 @@ fn dispatch(
             if matches!(s.status.as_str(), "running" | "approval") {
                 bail!("実行中です");
             }
-            let history_size = s.messages.iter().map(|m| m.content.len()).sum::<usize>();
-            if history_size + req.text.len() > engine::MAX_HISTORY {
-                bail!("会話がサイズ上限に達しています");
-            }
-            s.messages.push(Message {
+            let message = Message {
                 role: "user".into(),
                 content: engine.redact(&req.text),
-            });
+            };
+            // Measure the way the loop does. A message that does not fit is
+            // held back: the run compacts the finished turns first and appends
+            // it only if that made room, so a refusal never grows the history.
+            let deferred = if engine::fits_with(&s.messages, &message) {
+                s.messages.push(message);
+                None
+            } else if engine.compaction.native_web.enabled {
+                Some(message)
+            } else {
+                bail!("会話がサイズ上限に達しています");
+            };
             s.error = None;
             s.status = "running".into();
             s.run_id += 1;
             let id = s.run_id;
             let next = engine.clone();
             let task = runtime.spawn(async move {
-                next.run(id).await;
+                next.run_admitting(id, deferred).await;
             });
             s.task = Some(task.abort_handle());
             Ok(json!({"ok":true}))
@@ -398,6 +407,7 @@ mod tests {
         std::fs::write(&cli, "#!/bin/sh\n: > \"$0.started\"\n").unwrap();
         std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
         let e = Arc::new(Engine {
+            compaction: crate::compaction_config::Options::default(),
             state: Mutex::new(State::default()),
             workspace: root.clone(),
             sdk: sdk::SdkConfig {
@@ -435,8 +445,124 @@ mod tests {
         assert!(!root.join("devin-test.started").exists());
         std::fs::remove_dir_all(root).unwrap();
     }
+    /// An engine whose finished turns leave no room for one more message.
+    fn full_engine(enabled: bool, registry: profiles::Registry) -> Arc<Engine> {
+        let mut compaction = crate::compaction_config::Options::default();
+        compaction.native_web.enabled = enabled;
+        let reply = |text: &str, count: usize| Message {
+            role: "assistant".into(),
+            content: text.repeat(count),
+        };
+        let user = |text: &str| Message {
+            role: "user".into(),
+            content: text.into(),
+        };
+        Arc::new(Engine {
+            compaction,
+            state: Mutex::new(State {
+                provider: "dsh:test".into(),
+                model: "test-model".into(),
+                messages: vec![
+                    user("original goal"),
+                    reply("first long reply. ", 16_000),
+                    user("continue"),
+                    reply("second long reply. ", 14_000),
+                ],
+                ..State::default()
+            }),
+            workspace: std::env::temp_dir(),
+            sdk: sdk::SdkConfig {
+                bridge_dir: std::env::temp_dir(),
+                agy_key: None,
+            },
+            devin: PathBuf::from("devin"),
+            registry,
+            secrets: vec![],
+        })
+    }
+    fn post_message(e: &Arc<Engine>, runtime: &Arc<Runtime>) -> Result<Value> {
+        dispatch(
+            "POST",
+            "/api/message",
+            r#"{"text":"next request"}"#,
+            e.clone(),
+            runtime.clone(),
+        )
+    }
+    /// Wait for the spawned run to leave the running state.
+    fn settled(e: &Arc<Engine>) -> Value {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let snapshot = e.snapshot();
+            if snapshot["status"] != "running" {
+                return snapshot;
+            }
+            assert!(std::time::Instant::now() < deadline, "run did not settle");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    fn runtime() -> Arc<Runtime> {
+        Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .unwrap(),
+        )
+    }
+    #[test]
+    fn a_full_history_refuses_at_admission_only_when_compaction_is_off() {
+        let e = full_engine(false, profiles::Registry::default());
+        let before = e.snapshot()["messages"].clone();
+        let error = post_message(&e, &runtime()).unwrap_err();
+        assert_eq!(error.to_string(), "会話がサイズ上限に達しています");
+        assert_eq!(e.snapshot()["messages"], before);
+        assert_eq!(e.snapshot()["status"], "idle");
+    }
+    #[test]
+    fn a_full_history_is_compacted_before_the_message_is_admitted() {
+        // One reply: the summary. The model call of the turn then finds the
+        // stand-in provider closed, which ends the run after admission.
+        let (url, server) = profiles::tests::mock(vec![(
+            200,
+            json!({"choices":[{"message":{"content":"kept facts"}}]}),
+        )]);
+        let e = full_engine(true, profiles::tests::registry("openai-completions", &url));
+        // The runtime owns the spawned run; it must outlive the request.
+        let runtime = runtime();
+        assert_eq!(post_message(&e, &runtime).unwrap(), json!({"ok":true}));
+        let snapshot = settled(&e);
+        let requests = server.join().unwrap();
+        assert!(requests[0].1["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("compaction engine"));
+        let messages = snapshot["messages"].as_array().unwrap();
+        assert_eq!(messages[0]["content"], "original goal");
+        assert!(messages.iter().any(|m| m["role"] == "summary"));
+        assert_eq!(messages.last().unwrap()["content"], "next request");
+        assert!(serde_json::to_vec(messages).unwrap().len() <= engine::MAX_HISTORY);
+    }
+    #[test]
+    fn a_failed_compaction_refuses_the_message_without_growing_the_history() {
+        let (url, server) = profiles::tests::mock(vec![(
+            500,
+            json!({"choices":[{"message":{"content":"bad"}}]}),
+        )]);
+        let e = full_engine(true, profiles::tests::registry("openai-completions", &url));
+        let before = e.snapshot()["messages"].clone();
+        // The message is held back, so a refusal cannot accumulate requests.
+        let runtime = runtime();
+        assert_eq!(post_message(&e, &runtime).unwrap(), json!({"ok":true}));
+        let snapshot = settled(&e);
+        server.join().unwrap();
+        assert_eq!(snapshot["status"], "error");
+        assert_eq!(snapshot["error"], "会話がサイズ上限に達しています");
+        assert_eq!(snapshot["messages"], before);
+    }
     fn engine() -> Arc<Engine> {
         Arc::new(Engine {
+            compaction: crate::compaction_config::Options::default(),
             state: Mutex::new(State::default()),
             workspace: std::env::temp_dir(),
             sdk: sdk::SdkConfig {

@@ -4,7 +4,8 @@ This bundle carries **dsh-mobile-maxxing**, a DSH Web UI mobile/PWA plugin,
 vendored from the repository below:
 
 - Upstream: <https://github.com/kuraneko1/dsh-mobile-maxxing>
-- Upstream commit: `a29d2102da3a4de2d4a698723d6f336402b196b9` (2026-10-28), version 1.0.0
+- Upstream commit: `4c7c1d675cdf7e7e084ab77fb580d43ceb999162` (2026-11-06), version 1.0.4
+  (upstream has not tagged or released v1.0.4 yet; this is the `release: v1.0.4` commit on `main`)
 - License: MIT, Copyright (c) 2026 kuraneko1
 
 ## What ships
@@ -36,13 +37,19 @@ essential tier.
   screenshots) and `packages/dsh-mobile-maxxing/mockups/` are not shipped;
   they are review material, not runtime files.
 - Markdown is cleaned where our markdownlint rules disagreed with the
-  upstream files: three fenced blocks gained a `text` language, two double
-  blank lines were collapsed and one duplicate `#` heading was demoted.
-  Wording is unchanged.
+  upstream files: three fenced blocks gained a `text` language, double
+  blank lines were collapsed, one duplicate `#` heading was demoted, one
+  bare URL was wrapped and one table separator was spaced. Wording is
+  unchanged.
+- Two CodeQL-driven fixes are carried over from the previous copy: the
+  `<head>` lookup in `packages/dsh-mobile-maxxing/index.js` is a linear
+  scan instead of an unanchored regex (polynomial backtracking), and four
+  test files match `<script>` tags case-insensitively.
 
-Everything else (`index.js`, `client.js`, `sw.js`, `lib/`, `notify/`,
-`locale/`, `assets/`, the sub-packages and the root documentation) is upstream
-as-is. Verify the installed copy with the upstream repository when in doubt.
+Apart from the changes above, everything else (`client.js`, `sw.js`,
+`lib/`, `notify/`, `locale/`, `assets/`, the sub-packages and the root
+documentation) is upstream as-is. Verify the installed copy with the
+upstream repository when in doubt.
 
 ## Upstream license text
 

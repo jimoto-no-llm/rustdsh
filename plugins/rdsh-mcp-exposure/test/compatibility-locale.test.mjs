@@ -13,7 +13,7 @@ import { apply } from '../index.js';
 const versions = (version = DSH_VERSION) => Object.fromEntries(DSH_PACKAGES.map(name => [name, version]));
 
 test('each exact supported release accepts coherent peers and rejects mixed, unknown, future and missing peers', () => {
-  assert.deepEqual(DSH_VERSIONS, ['0.2.0-rc.2', '0.2.1-alpha.3', '0.2.1-rc.3', '0.2.1-rc.4']);
+  assert.deepEqual(DSH_VERSIONS, ['0.2.0-rc.2', '0.2.1-alpha.3', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5']);
   for (const release of DSH_VERSIONS) {
     assert.doesNotThrow(() => assertDshVersions(versions(release)));
     for (const name of DSH_PACKAGES) {

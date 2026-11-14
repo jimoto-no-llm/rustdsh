@@ -1,0 +1,23 @@
+{
+  "id": "improve-constraint-ports",
+  "split": "improve",
+  "kind": "constraint",
+  "required": true,
+  "turns": [
+    "Project rules for later: the service must listen on port 8443, never on 8080, and every log line must start with the tag SVC-7. Reply only with: noted.",
+    "Do not use any tools. In about 400 words, explain how a hash table works, including collisions and resizing.",
+    "Do not use any tools. In about 400 words, explain how a B-tree works and why databases use it.",
+    "Do not use any tools. In about 400 words, explain TCP congestion control, including slow start.",
+    "Do not use any tools. In about 400 words, explain public-key cryptography and digital signatures.",
+    "Do not use any tools. In about 400 words, explain how garbage collection works in managed runtimes.",
+    "Do not use any tools. In about 400 words, explain how DNS resolution works, including caching."
+  ],
+  "question": "Do not use any tools. From the project rules I gave earlier, return {\"port\": number, \"forbidden_port\": number, \"log_tag\": string}. Reply with one JSON object only.",
+  "expect": {
+    "equals": {
+      "port": 8443,
+      "forbidden_port": 8080,
+      "log_tag": "SVC-7"
+    }
+  }
+}

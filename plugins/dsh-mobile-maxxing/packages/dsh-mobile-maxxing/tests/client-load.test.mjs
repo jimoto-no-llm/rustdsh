@@ -391,6 +391,7 @@ function bootClient({
 	// false` models an old/absent bootstrap and must fail closed to desktop.
 	if (injectMode) sandbox.__RDSH_DEVICE_MODE__ = mode ?? (narrow ? "mobile" : "desktop");
 	if (globals !== null && typeof globals === "object") Object.assign(sandbox, globals);
+	if (sandbox.history !== undefined) sandbox.window.history = sandbox.history;
 	vm.createContext(sandbox);
 
 	vm.runInContext(CLIENT, sandbox, { filename: "client.js" });
@@ -470,6 +471,39 @@ function bootClient({
 		},
 	};
 }
+
+test("the shipped plugin installs Back at boot and tears it down with the module", () => {
+	const handlers = new Map();
+	const entries = [{ upstream: "kept" }]; let index = 0, homes = 0;
+	const history = {
+		get state() { return entries[index]; },
+		replaceState(value) { entries[index] = value; },
+		pushState(value) { entries.splice(++index); entries[index] = value; },
+	};
+	const workspace = {
+		selection: { getSnapshot: () => ({ sessionId: "existing-session" }) },
+		async openWorkspace(id) { assert.equal(id, "existing-workspace"); homes++; },
+		clearMain() { assert.fail("Back must preserve the selected Workspace"); },
+	};
+	const booted = bootClient({
+		mode: "mobile", narrow: true, globals: { history },
+		services: {
+			uiWorkspace: workspace,
+			workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: "existing-workspace", sessionIds: ["existing-session"] }] }) } },
+			layout: { panelInfo: { getSnapshot: () => ({ activePanelId: null }) } },
+		},
+		navigator: { userAgent: "Android", userActivation: { hasBeenActive: true } },
+		windowAdd: (type, handler) => handlers.set(type, handler),
+		windowRemove: (type, handler) => { if (handlers.get(type) === handler) handlers.delete(type); },
+	});
+	assert.equal(entries.length, 2);
+	assert.equal(typeof handlers.get("popstate"), "function");
+	handlers.get("popstate")({ state: entries[--index] });
+	assert.equal(homes, 1);
+	assert.equal(history.state.upstream, "kept");
+	booted.disposeAll();
+	assert.equal(handlers.has("popstate"), false);
+});
 
 test("the browser module registers and boots without a ReferenceError", () => {
 	let booted;

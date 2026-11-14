@@ -1,0 +1,9 @@
+{
+  "name": "rdsh-compaction-eval",
+  "private": true,
+  "type": "module",
+  "description": "Offline evaluation and optimization of compaction instructions (RQ-11). Not part of the runtime.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

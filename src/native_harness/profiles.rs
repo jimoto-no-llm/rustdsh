@@ -27,6 +27,7 @@ pub struct Model {
     pub api: String,
     pub base: String,
     pub max_tokens: u64,
+    pub context_window: Option<u64>,
     pub token_field: String,
     pub unavailable: Option<String>,
 }
@@ -287,6 +288,10 @@ impl Registry {
                     api: api.into(),
                     base: base.into(),
                     max_tokens,
+                    context_window: model
+                        .get("contextWindow")
+                        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+                        .or_else(|| base_model.and_then(|v| v["contextWindow"].as_u64())),
                     token_field,
                     unavailable,
                 });
@@ -313,6 +318,10 @@ impl Registry {
     pub fn allowed(&self, provider: &str, model: &str) -> bool {
         self.find(provider, model)
             .is_some_and(|(_, m)| m.unavailable.is_none())
+    }
+    pub fn capacity(&self, provider: &str, model: &str) -> Option<(u64, u64)> {
+        let (_, model) = self.find(provider, model)?;
+        Some((model.context_window?, model.max_tokens))
     }
     fn find(&self, provider: &str, model: &str) -> Option<(&Route, &Model)> {
         let route = self.routes.iter().find(|r| r.id == provider)?;

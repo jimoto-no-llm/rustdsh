@@ -381,9 +381,10 @@ rdsh settings get extras.enable
 | `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
 | `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`; `--auto-start` starts the bundled local SearXNG compose service. The local rustxng sidecar installed by rdsh follows the latest RustXNG release in the background (sha256-verified, one previous version kept; `rdsh rustxng update [--check]`, off with `RUSTXNG_SKIP_UPDATE=1`). See [Web search](docs/WEB-SEARCH.md). |
 
-To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
+To connect Mistral through Chat Completions or an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
 ```sh
+rdsh provider add mistral --profile web --discover --key-stdin # enter MISTRAL_API_KEY on stdin
 rdsh provider add hai --model deepseek-v4-flash              # key from HAI_API_KEY or --key-stdin
 rdsh provider add commandcode --model deepseek/deepseek-v4-flash   # key from COMMANDCODE_API_KEY
 rdsh provider add sarashina                                  # key from SARASHINA_API_KEY; mini and nano built in
@@ -620,7 +621,8 @@ unsupported non-Unix platforms before accessing the requested directory.
 The opt-in agent tool sandbox supports Linux x86_64 with bubblewrap, prlimit,
 and unprivileged user namespaces. Its audited DSH/tool-runtime pairs are
 `0.2.0-rc.2`, `0.2.1-alpha.1`, `0.2.1-alpha.3`, `0.2.1-rc.3`,
-`0.2.1-rc.4`, and `0.2.2-alpha.2`, with matching versions in
+`0.2.1-rc.4`, `0.2.2-alpha.2`, `0.2.2-alpha.3`, `0.2.2-rc.1`,
+`0.2.2-rc.2`, and `0.2.2-rc.3`, with matching versions in
 each pair. It verifies package metadata, runtime bytes and the loaded module,
 then limits inspection to explicitly shared files. Unknown, mixed, modified or
 unexpectedly resolved runtimes stop before delegation. macOS and Windows
@@ -874,7 +876,7 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999), [cyrne1-7208](https://github.com/cyrne1-7208)
 - AI provision: [StudioYebisu](https://github.com/yebisu0529-ship-it), Eureka ([@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM))
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
-- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)); the upstream [v1.0.0 release](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
+- Mobile/PWA/Web Push integration: [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)); the upstream [v1.0.4](https://github.com/kuraneko1/dsh-mobile-maxxing/tree/4c7c1d675cdf7e7e084ab77fb580d43ceb999162) is bundled as an essential Web/desktop plugin (see [third-party notices](plugins/dsh-mobile-maxxing/THIRD_PARTY_NOTICES.md)).
 - Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
 
 Third-party DSH plugins that rdsh uses, adapts or recommends (MIT, by their
@@ -883,7 +885,7 @@ authors):
 - [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama — the
   phone-width layout bundled as
   [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)
-- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.0 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
+- [dsh-mobile-maxxing](https://github.com/kuraneko1/dsh-mobile-maxxing) by [Ryu (kuraneko1)](https://github.com/kuraneko1) ([`@_ryu15_`](https://x.com/_ryu15_)) — PWA, mobile/tablet UX, in-app and Web Push notifications; v1.0.4 is bundled as an essential plugin. Its optional `dsh-md-rendering` and `dsh-locale-ja` packages are included in the source tree but are not automatically registered.
 - [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by
   cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
 - [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
