@@ -36,7 +36,7 @@
     "@deepseek-ai/schemastery": "3.19.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/cordis": "4.1.0",
     "@deepseek-ai/dsh-llm": "0.2.1-rc.5",
     "@deepseek-ai/dsh-mcp-client": "0.2.1-rc.5",
     "@deepseek-ai/dsh-scope": "0.2.1-rc.5",
