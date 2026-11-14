@@ -31,7 +31,7 @@ https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
 - Check my OS, shell and existing installation; install only what is needed.
 - After installing and verifying rdsh, open rdsh setup --web first.
 - Help me choose and configure exactly one model connection.
-- Once connected, run rdsh plugins install --recommended=starter, then start a conversation with rdsh tui.
+- Once connected, run rdsh plugins install --recommended=starter, then start a conversation from the setup screen. Use rdsh --profile web on a fresh installation; rdsh tui requires an existing TUI profile.
 - Never display API keys or login credentials in chat or logs, and preserve existing settings.
 - Proceed one step at a time and report only verified results. If a step fails, stop and explain the cause and next step.
 ```
