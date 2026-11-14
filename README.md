@@ -621,7 +621,8 @@ unsupported non-Unix platforms before accessing the requested directory.
 The opt-in agent tool sandbox supports Linux x86_64 with bubblewrap, prlimit,
 and unprivileged user namespaces. Its audited DSH/tool-runtime pairs are
 `0.2.0-rc.2`, `0.2.1-alpha.1`, `0.2.1-alpha.3`, `0.2.1-rc.3`,
-`0.2.1-rc.4`, `0.2.2-alpha.2`, and `0.2.2-alpha.3`, with matching versions in
+`0.2.1-rc.4`, `0.2.2-alpha.2`, `0.2.2-alpha.3`, `0.2.2-rc.1`,
+`0.2.2-rc.2`, and `0.2.2-rc.3`, with matching versions in
 each pair. It verifies package metadata, runtime bytes and the loaded module,
 then limits inspection to explicitly shared files. Unknown, mixed, modified or
 unexpectedly resolved runtimes stop before delegation. macOS and Windows
