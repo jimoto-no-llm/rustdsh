@@ -100,6 +100,7 @@ mod search;
 mod searxng;
 mod serial_proxy;
 mod serve;
+mod setup_models;
 mod setup_web;
 mod setup_wizard;
 mod shutdown;
