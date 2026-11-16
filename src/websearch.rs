@@ -1,15 +1,16 @@
-//! `rdsh search-web`: SearXNG by default, or explicitly selected Ollama search.
-//! SearXNG needs no API key and retains its HTML-based HTTP client; a local
-//! rustxng sidecar is the same protocol, so it rides the same client. Ollama
-//! uses the hosted HTTPS API with `OLLAMA_API_KEY`; providers never fall back
-//! to one another, so a local search cannot silently become a cloud request.
+//! `rdsh search-web`: SearXNG by default, with explicitly selected hosted providers.
+//! SearXNG and its rustxng-compatible engines retain their existing behavior.
+//! Ollama and Keenable send queries to fixed hosted APIs; providers never fall
+//! back to one another.
 
+mod keenable;
 mod ollama;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum Provider {
     Searxng,
     Ollama,
+    Keenable,
 }
 
 /// Which SearXNG-compatible engine `search-web` should resolve.
@@ -77,9 +78,9 @@ fn parse_json(body: &str, limit: usize) -> anyhow::Result<Vec<Hit>> {
 
 pub fn help(locale: crate::locale::Locale) -> &'static str {
     match locale {
-        crate::locale::Locale::English => "search-web is on by default; disable with: rdsh features off search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: rdsh rustxng install fetches the latest release into ~/.local/bin (or set RUSTXNG_BIN); rdsh starts the sidecar itself; --engine searxng never spawns it.\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Chinese => "search-web 默认开启；如需关闭：rdsh features off search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\n搜索引擎：--engine auto|searxng|rustxng。auto 依次使用 SEARXNG_URL、RUSTXNG_URL、本地 rustxng，最后是 http://127.0.0.1:8888。\n本地 rustxng：rdsh rustxng install 会把最新版安装到 ~/.local/bin（也可设置 RUSTXNG_BIN）；由 rdsh 启动该服务；--engine searxng 不会启动它。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Japanese => "search-web は既定で有効です。無効化: rdsh features off search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nエンジン: --engine auto|searxng|rustxng。auto は SEARXNG_URL、RUSTXNG_URL、ローカル rustxng、http://127.0.0.1:8888 の順に解決します。\nローカル rustxng: rdsh rustxng install が最新リリースを ~/.local/bin へ導入します（RUSTXNG_BIN でも可）。rdsh がサイドカーを起動します。--engine searxng は起動しません。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::English => "search-web is on by default; disable with: rdsh features off search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nKeenable: select --provider keenable explicitly. Queries are sent to Keenable; keyless calls use IP quota, consume no credits, and are logged with query, IP, and app title rdsh. KEENABLE_API_KEY calls draw on organization credits; providers never auto-fallback.\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: rdsh rustxng install fetches the latest release into ~/.local/bin (or set RUSTXNG_BIN); rdsh starts the sidecar itself; --engine searxng never spawns it.\nBuilt-in providers: searxng, ollama, keenable.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Chinese => "search-web 默认开启；如需关闭：rdsh features off search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\nKeenable：请显式使用 --provider keenable。查询会发送到 Keenable；无密钥请求使用 IP 配额、不消耗额度，并记录查询、IP 和应用标题 rdsh。设置 KEENABLE_API_KEY 后会消耗组织额度；提供方之间不会自动切换。\n搜索引擎：--engine auto|searxng|rustxng。auto 依次使用 SEARXNG_URL、RUSTXNG_URL、本地 rustxng，最后是 http://127.0.0.1:8888。\n本地 rustxng：rdsh rustxng install 会把最新版安装到 ~/.local/bin（也可设置 RUSTXNG_BIN）；由 rdsh 启动该服务；--engine searxng 不会启动它。\n内置提供方：searxng、ollama、keenable。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Japanese => "search-web は既定で有効です。無効化: rdsh features off search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nKeenable: --provider keenable を明示してください。検索語は Keenable に送信されます。キーなしは IP 単位の上限を使い、クレジットを消費せず、検索語・IP・アプリ名 rdsh を記録します。KEENABLE_API_KEY ありは組織クレジットを消費し、プロバイダー間の自動切り替えはありません。\nエンジン: --engine auto|searxng|rustxng。auto は SEARXNG_URL、RUSTXNG_URL、ローカル rustxng、http://127.0.0.1:8888 の順に解決します。\nローカル rustxng: rdsh rustxng install が最新リリースを ~/.local/bin へ導入します（RUSTXNG_BIN でも可）。rdsh がサイドカーを起動します。--engine searxng は起動しません。\n組み込み検索先: searxng、ollama、keenable。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
     }
 }
 
@@ -852,6 +853,7 @@ pub fn cmd_search_web(
             ollama::ENDPOINT.to_string(),
             ollama::search(query, limit, locale)?,
         ),
+        Provider::Keenable => keenable::search(query, limit, locale)?,
     };
     let shown: Vec<&Hit> = hits.iter().take(limit.max(1)).collect();
     if json {

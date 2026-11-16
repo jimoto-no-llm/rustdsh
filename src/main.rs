@@ -285,11 +285,11 @@ enum Commands {
         #[arg(long = "max")]
         max: Option<usize>,
     },
-    /// Web search through SearXNG (default) or Ollama (OLLAMA_API_KEY)
+    /// Web search through SearXNG by default; Ollama and Keenable are explicit hosted providers
     #[command(name = "search-web", after_help = websearch::help(locale::Locale::English))]
     SearchWeb {
         query: String,
-        /// Search provider (Ollama uses the hosted Web Search API).
+        /// Search provider; Keenable sends queries to its hosted search API.
         #[arg(long, value_enum, default_value = "searxng")]
         provider: websearch::Provider,
         /// SearXNG-compatible engine: auto (env, then local rustxng), searxng
@@ -2559,8 +2559,8 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         "tokens" => ("原生估算输入令牌数", "入力トークン数をネイティブで推定"),
         "search" => ("高速文件搜索", "高速ファイル検索"),
         "search-web" => (
-            "通过 SearXNG（默认）或 Ollama API 进行网页搜索",
-            "SearXNG（既定）または Ollama API によるWeb検索",
+            "默认使用 SearXNG；可显式选择 Ollama API 或 Keenable 网页搜索",
+            "SearXNG が既定です。Ollama API または Keenable は明示選択でWeb検索",
         ),
         "rustxng" => (
             "本地 rustxng 边车（兼容 SearXNG 的单文件引擎）",

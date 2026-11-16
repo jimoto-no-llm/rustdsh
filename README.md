@@ -144,7 +144,7 @@ rdsh --profile web              # start with Web profile
 | OS | Linux, macOS, WSL, Windows (native) |
 | DSH runtime | Required for conversations and agent runs (native tools and diagnostics run standalone) |
 | Rust | 1.85+ (only needed when building from source; prebuilt binaries require no Rust) |
-| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG or an Ollama API key for `search-web` |
+| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG, keyless Keenable, or Ollama / Keenable API credentials for `search-web` |
 
 ## Installation
 
@@ -381,7 +381,9 @@ rdsh settings get extras.enable
 | Extra | Command | Notes |
 | --- | --- | --- |
 | `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
-| `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`; `--auto-start` starts the bundled local SearXNG compose service. The local rustxng sidecar installed by rdsh follows the latest RustXNG release in the background (sha256-verified, one previous version kept; `rdsh rustxng update [--check]`, off with `RUSTXNG_SKIP_UPDATE=1`). See [Web search](docs/WEB-SEARCH.md). |
+| `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; explicitly select `--provider ollama` or `--provider keenable`; `--auto-start` starts the bundled local SearXNG compose service. The local rustxng sidecar installed by rdsh follows the latest RustXNG release in the background (sha256-verified, one previous version kept; `rdsh rustxng update [--check]`, off with `RUSTXNG_SKIP_UPDATE=1`). See [Web search](docs/WEB-SEARCH.md). |
+
+A Keenable search sends its query to Keenable's hosted API. Keyless calls use IP quota, consume no credits, and log the query, IP address, and app title `rdsh`; setting `KEENABLE_API_KEY` draws on organization credits. Provider selection is explicit and never auto-falls back.
 
 To connect Mistral through Chat Completions or an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
