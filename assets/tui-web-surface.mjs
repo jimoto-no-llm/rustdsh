@@ -76,7 +76,7 @@ async function init(value) {
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.pathname !== '/' || url.search || url.hash || url.username || url.password) fail('INVALID_HOST');
   if (typeof value.cookie !== 'string' || !value.cookie || value.cookie.length > 16384 || /[\r\n\0]/.test(value.cookie)) fail('INVALID_COOKIE');
   if (!isAbsolute(value.storagePath || '')) fail('INVALID_STORAGE');
-  config = { url: url.href, origin: url.origin, storagePath: value.storagePath, workspace: value.workspace, sessionId: value.sessionId }; 
+  config = { url: url.href, origin: url.origin, storagePath: value.storagePath, workspace: value.workspace, sessionId: value.sessionId };
   width = dimensions(value.width) ? value.width : width; height = dimensions(value.height) ? value.height : height;
   await mkdir(dirname(config.storagePath), { recursive: true, mode: 0o700 });
   await chmod(dirname(config.storagePath),0o700);
