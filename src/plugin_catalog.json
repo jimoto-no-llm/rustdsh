@@ -90,6 +90,18 @@
   ],
   "recommended": [
     {
+      "id": "compaction",
+      "package": "rdsh-compaction",
+      "bundled": true,
+      "why": "Native Compaction policies and summary instructions for headless and Web presets"
+    },
+    {
+      "id": "llm-native",
+      "package": "rdsh-llm-native",
+      "bundled": true,
+      "why": "Responses API routes that use the provider's own compaction; registers nothing until a profile configures a route"
+    },
+    {
       "id": "translation",
       "package": "rdsh-translation",
       "bundled": true,

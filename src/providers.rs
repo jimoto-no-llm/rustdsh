@@ -78,6 +78,30 @@ struct Preset {
 }
 
 const PRESETS: &[Preset] = &[
+    // Use Chat Completions explicitly: pi-ai's bundled Mistral catalog uses
+    // a different Conversations transport that the native harness does not run.
+    Preset {
+        id: "mistral",
+        display_name: "Mistral",
+        base_url: Some("https://api.mistral.ai/v1"),
+        default_models: &[PresetModel {
+            id: "mistral-small-latest",
+            name: "Mistral Small (latest)",
+            context_window: 262144,
+            // A conservative default output budget, not the model's limit.
+            max_tokens: 4096,
+            reasoning_efforts: &[],
+        }],
+        compat: &[
+            "supportsStore: false",
+            "supportsUsageInStreaming: false",
+            "supportsDeveloperRole: false",
+            "maxTokensField: max_tokens",
+        ],
+        max_tokens_cap: None,
+        supports_discovery: true,
+        needs_key: true,
+    },
     Preset {
         id: "hai",
         display_name: "HAI",
@@ -297,7 +321,9 @@ fn apply_preset_models(
                     model.input = vec!["text".to_string()];
                 }
             }
-            None if !preset.default_models.is_empty() => notes.push(localized_format!(locale, "{}: {} is not one of the documented chat models ({}); contextWindow is left to dsh's default", "{}：{} 不在已记录的聊天模型中（{}）；contextWindow 使用 dsh 默认值", "{}: {} は記載されたチャットモデル（{}）に含まれません。contextWindowはdshの既定値を使用します",
+            // Mistral's default is only a starting model, not an exhaustive
+            // catalog; its /models discovery is the authority for other ids.
+            None if !preset.default_models.is_empty() && preset.id != "mistral" => notes.push(localized_format!(locale, "{}: {} is not one of the documented chat models ({}); contextWindow is left to dsh's default", "{}：{} 不在已记录的聊天模型中（{}）；contextWindow 使用 dsh 默认值", "{}: {} は記載されたチャットモデル（{}）に含まれません。contextWindowはdshの既定値を使用します",
                 preset.id,
                 model.id,
                 preset
@@ -2353,6 +2379,14 @@ fn parse_opencode_provider(
 /// Chat Completions path. Command Code lists Claude models that answer on
 /// `/v1/messages` only; a listing without the field is unchanged.
 fn serves_chat_completions(model: &Value) -> bool {
+    // Mistral includes embeddings, OCR and FIM-only models in the same listing.
+    // An explicit capability is authoritative; undeclared OpenAI listings keep
+    // their existing behavior. Malformed capability values are not permission.
+    if let Some(chat) = model.pointer("/capabilities/completion_chat") {
+        if chat != &Value::Bool(true) {
+            return false;
+        }
+    }
     match model.get("supported_endpoints").and_then(Value::as_array) {
         Some(endpoints) => endpoints.iter().filter_map(Value::as_str).any(|endpoint| {
             endpoint
@@ -2413,6 +2447,13 @@ fn parse_listing(body: &str, locale: crate::locale::Locale) -> Result<Vec<Model>
 /// worth trusting: OpenRouter's architecture.input_modalities, a plain
 /// input_modalities, or a capabilities name list that says "vision".
 fn input_from_listing(entry: &Value) -> Vec<String> {
+    if entry
+        .pointer("/capabilities/vision")
+        .and_then(Value::as_bool)
+        == Some(true)
+    {
+        return vec!["text".into(), "image".into()];
+    }
     let Some(values) = entry
         .get("architecture")
         .and_then(|architecture| architecture.get("input_modalities"))
@@ -3009,6 +3050,31 @@ pub(crate) fn sample_patch_for_tests(id: &str, default_model: &str) -> String {
         "- id: agent-default-model\n  config:\n    provider: {id}\n    model: {default_model}\n"
     ));
     text
+}
+
+/// Private first-run overlay, separate from all existing profile documents.
+pub(crate) fn setup_local_overlay(model: &str) -> Result<String> {
+    anyhow::ensure!(crate::setup_models::model_allowed(model), "INVALID_MODEL");
+    let route = Route {
+        id: "rdsh-local".into(),
+        display_name: "Local model".into(),
+        base_url: "http://127.0.0.1:11534/v1".into(),
+        api_key_env: "RDSH_LOCAL_API_KEY".into(),
+        compat: Vec::new(),
+        models: vec![Model {
+            id: model.into(),
+            context_window: Some(4096),
+            max_tokens: Some(2048),
+            input: vec!["text".into()],
+            ..Model::default()
+        }],
+    };
+    let mut text = apply_route("", &route, false, crate::locale::Locale::English)?.text;
+    text.push_str(&format!(
+        "- id: agent-default-model\n  config:\n    provider: rdsh-local\n    model: {}\n",
+        yaml_scalar(model)
+    ));
+    Ok(text)
 }
 
 // --- command -------------------------------------------------------------------

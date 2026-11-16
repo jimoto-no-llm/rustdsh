@@ -100,7 +100,7 @@ test('installer pins specified mobile and locale refs independently', (t) => {
   delete env.DSH_BUNDLE_TAG; delete env.DSH_LOCALE_REF; delete env.DSH_BUNDLE_BASE_URL; delete env.DSH_MD_VERSION;
   const defaults = spawnSync(process.execPath, [script], { env, encoding: 'utf8' });
   assert.equal(defaults.status, 0, defaults.stderr);
-  assert.deepEqual(JSON.parse(defaults.stdout).slice(4), ['github:kuraneko1/dsh-mobile-maxxing', 'https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/v1.0.0/dsh-md-rendering-0.1.3.tgz', 'github:kuraneko1/dsh-locale-ja']);
+  assert.deepEqual(JSON.parse(defaults.stdout).slice(4), ['github:kuraneko1/dsh-mobile-maxxing', 'https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/v1.0.1/dsh-md-rendering-0.1.3.tgz', 'github:kuraneko1/dsh-locale-ja']);
 });
 
 test('bundle exports its client and distribution resources', () => {

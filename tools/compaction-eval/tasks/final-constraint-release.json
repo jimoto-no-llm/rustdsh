@@ -1,0 +1,23 @@
+{
+  "id": "final-constraint-release",
+  "split": "final",
+  "kind": "constraint",
+  "required": true,
+  "turns": [
+    "Release rules for later: releases happen only on Tuesday, the version tag must start with rel-, and the changelog file is NEWS.md. Reply only with: noted.",
+    "Do not use any tools. In about 400 words, explain how a hash table works, including collisions and resizing.",
+    "Do not use any tools. In about 400 words, explain how a B-tree works and why databases use it.",
+    "Do not use any tools. In about 400 words, explain TCP congestion control, including slow start.",
+    "Do not use any tools. In about 400 words, explain public-key cryptography and digital signatures.",
+    "Do not use any tools. In about 400 words, explain how garbage collection works in managed runtimes.",
+    "Do not use any tools. In about 400 words, explain how DNS resolution works, including caching."
+  ],
+  "question": "Do not use any tools. From the release rules I gave earlier, return {\"day\": string, \"tag_prefix\": string, \"changelog\": string}. Reply with one JSON object only.",
+  "expect": {
+    "equals": {
+      "day": "Tuesday",
+      "tag_prefix": "rel-",
+      "changelog": "NEWS.md"
+    }
+  }
+}

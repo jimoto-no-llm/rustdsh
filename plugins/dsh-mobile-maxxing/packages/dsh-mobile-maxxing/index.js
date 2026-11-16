@@ -36,6 +36,9 @@ import { COPY, PROBES, copyFor, serviceWorkerCopy } from "./lib/copy.js";
 import { copyTable } from "./lib/copy-source.js";
 import { MANIFEST_FILE, MODE_GLOBAL, earlyModeScript } from "./lib/device-mode.js";
 import { readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { isAbsolute, resolve as resolvePath } from "node:path";
 import { spawn } from "node:child_process";
 
 /** Stable Cordis plugin name. */
@@ -339,24 +342,160 @@ function assetPath(file) {
 
 
 /**
- * Install the confirmed release in the active profile.
+ * The command that runs *this* installation's DSH CLI.
+ *
+ * The update used to spawn a bare `dsh`, which assumes the CLI is on the
+ * server's PATH. It is not under a systemd unit with a minimal PATH, in a
+ * container, under launchd, or on Windows (where the shim is `dsh.cmd`): the
+ * install failed with `spawn dsh ENOENT` even though the server was running
+ * that very CLI. The running process knows its own entry script, so use it with
+ * the same Node binary and only fall back to PATH when it was embedded another
+ * way.
+ */
+export function resolveDshCli({
+	argv = process.argv,
+	execPath = process.execPath,
+	platform = process.platform,
+} = {}) {
+	const entry = Array.isArray(argv) ? argv[1] : undefined;
+	if (typeof entry === "string" && /(^|[\\/])bin\.js$/.test(entry)) {
+		const script = isAbsolute(entry) ? entry : resolvePath(entry);
+		// A path that no longer exists (the install moved, the cwd changed) is
+		// no better than guessing: let the PATH fallback speak for itself.
+		if (existsSync(script)) return { command: execPath, args: [script], shell: false, via: "process" };
+	}
+	return platform === "win32"
+		? { command: "dsh.cmd", args: [], shell: true, via: "path" }
+		: { command: "dsh", args: [], shell: false, via: "path" };
+}
+
+/**
+ * The update failures a user can act on.
+ *
+ * Each one carries a stable code, a one-line reason and what to do about it.
+ * The Web UI localises the code and only shows the raw installer output as
+ * "technical details", because `spawn dsh ENOENT` told nobody anything.
+ */
+export const UPDATE_FAILURES = Object.freeze({
+	"cli-missing": { code: "cli-missing", reason: "The dsh command could not be found on the server", hint: "Start DSH with its CLI on PATH, or install it with: npm i -g @deepseek-ai/dsh" },
+	network: { code: "network", reason: "The server could not reach GitHub", hint: "Check the server's network or proxy settings, then try again" },
+	timeout: { code: "timeout", reason: "The install did not finish in time", hint: "A slow connection can time out; try again" },
+	"release-missing": { code: "release-missing", reason: "The release file could not be downloaded", hint: "Try again later, or install it from the command line" },
+	permission: { code: "permission", reason: "The profile could not be written", hint: "Check the permissions of the DSH home directory" },
+	disk: { code: "disk", reason: "There is not enough free space", hint: "Free some space and try again" },
+	busy: { code: "busy", reason: "Another update is already running", hint: "Wait for it to finish, then try again" },
+	unknown: { code: "unknown", reason: "The install stopped with an error", hint: "Try again; if it keeps failing, update from the command line" },
+});
+
+/**
+ * Map an installer failure onto one of {@link UPDATE_FAILURES}.
+ *
+ * @param {unknown} error - the spawn error, when one was raised.
+ * @param {string} stderr - the installer's own output.
+ */
+export function classifyUpdateFailure(error, stderr = "") {
+	const text = `${stderr}\n${error && typeof error === "object" && typeof error.message === "string" ? error.message : ""}`;
+	const code = error && typeof error === "object" ? error.code : undefined;
+	if (code === "ENOENT") return UPDATE_FAILURES["cli-missing"];
+	if (code === "ETIMEDOUT" || (error && typeof error === "object" && (error.killed === true || error.signal === "SIGTERM"))) return UPDATE_FAILURES.timeout;
+	if (/\bENOSPC\b|no space left/i.test(text)) return UPDATE_FAILURES.disk;
+	if (/\bEACCES\b|\bEPERM\b|permission denied/i.test(text)) return UPDATE_FAILURES.permission;
+	if (/\bENOTFOUND\b|\bEAI_AGAIN\b|\bECONNREFUSED\b|\bECONNRESET\b|\bETIMEDOUT\b|getaddrinfo|socket hang up|certificate|TLS/i.test(text)) return UPDATE_FAILURES.network;
+	if (/\b404\b|Not Found|not found in the registry/i.test(text)) return UPDATE_FAILURES["release-missing"];
+	return UPDATE_FAILURES.unknown;
+}
+
+/** Strip the installer's noise so the detail line stays readable. */
+function cleanInstallerOutput(text) {
+	return String(text || "")
+		// eslint-disable-next-line no-control-regex
+		.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
+		.split("\n")
+		.map((line) => line.trimEnd())
+		.filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
+		.slice(-12)
+		.join("\n")
+		.trim();
+}
+
+let updateInFlight = false;
+
+/**
+ * Run the installer once.
  *
  * @returns {Promise<void>}
  */
-function runPluginUpdate(profile, tag) {
+function runPluginUpdateOnce(profile, tag) {
+	const cli = resolveDshCli();
+	// The release tarball, not `github:`: the git form needs a git binary and a
+	// working ssh/https clone in the server's environment, which is where a
+	// packaged deployment usually differs from a developer machine.
+	const spec = `https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/${tag}/dsh-mobile-maxxing.tgz`;
 	return new Promise((resolve, reject) => {
-		const child = spawn("dsh", ["plugin", "--profile", profile, "add", `github:kuraneko1/dsh-mobile-maxxing#${tag}`], {
+		const child = spawn(cli.command, [...cli.args, "plugin", "--profile", profile, "add", spec, "--force"], {
 			stdio: ["ignore", "ignore", "pipe"],
-			timeout: 120000,
+			timeout: 180000,
+			shell: cli.shell,
 		});
 		let stderr = "";
 		child.stderr.on("data", (chunk) => { stderr = (stderr + String(chunk)).slice(-16000); });
-		child.on("error", reject);
+		child.on("error", (error) => {
+			const failure = classifyUpdateFailure(error, stderr);
+			reject(Object.assign(new Error(failure.reason), { failure, detail: cleanInstallerOutput(stderr) || String(error?.message || error), spawnError: error }));
+		});
 		child.on("close", (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(stderr.trim() || `exit ${code}`));
+			if (code === 0) { resolve(); return; }
+			const failure = classifyUpdateFailure(null, stderr);
+			reject(Object.assign(new Error(failure.reason || `exit ${code}`), { failure, detail: cleanInstallerOutput(stderr) || `exit ${code}`, exitCode: code }));
 		});
 	});
+}
+
+/**
+ * Install the confirmed release in the active profile.
+ *
+ * One retry is allowed when the first attempt failed on the network: the
+ * release asset is served by a CDN, and a cold or flaky connection is the
+ * commonest one-off. A second failure is reported as it is.
+ *
+ * @returns {Promise<void>}
+ */
+async function runPluginUpdate(profile, tag) {
+	if (updateInFlight) {
+		const failure = UPDATE_FAILURES.busy;
+		throw Object.assign(new Error(failure.reason), { failure, detail: "" });
+	}
+	updateInFlight = true;
+	try {
+		try {
+			await runPluginUpdateOnce(profile, tag);
+		} catch (error) {
+			if (error?.failure?.code !== "network") throw error;
+			await runPluginUpdateOnce(profile, tag);
+		}
+	} finally {
+		updateInFlight = false;
+	}
+}
+
+/** The DSH version this process runs, for the Updates panel (#145). */
+export function dshVersion(argv = process.argv) {
+	// The running CLI is the one truth: <dsh>/lib/bin.js next to <dsh>/package.json.
+	const entry = Array.isArray(argv) ? argv[1] : undefined;
+	if (typeof entry === "string" && entry !== "") {
+		for (const candidate of [resolvePath(entry, "../package.json"), resolvePath(entry, "../../package.json")]) {
+			try {
+				const pkg = JSON.parse(readFileSync(candidate, "utf8"));
+				if (pkg && pkg.name === "@deepseek-ai/dsh" && typeof pkg.version === "string") return pkg.version;
+			} catch { /* try the next shape */ }
+		}
+	}
+	// An embedded install (no bin.js) still resolves if it depends on DSH.
+	try {
+		const pkg = createRequire(import.meta.url)("@deepseek-ai/dsh/package.json");
+		if (pkg && typeof pkg.version === "string") return pkg.version;
+	} catch { /* nothing to report */ }
+	return "";
 }
 
 export const RELEASE_URL = "https://github.com/kuraneko1/dsh-mobile-maxxing/releases";
@@ -420,11 +559,18 @@ export function apply(ctx, config) {
         try {
           checkedRelease = null;
           const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
+          const dsh = dshVersion();
+          // ?local=1 answers the versions only: the Updates panel shows them
+          // the moment it opens, without a GitHub round trip.
+          if (/[?&]local=1(&|$)/.test(req.url || "")) {
+            respond(res, req.method, 200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }, JSON.stringify({ current: pkg.version, dsh }));
+            return;
+          }
           const latest = await fetchLatestRelease();
           const comparison = compareReleaseVersions(pkg.version, latest);
           const available = comparison < 0;
           checkedRelease = available ? latest : null;
-          respond(res, req.method, 200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }, JSON.stringify({ current: pkg.version, latest, available, ahead: comparison > 0, repository: RELEASE_URL }));
+          respond(res, req.method, 200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }, JSON.stringify({ current: pkg.version, dsh, latest, available, ahead: comparison > 0, repository: RELEASE_URL }));
         } catch (error) {
           respond(res, req.method, 502, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }, JSON.stringify({ error: String(error?.message || error) }));
         }
@@ -445,7 +591,17 @@ export function apply(ctx, config) {
           await runPluginUpdate(profile, tag);
           respond(res, "POST", 200, { "content-type": "application/json", "cache-control": "no-store" }, JSON.stringify({ ok: true, version: tag }));
         } catch (error) {
-          respond(res, "POST", 500, { "content-type": "application/json", "cache-control": "no-store" }, JSON.stringify({ error: String(error?.message || error) }));
+          // The Web UI renders the code; the message and the installer output
+          // are the fallback and the "technical details" line.
+          const failure = error?.failure ?? UPDATE_FAILURES.unknown;
+          const status = failure.code === "busy" ? 409 : 500;
+          respond(res, "POST", status, { "content-type": "application/json", "cache-control": "no-store" }, JSON.stringify({
+            ok: false,
+            code: failure.code,
+            error: failure.reason,
+            hint: failure.hint,
+            detail: String(error?.detail || "").slice(0, 4000),
+          }));
         }
       },
     }));

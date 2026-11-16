@@ -428,6 +428,7 @@ run_case() {
     -v "$WORK_DIR/cases:/cases:ro"
     -v "$STAGE_DIR:/base:ro"
     -e HOME=/root
+    -e RDSH_SKIP_RUNTIME=1
     -e "PREFIX=$PREFIX"
     -e "ASSET_BASE=/base"
     -e "RDSH_RELEASE_BASE=file:///base"

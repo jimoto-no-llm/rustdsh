@@ -255,13 +255,7 @@ fn handle(
             Cow::Owned(crate::inspect::names_json("profiles")),
         ),
         ("GET", "/api/files") => {
-            let session = query.split('&').find_map(|kv| {
-                let mut it = kv.splitn(2, '=');
-                match (it.next(), it.next()) {
-                    (Some("session"), Some(v)) => Some(v.to_string()),
-                    _ => None,
-                }
-            });
+            let session = query_value(query, "session");
             match crate::files::deliverables(session.as_deref()) {
                 Ok((label, files)) => {
                     let body = serde_json::json!({
@@ -278,7 +272,7 @@ fn handle(
                 Err(error) => (
                     404,
                     "application/json",
-                    Cow::Owned(format!("{{\"error\":\"{error}\"}}")),
+                    Cow::Owned(serde_json::json!({"error": error.to_string()}).to_string()),
                 ),
             }
         }
@@ -290,13 +284,7 @@ fn handle(
 
 /// Stream one declared deliverable so a browser can save a copy.
 fn handle_file_download(s: &mut std::net::TcpStream, query: &str) -> std::io::Result<()> {
-    let Some(path) = query.split('&').find_map(|kv| {
-        let mut it = kv.splitn(2, '=');
-        match (it.next(), it.next()) {
-            (Some("path"), Some(v)) => Some(v),
-            _ => None,
-        }
-    }) else {
+    let Some(path) = query_value(query, "path") else {
         return crate::local_http::respond(
             s,
             400,
@@ -304,41 +292,105 @@ fn handle_file_download(s: &mut std::net::TcpStream, query: &str) -> std::io::Re
             b"{\"error\":\"missing path\"}",
         );
     };
-    let source = std::path::PathBuf::from(percent_decode(path));
-    let declared = match crate::files::deliverables(None) {
+    let source = std::path::PathBuf::from(path);
+    let session = query_value(query, "session");
+    let declared = match crate::files::deliverables(session.as_deref()) {
         Ok((_, files)) => files,
         Err(error) => {
-            let body = format!("{{\"error\":\"{error}\"}}");
+            let body = serde_json::json!({"error": error.to_string()}).to_string();
             return crate::local_http::respond(s, 404, "application/json", body.as_bytes());
         }
     };
-    let canonical = match crate::files::checked_source(&source, &declared) {
-        Ok(path) => path,
+    let (canonical, file, length) = match crate::files::open_source(&source, &declared) {
+        Ok(source) => source,
         Err(error) => {
-            let body = format!("{{\"error\":\"{error}\"}}");
+            let body = serde_json::json!({"error": error.to_string()}).to_string();
             return crate::local_http::respond(s, 403, "application/json", body.as_bytes());
-        }
-    };
-    let bytes = match std::fs::read(&canonical) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            let body = format!("{{\"error\":\"{error}\"}}");
-            return crate::local_http::respond(s, 500, "application/json", body.as_bytes());
         }
     };
     let name = crate::files::download_name(&canonical);
     let ctype = crate::files::content_type(&canonical);
+    let disposition = content_disposition(&name);
     let header = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Disposition: attachment; filename=\"{}\"\r\n\r\n",
-        ctype,
-        bytes.len(),
-        name
+        "HTTP/1.1 200 OK\r\nContent-Type: {ctype}\r\nContent-Length: {length}\r\nContent-Disposition: {disposition}\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n"
     );
-    use std::io::Write as _;
-    let _ = s.write_all(header.as_bytes());
-    let _ = s.write_all(&bytes);
-    let _ = s.flush();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    write_before_deadline(s, header.as_bytes(), deadline)?;
+    stream_file(s, file, length, deadline)
+}
+
+fn content_disposition(name: &str) -> String {
+    use std::fmt::Write as _;
+    let fallback: String = name
+        .chars()
+        .map(|c| match c {
+            ' '..='~' if !matches!(c, '"' | '\\' | '%') => c,
+            _ => '_',
+        })
+        .collect();
+    let mut value = format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''");
+    for byte in name.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            value.push(char::from(byte));
+        } else {
+            let _ = write!(value, "%{byte:02X}");
+        }
+    }
+    value
+}
+
+fn stream_file(
+    s: &mut std::net::TcpStream,
+    file: std::fs::File,
+    length: u64,
+    deadline: std::time::Instant,
+) -> std::io::Result<()> {
+    use std::io::Read as _;
+    let mut source = file.take(length);
+    let mut buffer = [0u8; 16 * 1024];
+    while source.limit() > 0 {
+        let count = source.read(&mut buffer)?;
+        if count == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "deliverable changed during download",
+            ));
+        }
+        write_before_deadline(s, &buffer[..count], deadline)?;
+    }
     Ok(())
+}
+
+fn write_before_deadline(
+    s: &mut std::net::TcpStream,
+    mut bytes: &[u8],
+    deadline: std::time::Instant,
+) -> std::io::Result<()> {
+    use std::io::Write as _;
+    while !bytes.is_empty() {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "download response timed out",
+            ));
+        }
+        s.set_write_timeout(Some(remaining))?;
+        match s.write(bytes) {
+            Ok(0) => return Err(std::io::ErrorKind::WriteZero.into()),
+            Ok(count) => bytes = &bytes[count..],
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+fn query_value(query: &str, name: &str) -> Option<String> {
+    query.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=')?;
+        (key == name).then(|| percent_decode(value))
+    })
 }
 
 /// Minimal percent-decoding for a query parameter.
@@ -414,4 +466,79 @@ fn bench_json(query: &str) -> String {
     let result = serde_json::json!({"rdsh_version_ms": mine, "n": n}).to_string();
     cache.insert(n, result.clone());
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+    use std::net::{TcpListener, TcpStream};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn downloads_use_the_checked_length_when_the_open_file_changes() {
+        let path =
+            std::env::temp_dir().join(format!("rdsh-serve-changed-file-{}", std::process::id()));
+        for (replacement, expected_error) in [
+            (b"original appended".as_slice(), None),
+            (b"short".as_slice(), Some(std::io::ErrorKind::UnexpectedEof)),
+        ] {
+            std::fs::write(&path, b"original").unwrap();
+            let file = std::fs::File::open(&path).unwrap();
+            let length = file.metadata().unwrap().len();
+            std::fs::write(&path, replacement).unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            client
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let (mut server, _) = listener.accept().unwrap();
+            let sender = std::thread::spawn(move || {
+                stream_file(
+                    &mut server,
+                    file,
+                    length,
+                    Instant::now() + Duration::from_secs(2),
+                )
+            });
+            let mut received = Vec::new();
+            client.read_to_end(&mut received).unwrap();
+            let result = sender.join().unwrap();
+            assert_eq!(result.err().map(|error| error.kind()), expected_error);
+            assert_eq!(
+                received,
+                replacement[..replacement.len().min(length as usize)]
+            );
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn download_releases_a_connection_that_stops_reading() {
+        let path =
+            std::env::temp_dir().join(format!("rdsh-serve-blocked-file-{}", std::process::id()));
+        let length = 64 * 1024 * 1024;
+        std::fs::File::create(&path)
+            .unwrap()
+            .set_len(length)
+            .unwrap();
+        let file = std::fs::File::open(&path).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let _client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        let started = Instant::now();
+        let error = stream_file(
+            &mut server,
+            file,
+            length,
+            started + Duration::from_millis(100),
+        )
+        .unwrap_err();
+        std::fs::remove_file(path).unwrap();
+        assert!(matches!(
+            error.kind(),
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+        ));
+        assert!(started.elapsed() < Duration::from_secs(3));
+    }
 }

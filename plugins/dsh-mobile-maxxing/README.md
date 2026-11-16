@@ -3,7 +3,7 @@
 DeepSeek Harness（DSH）の Web UI を、スマートフォンとタブレットで快適に使うためのプラグイン群です。
 PWA、モバイルレイアウト、通知、Markdown 表、日本語 UI を、必要なものだけ導入できます。
 
-**[最新リリース v1.0.0](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.0)** · **[リリースノート](RELEASE-NOTES-v1.0.0.md)** · **[English](README.en.md)**
+**[最新リリース v1.0.4](https://github.com/kuraneko1/dsh-mobile-maxxing/releases/tag/v1.0.4)** · **[リリースノート](RELEASE-NOTES-v1.0.4.md)** · **[English](README.en.md)** · **[简体中文](README.zh-CN.md)**
 
 - モバイル本体は素の DSH にそのまま導入でき、通知用の外部ライブラリも不要です。
 - 画面幅ではなく端末を判定するため、狭い PC ウィンドウやタッチ対応 Windows PC をモバイル扱いしません。
@@ -14,16 +14,16 @@ PWA、モバイルレイアウト、通知、Markdown 表、日本語 UI を、�
 
 | コンポーネント | 役割 | 現在の版 | ソース |
 | --- | --- | --- | --- |
-| `dsh-mobile-maxxing` | PWA、通知、モバイル UX | 1.0.0 | このリポジトリ |
+| `dsh-mobile-maxxing` | PWA、通知、モバイル UX | 1.0.4 | このリポジトリ |
 | `dsh-md-rendering` | モバイルの Markdown 表表示 | 0.1.3 | [kuraneko1/dsh-md-rendering](https://github.com/kuraneko1/dsh-md-rendering) / [`packages/dsh-md-rendering`](packages/dsh-md-rendering) |
-| `dsh-locale-ja` | 65名前空間・2915キーの日本語 UI | 0.1.1 | [kuraneko1/dsh-locale-ja](https://github.com/kuraneko1/dsh-locale-ja) / [`packages/dsh-locale-ja`](packages/dsh-locale-ja) |
+| `dsh-locale-ja` | 65名前空間・2915キーの日本語 UI | 0.1.2 | [kuraneko1/dsh-locale-ja](https://github.com/kuraneko1/dsh-locale-ja) / [`packages/dsh-locale-ja`](packages/dsh-locale-ja) |
 
 3つは独立しています。プラグイン画面で個別に有効・無効を切り替えられます。
 CJK の自動リンク修正は、PC の描画を変えない方針のため、別パッケージ `rdsh-markdown-cjk` に分離しています。
 
 ## 動作条件
 
-- 検証対象の DSH: **0.2.1-rc.2 / 0.2.1-rc.3**
+- 検証対象の DSH: **0.2.1-rc.2 / 0.2.1-rc.3 / 0.2.2-alpha.2**
 - ブラウザ: 現行の Chrome / Edge / Safari。iOS・iPadOS を含みます
 - PWA と Web Push: **HTTPS または localhost** で DSH へアクセスしていること
 - OS 通知: ブラウザと OS の両方で通知が許可されていること
@@ -40,7 +40,7 @@ CJK の自動リンク修正は、PC の描画を変えない方針のため、�
 curl -fsSL https://raw.githubusercontent.com/kuraneko1/dsh-mobile-maxxing/main/scripts/install-mobile-bundle.mjs | node --input-type=module
 ```
 
-既定では `web` プロファイルへ、本体と日本語化は各リポジトリの `main`、表表示は `v1.0.0` の `0.1.3` 成果物を導入します。
+既定では `web` プロファイルへ、本体と日本語化は各リポジトリの `main`、表表示は `v1.0.4` の `0.1.3` 成果物を導入します。
 導入後は DSH を再起動し、ブラウザを再読み込みしてください。
 
 別のプロファイルを使う場合:
@@ -64,7 +64,7 @@ dsh plugin --profile web add github:kuraneko1/dsh-locale-ja
 ### Markdown 表だけを追加
 
 ```sh
-dsh plugin --profile web add https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/v1.0.0/dsh-md-rendering-0.1.3.tgz
+dsh plugin --profile web add https://github.com/kuraneko1/dsh-mobile-maxxing/releases/download/v1.0.4/dsh-md-rendering-0.1.3.tgz
 ```
 
 `dsh plugin --profile web add` は依存と bundle の両方を更新します。`cd ~/.dsh/profiles/web` は不要です。
@@ -148,7 +148,8 @@ v1.0.0 では、通知の信頼性と安全性も強化しています。
 
 - 65名前空間・2915キーを翻訳し、英語フォールバックは0です
 - モバイル本体には含めず、独立した `dsh-locale-ja` だけが日本語を所有します
-- DSH 0.2.1-rc.2 / rc.3 の peer 依存に対応しています
+- DSH 0.2.1-rc.2 / rc.3 / 0.2.2-alpha.2 の peer 依存に対応しています
+- DSH 0.2.2-alpha.2 は本体に日本語を同梱しています。`dsh-locale-ja` は `ja` が登録済みなら何も登録せず、DSH 標準の日本語訳がそのまま使われます
 - 不完全なカタログは `pack-all` が `REFUSED` と表示し、配布しません
 
 詳しくは [`packages/dsh-locale-ja/README.md`](packages/dsh-locale-ja/README.md) を参照してください。
@@ -158,7 +159,7 @@ v1.0.0 では、通知の信頼性と安全性も強化しています。
 | 環境変数 | 用途 | 既定 |
 | --- | --- | --- |
 | `DSH_PROFILE` | 導入先プロファイル | `web` |
-| `DSH_BUNDLE_TAG` | 本体を固定する Git ref と、表 tarball を含むリリースタグ | `v1.0.0`（本体は `main`） |
+| `DSH_BUNDLE_TAG` | 本体を固定する Git ref と、表 tarball を含むリリースタグ | `v1.0.4`（本体は `main`） |
 | `DSH_BUNDLE_BASE_URL` | 表 tarball のダウンロード元 | 指定タグの GitHub Releases |
 | `DSH_LOCALE_REF` | 日本語化を固定する Git ref | `main` |
 | `DSH_MD_VERSION` | 表パッケージの版 | `0.1.3` |
@@ -167,7 +168,7 @@ v1.0.0 では、通知の信頼性と安全性も強化しています。
 
 ```sh
 DSH_PROFILE=web-mobile \
-DSH_BUNDLE_TAG=v1.0.0 \
+DSH_BUNDLE_TAG=v1.0.4 \
 DSH_LOCALE_REF=main \
 DSH_MD_VERSION=0.1.3 \
   node scripts/install-mobile-bundle.mjs

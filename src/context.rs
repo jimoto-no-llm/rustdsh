@@ -3085,7 +3085,7 @@ pub(crate) fn read_zstd_session(
     read_zstd_session_from_file(source, file, cap, line_limit, deadline)
 }
 
-fn read_zstd_session_from_file(
+pub(crate) fn read_zstd_session_from_file(
     source: &Path,
     file: std::fs::File,
     cap: usize,

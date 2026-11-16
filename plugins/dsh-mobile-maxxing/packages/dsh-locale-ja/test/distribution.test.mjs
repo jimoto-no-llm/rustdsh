@@ -56,7 +56,7 @@ test('the package is a separate, private web client with its own exports', () =>
 	assert.ok(manifest.files.includes('cordis.patch.yml'));
 	assert.deepEqual(manifest.dsh?.client?.inject, ['@deepseek-ai/dsh-client-locale']);
 	assert.equal(manifest.peerDependencies?.['@deepseek-ai/dsh-client-locale'], meta.clientLocalePeer);
-	assert.equal(meta.clientLocalePeer, '0.2.1-rc.2 || 0.2.1-rc.3', 'both distribution channels must advertise the same peer range');
+	assert.equal(meta.clientLocalePeer, '0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.2-alpha.2', 'both distribution channels must advertise the same peer range');
 	assert.equal(manifest.exports?.['.'], './index.js');
 	assert.equal(manifest.exports?.['./client'], './client.js');
 	for (const target of Object.values(manifest.exports)) {
@@ -204,6 +204,10 @@ test('the installed client is the single ja owner and coexists/disposes cleanly'
 			return dispose;
 		},
 		locale: {
+			// DSH 0.2.1-rc.2 / rc.3 ship only zh and en.
+			getSnapshot() {
+				return { locales: [{ id: 'zh' }, { id: 'en' }, ...(registered.has('__language__') ? [registered.get('__language__')] : [])] };
+			},
 			addLanguage(input) {
 				languages.push({ ...input });
 				registered.set('__language__', input);
@@ -345,15 +349,17 @@ syncBuiltinESMExports();`);
 	for (const file of files) assert.equal(fs.readFileSync(path.join(dist, file), 'utf8'), 'old ' + file);
 });
 
-test('packed locale accepts the advertised rc.2 peer under strict resolution', (t) => {
+test('packed locale accepts every advertised peer under strict resolution', (t) => {
 	const { file } = pack(t);
-	const dir = temporaryDirectory(t);
-	const peer = path.join(dir, 'peer');
-	fs.mkdirSync(peer);
-	fs.writeFileSync(path.join(peer, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-locale', version: '0.2.1-rc.2' }));
-	fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'locale-peer-test', version: '1.0.0', private: true, dependencies: { '@deepseek-ai/dsh-client-locale': 'file:./peer', 'dsh-locale-ja': 'file:' + file } }));
-	const result = spawnSync('npm', ['install', '--package-lock-only', '--ignore-scripts', '--offline', '--strict-peer-deps'], { cwd: dir, encoding: 'utf8' });
-	assert.equal(result.status, 0, result.stderr);
+	for (const version of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.2-alpha.2']) {
+		const dir = temporaryDirectory(t);
+		const peer = path.join(dir, 'peer');
+		fs.mkdirSync(peer);
+		fs.writeFileSync(path.join(peer, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-locale', version }));
+		fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'locale-peer-test', version: '1.0.0', private: true, dependencies: { '@deepseek-ai/dsh-client-locale': 'file:./peer', 'dsh-locale-ja': 'file:' + file } }));
+		const result = spawnSync('npm', ['install', '--package-lock-only', '--ignore-scripts', '--offline', '--strict-peer-deps'], { cwd: dir, encoding: 'utf8' });
+		assert.equal(result.status, 0, version + ': ' + result.stderr);
+	}
 });
 
 function releaseCommand(copy) {
@@ -405,7 +411,8 @@ test('documented release does not run gh after locale validation fails', (t) => 
 test('docs describe the optional local-tarball install and never a fake release asset', () => {
 	const readme = fs.readFileSync(path.join(packageDir, 'README.md'), 'utf8');
 	assert.doesNotMatch(readme, /releases\/download\/[^\s"']*dsh-locale-ja/, 'the unreleased locale must not link a release asset');
-	assert.match(readme, /dsh plugin --profile web add \.\/dist\/dsh-locale-ja-0\.1\.1\.tgz/);
+	const { version: localeVersion } = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
+	assert.match(readme, new RegExp("dsh plugin --profile web add \\.\\/dist\\/dsh-locale-ja-" + localeVersion.replace(/[^a-zA-Z0-9]/g, '\\$&') + "\\.tgz"));
 	assert.match(readme, /REFUSED/);
 	assert.match(readme, /sole owner|only owner/i, 'the sole-owner migration must be explicit');
 	const rootReadme = fs.readFileSync(path.join(repo, 'README.md'), 'utf8');

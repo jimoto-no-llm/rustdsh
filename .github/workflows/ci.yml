@@ -36,7 +36,7 @@ jobs:
         run: |
           docker build --file - --output "type=local,dest=$RUNNER_TEMP/rdsh-cloud-context" . <<'EOF'
           FROM scratch
-          COPY Cargo.toml Cargo.lock build.rs install.sh docker-compose.searxng.yml /
+          COPY Cargo.toml Cargo.lock build.rs install.sh install.ps1 docker-compose.searxng.yml /
           COPY src /src
           COPY assets /assets
           COPY security /security
@@ -137,6 +137,8 @@ jobs:
         shell: bash
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
+          bash tests/runtime-bootstrap.sh
+          node --test tests/setup-model-catalog.test.mjs
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
 
   # Network acquisition only. Kept out of the required check so a registry or
@@ -308,7 +310,8 @@ jobs:
             'ALPHA3 0.2.1-alpha.3' \
             'RC3 0.2.1-rc.3' \
             'RC4 0.2.1-rc.4' \
-            'ALPHA22 0.2.2-alpha.2'
+            'ALPHA22 0.2.2-alpha.2' \
+            'ALPHA23 0.2.2-alpha.3'
           do
             label=${pair%% *}
             version=${pair#* }
@@ -324,7 +327,7 @@ jobs:
           done
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: cargo test --locked tool_security
-      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs tests/opencode-session-header.test.mjs
+      - run: node --test tests/security-boundaries.test.mjs tests/dsh-alpha23.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs tests/opencode-session-header.test.mjs
       - name: Verify Rust launcher, official profiles and kernel enforcement together
         run: RDSH_GUARDED_MATRIX_REQUIRED=1 node --test tests/guarded-launcher-matrix.test.mjs
       - name: Install pinned upstream tool-bash for approval integrity test
@@ -422,6 +425,8 @@ jobs:
         shell: bash
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
+          bash tests/runtime-bootstrap.sh
+          node --test tests/setup-model-catalog.test.mjs
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
           BIN=./target/debug/rdsh sh tests/context_prototype.sh
           BIN=./target/debug/rdsh sh tests/context_hook_prototype.sh
@@ -435,6 +440,7 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ./install.ps1), [ref]$null, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          ./tests/runtime-bootstrap.ps1
           ./tests/installer-security.ps1
           ./tests/installer-security.ps1 -Version v0.0.0-rc.1
           # The bundled plugins archive is what gives a release-only install
@@ -537,6 +543,7 @@ jobs:
         env:
           RDSH_E2E_BIN: ./target/release/rdsh
           RDSH_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - run: node tests/e2e/setup-provision.mjs
       # The rdsh-ui-comfort DOM test drives a real Chromium, so it belongs to
       # this job: without playwright-core it silently skips instead of proving
       # the bundle's key handling.

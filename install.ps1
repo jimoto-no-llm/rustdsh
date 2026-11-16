@@ -35,11 +35,15 @@ param(
   [switch]$Desktop,
   [string]$Version = 'latest',
   [switch]$NoChecksum,
-  [switch]$NoSetup
+  [switch]$NoSetup,
+  [switch]$NoRuntime,
+  [switch]$WithCodex,
+  [switch]$RuntimeOnly
 )
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ([string]::IsNullOrEmpty($Prefix)) { $Prefix = "$env:LOCALAPPDATA/rdsh/bin" }
+$script:ManagedDshEntry = $null
 $OriginFile = Join-Path $env:USERPROFILE '.config/rdsh/origin'
 # Trusted digest registry for the release archives. Never make it follow
 # RDSH_RELEASE_BASE or another environment value: the release origin must not
@@ -51,6 +55,80 @@ $ReleaseMember = 'rdsh.exe'
 # settings tab and the update banner without a checkout.
 $PluginDigestsUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-plugins-digests.tsv'
 $PluginAsset = 'rdsh-plugins.tar.gz'
+
+function Ensure-AgentRuntime {
+  if ($NoRuntime -or $env:RDSH_SKIP_RUNTIME -eq '1') { return }
+  $runtime = Join-Path $env:USERPROFILE '.local/share/rdsh/runtime'
+  $privateBin = Join-Path $runtime 'bin'
+  $node = Get-Command node -ErrorAction SilentlyContinue
+  $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+  $major = 0
+  if ($node) { try { $major = [int]((& $node.Source --version).TrimStart('v').Split('.')[0]) } catch { $major = 0 } }
+  if ($major -lt 24 -or -not $npm) {
+    $arch = 'x64'
+    $sha = 'd2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5'
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { $arch = 'arm64'; $sha = 'a0c807319fede24c4a0d8f84564c82a619bd313b16b10c007c383c2609e99171' }
+    $nodeDir = Join-Path $runtime "node-v24.22.1-win-$arch"
+    if (-not (Test-Path (Join-Path $nodeDir 'node.exe'))) {
+      Write-Host '[1/3] Installing verified Node.js 24.22.1 without Administrator...'
+      $work = Join-Path ([IO.Path]::GetTempPath()) ('rdsh-node-' + [guid]::NewGuid().ToString('N'))
+      New-Item -ItemType Directory -Path $work | Out-Null
+      try {
+        $archive = Join-Path $work 'node.zip'
+        Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-$arch.zip" -OutFile $archive
+        if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $sha) { throw 'Node.js checksum mismatch; nothing was executed' }
+        Expand-Archive -LiteralPath $archive -DestinationPath $work
+        New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+        Move-Item -LiteralPath (Join-Path $work "node-v24.22.1-win-$arch") -Destination $nodeDir
+      } finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    $nodeProgram = Join-Path $nodeDir 'node.exe'
+    $npmProgram = Join-Path $nodeDir 'npm.cmd'
+    $env:Path = "$nodeDir;$env:Path"
+  } else { $nodeProgram = $node.Source; $npmProgram = $npm.Source }
+  $existingDsh = Get-Command dsh -ErrorAction SilentlyContinue
+  $needDsh = $true
+  if ($existingDsh) { try { $needDsh = ((& $existingDsh.Source --version) -notmatch '^\d+\.\d+\.') } catch { $needDsh = $true } }
+  if ($env:DSH_ORIG_BIN -or $env:RDSH_ORIG_BIN) { $needDsh = $false }
+  New-Item -ItemType Directory -Force -Path $runtime, $privateBin, $Prefix | Out-Null
+  Write-Host '[2/3] Preparing private pnpm and DSH runtime...'
+  $packages = @('pnpm@10.34.9')
+  if ($WithCodex) { $packages += '@openai/codex@0.166.0' }
+  if ($needDsh) { $packages += '@deepseek-ai/dsh@0.2.2-alpha.3' }
+  & $npmProgram install --prefix $runtime --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true @packages
+  if ($LASTEXITCODE -ne 0) { throw 'Private runtime installation failed' }
+  $pnpmScript = Join-Path $runtime 'node_modules/pnpm/bin/pnpm.cjs'
+  if (-not (Test-Path -LiteralPath $pnpmScript)) { throw 'pnpm package is incomplete' }
+  $pnpmWrapper = "@echo off`r`nsetlocal DisableDelayedExpansion`r`nchcp 65001 >nul`r`n`"$nodeProgram`" `"$pnpmScript`" %*`r`n"
+  [IO.File]::WriteAllText((Join-Path $privateBin 'pnpm.cmd'), $pnpmWrapper)
+  if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { [IO.File]::WriteAllText((Join-Path $Prefix 'pnpm.cmd'), $pnpmWrapper) }
+  if ($needDsh) {
+    $dshScript = Join-Path $runtime 'node_modules/@deepseek-ai/dsh/lib/bin.js'
+    if (-not (Test-Path -LiteralPath $dshScript)) { throw 'DSH package is incomplete' }
+    $dshWrapper = "@echo off`r`nsetlocal DisableDelayedExpansion`r`nchcp 65001 >nul`r`nset `"PATH=$privateBin;$([IO.Path]::GetDirectoryName($nodeProgram));%PATH%`"`r`n`"$nodeProgram`" `"$dshScript`" %*`r`n"
+    $privateDsh = Join-Path $privateBin 'dsh.cmd'
+    [IO.File]::WriteAllText($privateDsh, $dshWrapper)
+    if (-not (Test-Path (Join-Path $Prefix 'dsh.cmd'))) { [IO.File]::WriteAllText((Join-Path $Prefix 'dsh.cmd'), $dshWrapper) }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OriginFile) | Out-Null
+    [IO.File]::WriteAllText($OriginFile, $dshScript + "`n")
+    $script:ManagedDshEntry = $dshScript
+  }
+  if ($WithCodex) {
+    $codexScript = Join-Path $runtime 'node_modules/@openai/codex/bin/codex.js'
+    if (-not (Test-Path -LiteralPath $codexScript)) { throw 'login helper is incomplete' }
+    [IO.File]::WriteAllText((Join-Path $privateBin 'codex.cmd'), "@echo off`r`nsetlocal DisableDelayedExpansion`r`nchcp 65001 >nul`r`n`"$nodeProgram`" `"$codexScript`" %*`r`n")
+    & (Join-Path $privateBin 'codex.cmd') --version
+    if ($LASTEXITCODE -ne 0) { throw 'login helper verification failed' }
+  }
+  $env:Path = "$privateBin;$Prefix;$env:Path"
+  & (Join-Path $privateBin 'pnpm.cmd') --version
+  if ($LASTEXITCODE -ne 0) { throw 'Private pnpm verification failed' }
+  if (Get-Command dsh -ErrorAction SilentlyContinue) { & dsh --version }
+  if ($LASTEXITCODE -ne 0) { throw 'DSH verification failed' }
+  Write-Host '[3/3] Agent runtime ready. Next: model setup.'
+}
+
+if ($RuntimeOnly) { Ensure-AgentRuntime; exit 0 }
 
 function Ensure-Cargo {
   if (Get-Command cargo -ErrorAction SilentlyContinue) { return }
@@ -386,7 +464,7 @@ if ($AsDsh) {
   if ($found -and ($found.Source -ne $dsh)) {
     Copy-Item $found.Source $backup -Force
     New-Item -ItemType Directory -Force -Path (Split-Path $OriginFile) | Out-Null
-    Set-Content $OriginFile $backup
+    if ($script:ManagedDshEntry) { [IO.File]::WriteAllText($OriginFile, $script:ManagedDshEntry + "`n") } else { [IO.File]::WriteAllText($OriginFile, $backup + "`n") }
     Write-Host "backed up original dsh -> $backup"
   } elseif (-not $found) {
     Write-Host 'no existing dsh on PATH; rdsh will be found as dsh via Prefix'
@@ -412,6 +490,7 @@ Write-Host '--- rdsh doctor ---'
 # banner, phone-width layout). A checkout attaches them from its own plugins/
 # directory; a release-only install fetches the bundled tree that CD publishes
 # next to the release archives. Neither path fails the install.
+Ensure-AgentRuntime
 $rdshExe = Join-Path $Prefix 'rdsh.exe'
 if ($env:RDSH_SKIP_PLUGINS -ne '1') {
   $checkoutPlugins = Join-Path $Repo 'plugins'
@@ -469,14 +548,6 @@ function Text([string]$JaBase64, [string]$EnText) {
   if ($Ja) { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($JaBase64)) } else { $EnText }
 }
 if ($Interactive -and -not $NoSetup) {
-  if (-not (Get-Command dsh -ErrorAction SilentlyContinue) -and (Get-Command npm -ErrorAction SilentlyContinue)) {
-    # "Install DeepSeek Harness (dsh), used for conversations, now?"
-    $answer = Read-Host (Text 'QUnjgajjga7kvJroqbHjgavkvb/jgYYgRGVlcFNlZWsgSGFybmVzcyAoZHNoKSDjgpLku4rjgqTjg7Pjgrnjg4jjg7zjg6vjgZfjgb7jgZnjgYvvvJ8gW1kvbl0=' 'Install DeepSeek Harness (dsh), used for conversations, now? [Y/n]')
-    if ($answer -notmatch '^[nN]') {
-      & npm install -g '@deepseek-ai/dsh'
-      if ($LASTEXITCODE -ne 0) { Write-Host (Text 'ZHNoIOOBruOCpOODs+OCueODiOODvOODq+OBq+WkseaVl+OBl+OBvuOBl+OBn+OAguOCu+ODg+ODiOOCouODg+ODl+eUu+mdouOBq+aJi+mghuOCkuihqOekuuOBl+OBvuOBmeOAgg==' 'dsh install failed; the setup screen shows the steps.') }
-    }
-  }
   try {
     $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'rdsh'
     New-Item -ItemType Directory -Force -Path $menu | Out-Null

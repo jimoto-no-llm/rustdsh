@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use tokio::runtime::Runtime;
 fn engine() -> Arc<Engine> {
     Arc::new(Engine {
+        compaction: crate::compaction_config::Options::default(),
         state: Mutex::new(State::default()),
         workspace: PathBuf::from("/test/workspace"),
         sdk: sdk::SdkConfig {

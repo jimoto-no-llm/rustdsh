@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Stdio,
     sync::{Arc, Mutex},
     time::Duration,
@@ -19,6 +19,10 @@ use tokio::{
 const HELPER: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/tui-web-surface.mjs"
+));
+const SCRIPT_JSON: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/script-json.mjs"
 ));
 const MAX_FRAME: usize = 16 * 1024 * 1024;
 const MAX_INPUT: usize = 2 * 1024 * 1024;
@@ -179,6 +183,24 @@ impl DshBackend {
         }
     }
 }
+fn materialize_modules(temporary: &Path) -> Result<PathBuf> {
+    let serializer = temporary.join("script-json.mjs");
+    fs::write(&serializer, SCRIPT_JSON)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&serializer, fs::Permissions::from_mode(0o600))?;
+    }
+    let helper = temporary.join("surface.mjs");
+    fs::write(&helper, HELPER)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(helper)
+}
+
 impl Surface {
     async fn start(init: Value) -> Result<Self> {
         let node = crate::passthrough::find_node_bin().context("Web画面にはNode.jsが必要です")?;
@@ -195,13 +217,7 @@ impl Surface {
         directory
             .create(&temporary)
             .context("Web画面の作業フォルダを作成できません")?;
-        let helper = temporary.join("surface.mjs");
-        fs::write(&helper, HELPER)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&helper, fs::Permissions::from_mode(0o600))?;
-        }
+        let helper = materialize_modules(&temporary)?;
         let mut command = tokio::process::Command::new(node);
         command
             .arg(&helper)
@@ -310,5 +326,35 @@ mod tests {
         assert!(HELPER.contains("--remote-debugging-pipe"));
         assert!(!HELPER.contains("--no-sandbox"));
         assert!(!HELPER.contains("--remote-debugging-port"));
+    }
+
+    struct TemporaryDirectory(PathBuf);
+
+    impl Drop for TemporaryDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn production_materialization_copies_relative_serializer_beside_surface() {
+        let directory = TemporaryDirectory(std::env::temp_dir().join(format!(
+            "rdsh-web-surface-materialization-{}",
+            crate::local_http::random_token().unwrap()
+        )));
+        fs::create_dir(&directory.0).unwrap();
+
+        let entry = materialize_modules(&directory.0).unwrap();
+        assert_eq!(entry.parent(), Some(directory.0.as_path()));
+        assert!(
+            directory.0.join("script-json.mjs").is_file(),
+            "the production directory must contain the surface's relative serializer import"
+        );
+        let source = fs::read_to_string(entry).unwrap();
+        assert!(source.contains("from './script-json.mjs'"));
+        assert_eq!(
+            fs::read_to_string(directory.0.join("script-json.mjs")).unwrap(),
+            SCRIPT_JSON
+        );
     }
 }

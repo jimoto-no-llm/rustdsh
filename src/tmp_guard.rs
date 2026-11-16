@@ -277,6 +277,7 @@ fn owned_by_current_user(_md: &std::fs::Metadata) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OrphanKind {
     /// A per-run dir whose owning process is gone.
+    #[cfg(unix)]
     DeadOwner,
     /// A legacy snapshot dir (or a per-run dir on non-unix) quiet for
     /// over [`STALE_AFTER`].

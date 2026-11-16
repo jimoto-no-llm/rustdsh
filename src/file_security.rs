@@ -4,8 +4,8 @@
 //! Unix closes the check/open race: every component is opened with
 //! `openat`/`O_NOFOLLOW` under a held directory fd. Windows opens the target
 //! without following a final reparse point, then checks the opened handle's
-//! final path and hard-link count before returning it. Hosts without a secure
-//! handle path fail closed.
+//! final path before returning it. Transcript readers additionally require a
+//! single hard link. Hosts without a secure handle path fail closed.
 use std::path::Path;
 #[cfg(any(unix, windows))]
 use std::path::PathBuf;
@@ -71,8 +71,13 @@ impl Root {
         None
     }
 
-    #[cfg(unix)]
     pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
+        let (file, links) = self.open_regular(target)?;
+        (links == 1).then_some(file)
+    }
+
+    #[cfg(unix)]
+    fn open_regular(&self, target: &Path) -> Option<(std::fs::File, u64)> {
         let relative = target.strip_prefix(&self.path).ok()?;
         if relative.as_os_str().is_empty() {
             return None;
@@ -92,7 +97,7 @@ impl Root {
     }
 
     #[cfg(unix)]
-    fn open_component_walk(&self, relative: &Path) -> Option<std::fs::File> {
+    fn open_component_walk(&self, relative: &Path) -> Option<(std::fs::File, u64)> {
         use std::ffi::CString;
         use std::os::fd::{AsRawFd, FromRawFd};
         use std::os::unix::ffi::OsStrExt;
@@ -122,14 +127,14 @@ impl Root {
         }
         let file = current?;
         let metadata = file.metadata().ok()?;
-        (metadata.is_file() && metadata.nlink() == 1).then_some(file)
+        metadata.is_file().then_some((file, metadata.nlink()))
     }
 
     #[cfg(target_os = "macos")]
     fn open_macos_nofollow_any(
         &self,
         relative: &Path,
-    ) -> Result<Option<std::fs::File>, std::io::Error> {
+    ) -> Result<Option<(std::fs::File, u64)>, std::io::Error> {
         use std::ffi::CString;
         use std::os::fd::{AsRawFd, FromRawFd};
         use std::os::unix::ffi::OsStrExt;
@@ -159,11 +164,11 @@ impl Root {
             Ok(metadata) => metadata,
             Err(_) => return Ok(None),
         };
-        Ok((metadata.is_file() && metadata.nlink() == 1).then_some(file))
+        Ok(metadata.is_file().then_some((file, metadata.nlink())))
     }
 
     #[cfg(windows)]
-    pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
+    fn open_regular(&self, target: &Path) -> Option<(std::fs::File, u64)> {
         use std::os::windows::fs::OpenOptionsExt;
 
         const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
@@ -186,16 +191,15 @@ impl Root {
         if !metadata.is_file()
             || attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
             || attributes & FILE_ATTRIBUTE_DIRECTORY != 0
-            || links != 1
         {
             return None;
         }
         let final_path = windows_final_handle_path(&file)?;
-        windows_path_is_beneath(&self.path, &final_path).then_some(file)
+        windows_path_is_beneath(&self.path, &final_path).then_some((file, u64::from(links)))
     }
 
     #[cfg(not(any(unix, windows)))]
-    pub(crate) fn open(&self, _target: &Path) -> Option<std::fs::File> {
+    fn open_regular(&self, _target: &Path) -> Option<(std::fs::File, u64)> {
         None
     }
 }
@@ -342,9 +346,19 @@ pub(crate) fn open_beneath(root: &Path, target: &Path) -> Option<std::fs::File> 
     Root::new(root)?.open(target)
 }
 
+/// Declared artifacts may be hardlinked; symlink confinement still applies.
+pub(crate) fn open_declared_file(root: &Path, target: &Path) -> Option<std::fs::File> {
+    let reader = Root::new(root)?;
+    #[cfg(windows)]
+    if reader.path != root {
+        return None;
+    }
+    reader.open_regular(target).map(|(file, _)| file)
+}
+
 #[cfg(all(test, unix))]
 mod secure_open_tests {
-    use super::{open_beneath, Root};
+    use super::{open_beneath, open_declared_file, Root};
     use std::path::Path;
 
     #[cfg(target_os = "macos")]
@@ -573,12 +587,14 @@ mod secure_open_tests {
         std::fs::rename(&parent, project.join("original-parent")).unwrap();
         std::os::unix::fs::symlink(&outside, &parent).unwrap();
         assert!(open_beneath(&root, &validated).is_none());
+        assert!(open_declared_file(&root, &validated).is_none());
         assert!(reader.open(&validated).is_none());
 
         let fifo = root.join("pipe");
         let name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
         assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
         assert!(open_beneath(&root, &fifo).is_none());
+        assert!(open_declared_file(&root, &fifo).is_none());
         assert!(reader.open(&fifo).is_none());
         assert!(open_beneath(&root, &root).is_none());
         std::fs::remove_dir_all(temporary).unwrap();
@@ -639,6 +655,7 @@ mod secure_open_tests {
         std::fs::remove_file(&slot).unwrap();
         std::os::unix::fs::symlink(&outside, &slot).unwrap();
         assert!(open_beneath(&root, &validated).is_none());
+        assert!(open_declared_file(&root, &validated).is_none());
         assert!(reader.open(&validated).is_none());
 
         std::fs::remove_file(&slot).unwrap();
@@ -646,6 +663,7 @@ mod secure_open_tests {
         let linked = std::fs::canonicalize(&slot).unwrap();
         assert!(open_beneath(Path::new(&root), &linked).is_none());
         assert!(reader.open(&linked).is_none());
+        assert!(open_declared_file(&root, &linked).is_some());
         std::fs::remove_dir_all(root.parent().unwrap()).unwrap();
     }
 }
@@ -804,7 +822,7 @@ mod share_validation_tests {
 }
 #[cfg(all(test, windows))]
 mod windows_secure_open_tests {
-    use super::Root;
+    use super::{open_declared_file, Root};
     use std::io::Read;
 
     struct Temp(std::path::PathBuf);
@@ -873,5 +891,30 @@ mod windows_secure_open_tests {
         let canonical_root = std::fs::canonicalize(root).unwrap();
         let reader = Root::new(&canonical_root).unwrap();
         assert!(reader.open(&junction.join("secret.rs")).is_none());
+    }
+
+    #[test]
+    fn declared_file_rejects_a_replaced_canonical_parent() {
+        use std::os::windows::fs::symlink_dir;
+
+        let temp = Temp::new();
+        let root = temp.0.join("project");
+        let outside = temp.0.join("outside");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::write(root.join("report.txt"), "approved").unwrap();
+        std::fs::write(outside.join("report.txt"), "outside").unwrap();
+        let canonical_root = std::fs::canonicalize(&root).unwrap();
+        let canonical_target = std::fs::canonicalize(root.join("report.txt")).unwrap();
+        assert!(open_declared_file(&canonical_root, &canonical_target).is_some());
+        std::fs::rename(&root, temp.0.join("original")).unwrap();
+        if let Err(error) = symlink_dir(&outside, &root) {
+            if error.raw_os_error() == Some(1314) {
+                eprintln!("directory symlink privilege unavailable: {error}");
+                return;
+            }
+            panic!("cannot create replacement directory symlink: {error}");
+        }
+        assert!(open_declared_file(&canonical_root, &canonical_target).is_none());
     }
 }

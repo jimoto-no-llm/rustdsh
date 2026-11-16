@@ -1,0 +1,7 @@
+{
+  "name": "rdsh-responses-emulator",
+  "private": true,
+  "type": "module",
+  "description": "Local stand-in for the OpenAI Responses and compaction endpoints, for tests.",
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

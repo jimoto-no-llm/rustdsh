@@ -806,7 +806,7 @@ fn configure_process_tree(command: &mut Command) {
 }
 
 #[cfg(windows)]
-fn configure_process_tree(command: &mut Command) {
+pub(crate) fn configure_process_tree(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
@@ -857,13 +857,13 @@ impl Drop for ProcessTreeGuard {
 }
 
 #[cfg(windows)]
-struct ProcessTreeGuard {
+pub(crate) struct ProcessTreeGuard {
     job: Option<windows_sys::Win32::Foundation::HANDLE>,
 }
 
 #[cfg(windows)]
 impl ProcessTreeGuard {
-    fn attach(child: &mut std::process::Child) -> io::Result<Self> {
+    pub(crate) fn attach(child: &mut std::process::Child) -> io::Result<Self> {
         if PROCESS_TREE_CONTAINMENT_ACTIVE.load(Ordering::Relaxed) {
             // Git inherits the worker's job before it starts, so this operation
             // avoids a system-wide thread snapshot for every Git subprocess.

@@ -247,6 +247,10 @@ test('apply registers all 65 dictionaries and every effect can dispose its regis
 			return dispose;
 		},
 		locale: {
+			// DSH 0.2.1-rc.2 / rc.3 ship only zh and en.
+			getSnapshot() {
+				return { locales: [{ id: 'zh' }, { id: 'en' }, ...(registered.has('__language__') ? [registered.get('__language__')] : [])] };
+			},
 			addLanguage(input) {
 				languages.push({ ...input });
 				registered.set('__language__', input);
@@ -274,6 +278,44 @@ test('apply registers all 65 dictionaries and every effect can dispose its regis
 	assert.equal(registered.has('common'), true);
 	for (const dispose of disposers) dispose();
 	assert.equal(registered.size, 0);
+});
+
+test('apply registers nothing when DSH already defines ja (0.2.2 and later)', () => {
+	for (const hostId of ['ja', 'JA']) {
+		// Mirrors dsh-client-locale 0.2.2-alpha.2: ja is defined before the
+		// service is provided, and a second definition or ja dictionary throws.
+		const languages = new Map([['zh', { id: 'zh' }], ['en', { id: 'en' }], ['ja', { id: hostId, label: '日本語', fallback: 'en' }], ['es', { id: 'es' }]]);
+		const hostCommon = { ok: 'OK' };
+		const jaDictionaries = new Map([['common', hostCommon]]);
+		let effects = 0;
+		const ctx = {
+			effect(effect) {
+				effects += 1;
+				return effect();
+			},
+			locale: {
+				getSnapshot() {
+					return { locales: [...languages.values()] };
+				},
+				addLanguage(input) {
+					if (languages.has(input.id.toLowerCase())) throw new Error('locale "' + input.id + '" is already registered');
+					languages.set(input.id.toLowerCase(), input);
+					return () => languages.delete(input.id.toLowerCase());
+				},
+				register(namespace, locale, dictionary) {
+					if (jaDictionaries.has(namespace)) throw new Error('locale namespace "' + namespace + '" already has locale "' + locale + '"');
+					jaDictionaries.set(namespace, dictionary);
+					return () => jaDictionaries.delete(namespace);
+				},
+			},
+		};
+		assert.doesNotThrow(() => apply(ctx), 'host id ' + hostId);
+		assert.equal(effects, 0, 'host id ' + hostId);
+		assert.deepEqual([...languages.keys()], ['zh', 'en', 'ja', 'es']);
+		assert.equal(languages.get('ja').id, hostId);
+		assert.deepEqual([...jaDictionaries.keys()], ['common']);
+		assert.equal(jaDictionaries.get('common'), hostCommon);
+	}
 });
 
 test('the 83 migrated values stay byte-for-byte equal to the immutable seed fixture', () => {

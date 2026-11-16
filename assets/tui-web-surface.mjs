@@ -8,6 +8,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
+import { scriptJson } from './script-json.mjs';
 
 const MAX_LINE = 2 * 1024 * 1024;
 const MAX_TEXT = 16 * 1024;
@@ -114,8 +115,8 @@ async function init(value) {
 }
 function script() {
   // Only the DSH origin gets localStorage restoration and notification delivery.
-  return `(() => { globalThis.__RDSH_TUI_BRIDGE_ENABLED__=true; if (location.origin !== ${JSON.stringify(config.origin)}) return;
-    const initial=${JSON.stringify(storage)};
+  return `(() => { globalThis.__RDSH_TUI_BRIDGE_ENABLED__=true; if (location.origin !== ${scriptJson(config.origin)}) return;
+    const initial=${scriptJson(storage)};
     if (!sessionStorage.getItem('__rdsh_tui_storage_loaded')) {
       for (const [key,value] of Object.entries(initial)) if(typeof value==='string') localStorage.setItem(key,value);
       sessionStorage.setItem('__rdsh_tui_storage_loaded','1');

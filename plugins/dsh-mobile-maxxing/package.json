@@ -1,6 +1,6 @@
 {
   "name": "dsh-mobile-maxxing",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "type": "module",
   "license": "MIT",
   "description": "DSH Web GUI をインストール可能なアプリにし、スマホ/タブレット向けUX・通知・小物をまとめて改善する統合プラグイン",

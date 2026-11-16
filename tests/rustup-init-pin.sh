@@ -126,7 +126,7 @@ run_installer() {
     export PATH="$FAKE_BIN"
     export RDSH_TEST_URL="$RUSTUP_INIT_URL" RDSH_TEST_SHA256="$RUSTUP_INIT_SHA256"
     export RDSH_TEST_CHECKSUM_MODE="$mode"
-    bash "$REPO_ROOT/install.sh"
+    RDSH_SKIP_RUNTIME=1 bash "$REPO_ROOT/install.sh"
   ) > "$work/install.log" 2>&1
 }
 

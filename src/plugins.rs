@@ -1252,7 +1252,7 @@ mod tests {
         );
         assert_eq!(
             catalog.recommended_for("web", Some("all")).unwrap().len(),
-            9
+            11
         );
         assert!(catalog
             .recommended_for("web", Some("none"))

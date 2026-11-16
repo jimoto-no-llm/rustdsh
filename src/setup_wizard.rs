@@ -30,6 +30,8 @@ pub fn env_json() -> String {
             "supported": node_major.is_some_and(|m| m >= 22),
         },
         "npm": crate::auth::command_on_path("npm"),
+        "tui": std::path::Path::new(&crate::inspect::dsh_home()).join("profiles/tui").is_dir(),
+        "pnpm": crate::auth::command_on_path("pnpm") || crate::setup_models::root().is_ok_and(|p|p.join("bin").join(if cfg!(windows){"pnpm.cmd"}else{"pnpm"}).is_file()),
         "codex": crate::auth::command_on_path("codex"),
         "opencode": crate::auth::command_on_path("opencode"),
         "desktop": desktop.is_some(),
@@ -39,23 +41,26 @@ pub fn env_json() -> String {
 }
 
 fn node_version(bin: &str) -> Option<String> {
-    let out = std::process::Command::new(bin)
-        .arg("--version")
-        .stdin(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()?;
-    let text = String::from_utf8(out.stdout).ok()?;
+    let mut command = std::process::Command::new(bin);
+    command.arg("--version");
+    let bytes =
+        crate::dsh_env::run_bounded_capture(command, 128, std::time::Duration::from_secs(2))?;
+    let text = String::from_utf8(bytes).ok()?;
     let text = text.trim();
-    (out.status.success() && text.starts_with('v') && text.len() < 32).then(|| text.to_string())
+    (text.starts_with('v') && text.len() < 32).then(|| text.to_string())
 }
 
 /// Start a provider login (`codex login` / `opencode auth login`).
 pub fn start_login(tool: &str) -> anyhow::Result<()> {
     let (bin, args) = crate::auth::login_command(tool)
         .ok_or_else(|| anyhow::anyhow!("login helper is not installed"))?;
-    let program =
-        resolve_on_path(bin).ok_or_else(|| anyhow::anyhow!("login helper is not installed"))?;
+    let program = (if tool == "codex" {
+        crate::setup_models::managed_login()
+    } else {
+        None
+    })
+    .or_else(|| resolve_on_path(bin))
+    .ok_or_else(|| anyhow::anyhow!("login helper is not installed"))?;
     if open_terminal(&program, args).is_ok() {
         return Ok(());
     }
@@ -83,6 +88,13 @@ pub fn start_chat(kind: &str) -> anyhow::Result<()> {
                 .map(|_| ())
         }
         "tui" | "web" => {
+            anyhow::ensure!(
+                kind != "tui"
+                    || std::path::Path::new(&crate::inspect::dsh_home())
+                        .join("profiles/tui")
+                        .is_dir(),
+                "terminal profile is not installed; choose the browser option"
+            );
             anyhow::ensure!(
                 crate::passthrough::find_original_dsh().is_some(),
                 "DeepSeek Harness (dsh) is not installed"

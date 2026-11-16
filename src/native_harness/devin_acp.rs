@@ -365,6 +365,7 @@ for line in sys.stdin:
 "#).unwrap();
             std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700)).unwrap();
             let engine = Arc::new(Engine {
+                compaction: crate::compaction_config::Options::default(),
                 state: Mutex::new(super::super::engine::State {
                     run_id: 1,
                     status: "running".into(),

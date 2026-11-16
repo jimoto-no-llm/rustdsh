@@ -8,6 +8,8 @@ import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { scriptJson } from '../assets/script-json.mjs';
 
 const helper=process.env.RDSH_SURFACE_TEST_HELPER||fileURLToPath(new URL('../assets/tui-web-surface.mjs',import.meta.url));
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -25,6 +27,17 @@ async function start(url,root){
   await wait(s=>s.status==='ready','initial ready',25000);
   return {child,input,activate,wait,close,state:()=>state};
 }
+
+test('script JSON escaping preserves hostile-looking data as inert values', () => {
+  const value = { key: '</script><script>globalThis.compromised=true</script>\u2028\u2029', value: '<>&/' };
+  const encoded = scriptJson(value);
+  assert.doesNotMatch(encoded, /[<>/\u2028\u2029]/);
+  const context = {};
+  const decoded = runInNewContext('(' + encoded + ')', context);
+  assert.equal(decoded.key, value.key);
+  assert.equal(decoded.value, value.value);
+  assert.equal(context.compromised, undefined);
+});
 
 test('private Chrome surface supports Web-only controls without an external window', {timeout:120000},async()=>{
  const root=await mkdtemp(join(tmpdir(),'rdsh-surface-test-'));let app,second,engine;let leakedHttp=0,leakedWs=0,authenticatedWs=0;let settings='{"test":true}',revision='one',openCalls=0;

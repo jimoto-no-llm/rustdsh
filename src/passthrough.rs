@@ -289,6 +289,9 @@ pub fn latest_node_tree() -> Option<String> {
 // permission without spawning (`node --version` costs ~14ms per delegation),
 // else the newest matching tree under ~/.local/opt.
 pub fn find_node_bin() -> Option<String> {
+    if let Some(node) = crate::setup_models::managed_node() {
+        return Some(node.to_string_lossy().into_owned());
+    }
     #[cfg(target_os = "windows")]
     const NAMES: &[&str] = &["node.exe", "node.cmd", "node.bat", "node"];
     #[cfg(not(target_os = "windows"))]
@@ -652,7 +655,171 @@ fn apply_gzip_overlay(cmd: &mut std::process::Command, orig: &str, profile: &str
     true
 }
 
+/// What the compaction policy layer did for one boot.
+enum CompactionLayer {
+    /// The feature is off, or there is no policy to pass on.
+    Off,
+    /// The overlay at `path` configures `rows` compaction rows.
+    Applied { path: String, rows: usize },
+    /// The layer was left out; the reason goes into a notice.
+    Skipped(String),
+}
+
+/// Write the generated compaction policy overlay and return its path.
+///
+/// Same placement rule as the gzip overlay: beside the settings document,
+/// never in the profile. Content-addressed names isolate concurrent launches.
+fn write_compaction_overlay(body: &str) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+    let dir = format!("{}/compaction", crate::inspect::dsh_home());
+    std::fs::create_dir_all(&dir)?;
+    let digest: String = Sha256::digest(body.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let path = format!("{dir}/policy-{digest}.patch.yml");
+    if std::fs::read_to_string(&path).ok().as_deref() == Some(body) {
+        return Ok(path);
+    }
+    let temp = format!(
+        "{path}.{}.tmp",
+        crate::local_http::random_token().map_err(std::io::Error::other)?
+    );
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&temp)?;
+    let result = file
+        .write_all(body.as_bytes())
+        .and_then(|_| file.sync_all());
+    drop(file);
+    let result = result.and_then(|_| std::fs::rename(&temp, &path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+        if std::fs::read_to_string(&path).ok().as_deref() != Some(body) {
+            result?;
+        }
+    }
+    Ok(path)
+}
+
+/// Build the compaction policy overlay for `profile`.
+///
+/// Missing settings leave the command untouched. Invalid settings, a missing
+/// required plugin, and unreadable composed config reject the enabled boot.
+/// A profile without a safely configurable row or an unwritable overlay is
+/// reported as skipped rather than silently claiming the policy was applied.
+/// With ZDR mode on, refuse a boot whose compaction would send conversation
+/// content to a route that is not verified as zero data retention (RQ-10).
+/// Returns the notice for a boot that passed, or `None` while the mode is off.
+fn zdr_compaction_guard(orig: &str, profile: &str) -> anyhow::Result<Option<String>> {
+    let cfg = crate::rdsh_config::load();
+    if !crate::zdr::mode_on(&cfg, std::env::var("RDSH_ZDR").ok().as_deref()) {
+        return Ok(None);
+    }
+    let Some(composed) = dump_composed_config(orig, profile) else {
+        anyhow::bail!("ZDR mode: the profile config could not be read, so compaction routes cannot be verified");
+    };
+    // The settings file only matters while its feature passes it to DSH.
+    let mut named = Vec::new();
+    if crate::rdsh_config::feature_enabled(&cfg, crate::compaction_overlay::FEATURE_ID) {
+        if let Ok(text) = std::fs::read_to_string(crate::compaction_policy::policy_path()) {
+            if let Ok(policies) = crate::compaction_policy::parse(&text) {
+                for (index, policy) in policies.iter().enumerate() {
+                    named.push((format!("policies[{index}]"), policy.provider.clone()));
+                }
+            }
+        }
+        if let Ok(options) = crate::compaction_config::Options::load() {
+            for (index, route) in options.routes.iter().enumerate() {
+                // `off` sends nothing for that route.
+                if route.method != "off" {
+                    named.push((format!("routes[{index}]"), route.provider.clone()));
+                }
+            }
+        }
+    }
+    match crate::zdr::check_compaction(&named, &composed) {
+        Ok(routes) => Ok(Some(format!(
+            "[rdsh] ZDR mode: compaction destinations verified ({routes} routes)"
+        ))),
+        Err(reason) => anyhow::bail!("{reason}"),
+    }
+}
+
+fn compaction_layer(orig: &str, profile: &str) -> anyhow::Result<CompactionLayer> {
+    if !crate::rdsh_config::feature_enabled(
+        &crate::rdsh_config::load(),
+        crate::compaction_overlay::FEATURE_ID,
+    ) {
+        return Ok(CompactionLayer::Off);
+    }
+    let file = crate::compaction_policy::FILE_NAME;
+    let options = crate::compaction_config::Options::load()?;
+    let policies = match crate::compaction_policy::load_at(&crate::compaction_policy::policy_path())
+    {
+        Ok(Some(policies)) => policies,
+        Ok(_) => return Ok(CompactionLayer::Off),
+        Err(reason) => anyhow::bail!("{file} {reason}"),
+    };
+    if policies.is_empty() && !options.needs_plugin() {
+        return Ok(CompactionLayer::Off);
+    }
+    if options.needs_plugin() {
+        let manifest = std::path::PathBuf::from(crate::inspect::dsh_home())
+            .join("profiles")
+            .join(profile)
+            .join("package.json");
+        let installed = std::fs::read_to_string(manifest)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .is_some_and(|v| v["dependencies"]["rdsh-compaction"].is_string());
+        if !installed {
+            anyhow::bail!("rdsh-compaction is required; install it with rdsh plugins install --profile {profile} --recommended compaction");
+        }
+    }
+    let Some(composed) = dump_composed_config(orig, profile) else {
+        anyhow::bail!("compaction: the profile config could not be read");
+    };
+    if let Err(reason) = crate::compaction_native::check_routes(&options, &composed) {
+        anyhow::bail!("{file} {reason}");
+    }
+    let overlay = if options.needs_plugin() {
+        crate::compaction_overlay::overlay_with_options(&composed, &policies, &options)
+    } else {
+        crate::compaction_overlay::overlay_for(&composed, &policies)
+    };
+    let Some(overlay) = overlay else {
+        return Ok(CompactionLayer::Skipped(
+            "the profile has no compaction row that can be configured".to_string(),
+        ));
+    };
+    Ok(match write_compaction_overlay(&overlay.body) {
+        Ok(path) => CompactionLayer::Applied {
+            path,
+            rows: overlay.rows,
+        },
+        Err(_) => CompactionLayer::Skipped("the overlay could not be written".to_string()),
+    })
+}
+
 fn base_cmd(
+    orig: &str,
+    dry: bool,
+    metadata_only: bool,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<std::process::Command> {
+    let mut command = base_cmd_inner(orig, dry, metadata_only, locale)?;
+    crate::setup_models::runtime_environment(&mut command)?;
+    Ok(command)
+}
+
+fn base_cmd_inner(
     orig: &str,
     dry: bool,
     metadata_only: bool,
@@ -904,14 +1071,28 @@ pub(crate) fn assemble_boot(
     let mut cmd = base_cmd(origin, dry, false, locale)?;
     if !dry {
         // Status is read-only and runs only after enforcement validation.
-        crate::auth::pre_boot(true, locale);
+        crate::auth::pre_boot(!crate::setup_models::selected_for(profile), locale);
     }
     cmd.arg("--profile").arg(profile);
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
     }
     // Generated layer first so every caller-supplied --patch stays authoritative.
+    crate::setup_models::apply_launch(&mut cmd, dry, profile)?;
     let overlay = !dry && apply_gzip_overlay(&mut cmd, origin, profile);
+    let compaction = if dry {
+        CompactionLayer::Off
+    } else {
+        compaction_layer(origin, profile)?
+    };
+    let zdr_notice = if dry {
+        None
+    } else {
+        zdr_compaction_guard(origin, profile)?
+    };
+    if let CompactionLayer::Applied { path, .. } = &compaction {
+        cmd.arg("--patch").arg(path);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
@@ -938,6 +1119,16 @@ pub(crate) fn assemble_boot(
     if overlay {
         notices.push("[rdsh] web ui: gzip overlay applied".to_string());
     }
+    match compaction {
+        CompactionLayer::Applied { rows, .. } => notices.push(format!(
+            "[rdsh] compaction: policy overlay applied ({rows} rows)"
+        )),
+        CompactionLayer::Skipped(reason) => notices.push(format!(
+            "[rdsh] compaction: policy overlay skipped: {reason}"
+        )),
+        CompactionLayer::Off => {}
+    }
+    notices.extend(zdr_notice);
     Ok(crate::harness_adapter::BootedCommand {
         command: cmd,
         notices,
@@ -975,6 +1166,7 @@ pub fn exec_dump_config(
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
     }
+    crate::setup_models::apply_launch(&mut cmd, true, profile)?;
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
@@ -1001,7 +1193,15 @@ pub fn exec_raw(args: &[OsString], dry: bool, slim: bool) -> anyhow::Result<()> 
             .any(|flag| args[0] == OsStr::new(flag));
     let mut cmd = base_cmd(&orig, dry, metadata_only, crate::locale::Locale::English)?;
     if !dry {
-        crate::auth::pre_boot(true, crate::locale::Locale::English);
+        crate::auth::pre_boot(
+            !metadata_only && !profile_of(args).is_some_and(crate::setup_models::selected_for),
+            crate::locale::Locale::English,
+        );
+    }
+    if !metadata_only {
+        if let Some(profile) = profile_of(args) {
+            crate::setup_models::apply_launch(&mut cmd, dry, profile)?;
+        }
     }
     cmd.args(args);
     apply_slim(&mut cmd, slim, crate::locale::Locale::English);

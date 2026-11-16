@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# This offline suite verifies release assets; runtime bootstrap has its own test.
+export RDSH_SKIP_RUNTIME=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_ROOT="$(mktemp -d)"

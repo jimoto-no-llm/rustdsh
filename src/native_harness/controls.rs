@@ -125,6 +125,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     fn engine() -> Arc<Engine> {
         Arc::new(Engine {
+            compaction: crate::compaction_config::Options::default(),
             state: Mutex::new(State::default()),
             workspace: std::env::temp_dir(),
             sdk: sdk::SdkConfig {

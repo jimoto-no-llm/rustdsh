@@ -31,6 +31,8 @@ const sidebarSource = functionSource("sidebarToggle");
 const decorateSource = functionSource("decorateSidebarToggle");
 const toggleSource = functionSource("toggleDrawer");
 const closeSource = functionSource("closeDrawer");
+// #134: closeDrawer records the closed drawer marker through this shared helper.
+const closedSource = functionSource("markDrawerClosed");
 
 // --------------------------------------------------------------------------
 // A DOM double. Only the selectors these four functions use are understood.
@@ -144,7 +146,7 @@ function load({ sidebar = null, globals = [], phone = true, frameElement = null 
 			.join(", "),
 	};
 	const api = vm.runInNewContext(
-		`(() => {\n${sidebarSource}\n${decorateSource}\n${toggleSource}\n${closeSource}\nreturn { sidebarToggle, decorateSidebarToggle, toggleDrawer, closeDrawer };\n})()`,
+		`(() => {\n${sidebarSource}\n${decorateSource}\n${toggleSource}\n${closeSource}\n${closedSource}\nreturn { sidebarToggle, decorateSidebarToggle, toggleDrawer, closeDrawer };\n})()`,
 		context,
 	);
 	return { ...api, document, body };

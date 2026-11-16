@@ -469,6 +469,12 @@ function bootGestures({ narrow = true, mode = narrow ? "mobile" : "desktop", wid
 			for (const callback of batch) callback();
 		}
 	};
+	/** Run one animation frame, so a test can step a transition frame by frame. */
+	const frameOnce = () => {
+		const batch = [...frames.values()];
+		frames.clear();
+		for (const callback of batch) callback();
+	};
 	const runTimers = (delay) => {
 		const batch = [...timers.entries()].filter(([, timer]) => delay === undefined || timer.delay === delay);
 		for (const [id, timer] of batch) {
@@ -490,6 +496,7 @@ function bootGestures({ narrow = true, mode = narrow ? "mobile" : "desktop", wid
 		windowHandlers,
 		observers,
 		drainFrames,
+		frameOnce,
 		runTimers,
 		handler,
 		disposeAll() {
@@ -986,6 +993,35 @@ test("#113 a left-edge swipe while a fullscreen panel is open closes the panel",
 	booted.disposeAll();
 });
 
+test("#113 a sheet narrower than the viewport still owns the left edge", () => {
+	// A 320px preview on a 390px phone is narrower than 85% of the viewport
+	// but still starts at the left edge. The width ratio called it "docked"
+	// and handed the left-edge swipe to the drawer, which opened the session
+	// list on top of the panel the user was reading.
+	const booted = bootGestures({ narrow: true, mode: "mobile", width: 390 });
+	const { root, collapse } = panelFixture(booted.doc, 320);
+	const innerQuery = booted.doc.querySelectorAll;
+	booted.doc.querySelectorAll = (selector) => (selector.includes("data-sidebar-right-open") ? [root] : innerQuery(selector));
+	booted.doc.querySelector = (selector) => (selector.includes("data-sidebar-right-open") ? root : null);
+	booted.drainFrames();
+	// The narrow sheet may not be the node the panel hook tags (it is under the
+	// 85% width the hook looks for), but the app's own open marker still says a
+	// panel owns the screen, and the left edge must not open the drawer on it.
+	assert.notEqual(booted.doc.querySelector("[data-sidebar-right-open]"), null, "the fixture is not open");
+
+	const start = booted.handler("touchstart", "onEdgeSwipeStart");
+	const move = booted.handler("touchmove", "onEdgeSwipeMove");
+	const touch = (x, y = 200) => ({ cancelable: true, prevented: 0, preventDefault() { this.prevented += 1; }, touches: [{ clientX: x, clientY: y }] });
+	const body = new FakeElement("div");
+	body._closest = () => null;
+
+	start({ touches: [{ clientX: 10, clientY: 200 }], target: body });
+	move(touch(150, 200));
+	assert.equal(collapse.clicks, 1, "a narrow sheet handed its left edge to the drawer");
+	assert.notEqual(booted.doc.documentElement.getAttribute("data-rdsh-drawer"), "open", "the drawer opened over the sheet");
+	booted.disposeAll();
+});
+
 /** A phone panel with dockkit's fullscreen control and its once-marker. */
 function promoteFixture(doc, { viewport = 390, fired = "1" } = {}) {
 	const root = new FakeElement("div");
@@ -1232,6 +1268,105 @@ test("keyboard open/close cycles leave no stale height, and rotation refits", ()
 	orientation();
 	booted.drainFrames();
 	assert.equal(terminal.screen.style.height, "346px", "a rotation runs the same fit path");
+	booted.disposeAll();
+});
+
+/* ---------------------------------------------------------------------- */
+/* #96: a moving band is fitted once, at the geometry that stays          */
+/* ---------------------------------------------------------------------- */
+
+/** Count the height writes a fixture mount takes. */
+function countHeightWrites(screen) {
+	const state = { writes: 0, value: screen.style.height };
+	Object.defineProperty(screen.style, "height", {
+		configurable: true,
+		get() {
+			return state.value;
+		},
+		set(value) {
+			state.writes += 1;
+			state.value = String(value);
+		},
+	});
+	return state;
+}
+
+test("#96 a keyboard transition lands one fit, at the settled band", () => {
+	const booted = bootGestures({ narrow: true });
+	const collapseFixture = panelFixture(booted.doc);
+	const terminal = terminalFixture(booted.doc, collapseFixture);
+	booted.drainFrames();
+	const writes = countHeightWrites(terminal.screen);
+	const resize = visualViewportHandler(booted);
+
+	// The keyboard slides in over four frames: a new band on every one. Each
+	// write would make the app refit and resize the pty, and a shell answers
+	// every pty resize by repainting its prompt from the cursor's row, which
+	// leaves a wrapped prompt line twice.
+	for (const height of [800, 700, 620, 544]) {
+		booted.visualViewport.height = height;
+		resize();
+		booted.frameOnce();
+	}
+	assert.equal(writes.writes, 0, "a band that is still moving is not written");
+
+	booted.drainFrames();
+	assert.equal(writes.writes, 1, "the settled band is written once, not once per frame");
+	assert.equal(terminal.screen.style.height, "500px", "and at the band that stays");
+	assert.equal(terminal.screen.style.width, undefined, "the fit never writes a width");
+	booted.disposeAll();
+});
+
+test("#96 a panel that is still opening does not take a fit at a crossing width", () => {
+	const booted = bootGestures({ narrow: true });
+	const collapseFixture = panelFixture(booted.doc);
+	const terminal = terminalFixture(booted.doc, collapseFixture);
+	booted.drainFrames();
+	const writes = countHeightWrites(terminal.screen);
+	const resize = visualViewportHandler(booted);
+
+	booted.visualViewport.height = 544;
+	// The panel slides open: the mount is 300px wide, then 390px, while the
+	// visible band itself is unchanged. The app's fit recomputes cols from the
+	// width it sees at the instant it runs, so a fit committed mid-slide sends
+	// a cols the pty has to reflow wrapped lines for.
+	terminal.screen._rect = () => ({ x: 0, y: 44, top: 44, left: 0, right: 300, bottom: 744, width: 300, height: 700 });
+	resize();
+	booted.frameOnce();
+	assert.equal(writes.writes, 0, "a width that is still moving holds the fit");
+
+	terminal.screen._rect = () => ({ x: 0, y: 44, top: 44, left: 0, right: 390, bottom: 744, width: 390, height: 700 });
+	resize();
+	booted.frameOnce();
+	booted.drainFrames();
+	assert.equal(writes.writes, 1, "the geometry that settles is written once");
+	assert.equal(terminal.screen.style.height, "500px");
+	booted.disposeAll();
+});
+
+test("#96 a band that never settles lands within the burst budget", () => {
+	const booted = bootGestures({ narrow: true });
+	const collapseFixture = panelFixture(booted.doc);
+	const terminal = terminalFixture(booted.doc, collapseFixture);
+	booted.drainFrames();
+	const writes = countHeightWrites(terminal.screen);
+	const resize = visualViewportHandler(booted);
+
+	// A drag that never stops moving: one new band every frame must not mean
+	// one pty resize every frame, but it must still land.
+	for (let frame = 0; frame < 20; frame += 1) {
+		booted.visualViewport.height = 700 + frame * 3;
+		resize();
+		booted.frameOnce();
+	}
+	assert.equal(writes.writes, 0, "a moving band does not write a height per frame");
+
+	for (let frame = 20; frame < 30; frame += 1) {
+		booted.visualViewport.height = 700 + frame * 3;
+		resize();
+		booted.frameOnce();
+	}
+	assert.equal(writes.writes, 1, "the burst budget lands the fit anyway");
 	booted.disposeAll();
 });
 
@@ -1891,12 +2026,13 @@ test("#78 the mobile terminal gets one labelled, ordered key row above xterm", (
 	assert.ok(terminal.section.children.indexOf(row) < terminal.section.children.indexOf(terminal.screen), "the row is not above the xterm mount");
 	assert.equal(row.getAttribute("role"), "group");
 	assert.equal(row.getAttribute("aria-label"), COPY.en["terminalKeys.label"]);
-	assert.deepEqual(row.children.map((button) => button.getAttribute("data-rdsh-terminal-key")), ["escape", "tab", "up", "down", "left", "right", "ctrl"]);
+	assert.deepEqual(row.children.map((button) => button.getAttribute("data-rdsh-terminal-key")), ["escape", "tab", "up", "down", "left", "right", "ctrl", "paste"]);
 	assert.equal(terminalKeyButton(row, "escape").textContent, "Esc");
 	assert.equal(terminalKeyButton(row, "tab").textContent, "Tab");
 	assert.equal(terminalKeyButton(row, "up").getAttribute("aria-label"), "Arrow up");
 	assert.equal(terminalKeyButton(row, "ctrl").textContent, "Ctrl");
 	assert.equal(terminalKeyButton(row, "ctrl").getAttribute("aria-pressed"), "false");
+	assert.equal(terminalKeyButton(row, "paste").textContent, COPY.en["terminalKeys.paste"]);
 
 	// The test seam is the same pure table production uses.
 	const api = booted.sandbox.__RDSH_MOBILE_UX__;

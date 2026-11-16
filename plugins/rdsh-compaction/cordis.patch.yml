@@ -1,0 +1,3 @@
+# Installation only makes the package available. rdsh's launch overlay replaces
+# each enabled backend in place, including the four Web presets.
+[]

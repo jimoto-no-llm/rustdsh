@@ -5,6 +5,10 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+export function providerModuleUrl(manifest, target) {
+  return pathToFileURL(path.resolve(path.dirname(manifest), target.replaceAll('*', 'all'))).href;
+}
+
 async function builtinModels() {
   const anchors = [import.meta.url, pathToFileURL(path.join(homedir(), '.local/lib/node_modules/@deepseek-ai/dsh/package.json')).href];
   for (const anchor of anchors) {
@@ -14,7 +18,7 @@ async function builtinModels() {
       const data = JSON.parse(await readFile(manifest, 'utf8'));
       const target = data.exports?.['./providers/*']?.import;
       if (typeof target !== 'string' || !target.startsWith('./') || target.includes('..')) continue;
-      const api = await import(pathToFileURL(path.resolve(path.dirname(manifest), target.replace('*', 'all'))).href);
+      const api = await import(providerModuleUrl(manifest, target));
       if (typeof api.getBuiltinModels === 'function') return api.getBuiltinModels;
     } catch { /* Another installation anchor may own the catalog. */ }
   }

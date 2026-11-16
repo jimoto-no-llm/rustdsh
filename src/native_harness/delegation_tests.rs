@@ -19,6 +19,7 @@ fn engine(url: &str) -> Arc<Engine> {
     other.models[0].id = "reviewer-model".into();
     registry.routes.push(other);
     Arc::new(Engine {
+        compaction: crate::compaction_config::Options::default(),
         state: Mutex::new(State {
             provider: "dsh:test".into(),
             model: "test-model".into(),
@@ -76,7 +77,7 @@ async fn cross_model_calls_require_approval_and_only_send_the_displayed_prompt()
         ));
         let (url, server) = profiles::tests::mock(replies);
         let engine = engine(&url);
-        let task = tokio::spawn(engine.clone().run(1));
+        let task = tokio::spawn(engine.clone().run_admitting(1, None));
         let id = pending(&engine).await;
         assert_eq!(engine.snapshot()["usage"]["requests"], 1);
         assert_eq!(engine.snapshot()["pending"]["tool"], "model_call");
@@ -124,7 +125,7 @@ async fn cancelled_approval_does_not_start_a_recipient_or_record_a_late_result()
     let _env = crate::test_support::env_lock();
     let (url, server) = profiles::tests::mock(vec![reply(proposal(), 100, 20, 80)]);
     let engine = engine(&url);
-    let task = tokio::spawn(engine.clone().run(1));
+    let task = tokio::spawn(engine.clone().run_admitting(1, None));
     let id = pending(&engine).await;
     engine.cancel();
     task.await.unwrap();
@@ -200,7 +201,7 @@ async fn delegated_model_reads_writes_and_reads_back_under_shared_permissions() 
             engine.state.lock().unwrap().controls.permission =
                 super::controls::Permission::FullAccess;
         }
-        let task = tokio::spawn(engine.clone().run(1));
+        let task = tokio::spawn(engine.clone().run_admitting(1, None));
         if !full_access {
             for tool in ["model_call", "read", "write", "read"] {
                 approve_tool(&engine, tool, true).await;
@@ -262,7 +263,7 @@ async fn delegated_write_denials_and_plan_never_modify_the_workspace() {
         if plan {
             engine.state.lock().unwrap().controls.mode = super::controls::Mode::Plan;
         }
-        let task = tokio::spawn(engine.clone().run(1));
+        let task = tokio::spawn(engine.clone().run_admitting(1, None));
         approve_tool(&engine, "model_call", true).await;
         if !plan {
             approve_tool(&engine, "write", false).await;
@@ -294,7 +295,7 @@ async fn cancel_during_a_child_write_approval_prevents_the_write_and_late_result
     ]);
     let mut engine = engine(&url);
     Arc::get_mut(&mut engine).unwrap().workspace = root.0.canonicalize().unwrap();
-    let task = tokio::spawn(engine.clone().run(1));
+    let task = tokio::spawn(engine.clone().run_admitting(1, None));
     approve_tool(&engine, "model_call", true).await;
     let id = pending(&engine).await;
     assert_eq!(engine.snapshot()["pending"]["tool"], "write");

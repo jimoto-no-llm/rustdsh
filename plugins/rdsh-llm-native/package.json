@@ -1,0 +1,14 @@
+{
+  "name": "rdsh-llm-native",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": ">=22.19.0" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/schemastery": "~3.18.5"
+  },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

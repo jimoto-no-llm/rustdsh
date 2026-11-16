@@ -50,6 +50,10 @@ VER="latest"
 USE_MUSL="${RDSH_MUSL:-0}"
 DESKTOP=0
 NO_SETUP=0
+MANAGED_DSH_ENTRY=""
+RUNTIME_ONLY=0
+WITH_CODEX=0
+INSTALL_INITIAL_PATH="$PATH"
 for a in "$@"; do
   case "$a" in
     --as-dsh) MODE="as-dsh" ;;
@@ -60,6 +64,9 @@ for a in "$@"; do
     --musl) USE_MUSL=1 ;;
     --desktop) DESKTOP=1 ;;
     --no-setup) NO_SETUP=1 ;;
+    --no-runtime) export RDSH_SKIP_RUNTIME=1 ;;
+    --runtime-only) RUNTIME_ONLY=1 ;;
+    --with-codex) WITH_CODEX=1 ;;
     --version=*) VER="${a#--version=}" ;;
     -h|--help)
       echo "usage: ./install.sh [--as-dsh] [--restore] [--prefix=DIR] [--no-rustup] [--from-release] [--musl] [--desktop] [--no-setup] [--version=VER]"
@@ -71,6 +78,8 @@ for a in "$@"; do
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
       echo "  --desktop  also attach the bundled starter + default third-party (sound, gitview, intelligent-ui) plugins to the Desktop profile"
       echo "  --no-setup  do not open the browser setup screen after installing"
+      echo "  --no-runtime  install native rdsh only; skip Node.js, pnpm and DSH"
+      echo "  --runtime-only  prepare Node.js, pnpm and DSH without reinstalling rdsh"
       echo "  --version=VER  release to fetch with --from-release (default: latest, resolved from repository pins)"
       echo "  RDSH_NO_CHECKSUM=1  skip SHA-256 verification only after typing YES at a terminal"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
@@ -709,7 +718,103 @@ preflight_tools() {
     exit 1
   fi
 }
+# User-local runtime: curl installs must not depend on a preinstalled pnpm,
+# corepack, global npm prefix, or a shell startup file.
+install_agent_runtime() {
+  [ "${RDSH_SKIP_RUNTIME:-0}" != 1 ] || return 0
+  local runtime="$HOME/.local/share/rdsh/runtime" node_program="" major="" npm_program=""
+  mkdir -p "$runtime"
+  chmod 700 "$runtime"
+  local node_version="24.22.1" pnpm_version="10.34.9" dsh_version="0.2.2-alpha.3"
+  local platform="" expected="" archive="" actual="" node_dir="" spec="" package="" need_dsh=1
+  if command -v dsh >/dev/null 2>&1; then
+    case "$(dsh --version 2>/dev/null || true)" in [0-9]*.[0-9]*.*) need_dsh=0 ;; esac
+  fi
+  if [ -n "${DSH_ORIG_BIN:-${RDSH_ORIG_BIN:-}}" ]; then need_dsh=0; fi
+  node_program="$(command -v node || true)"
+  if [ -n "$node_program" ]; then
+    major="$("$node_program" --version 2>/dev/null || true)"; major="${major#v}"; major="${major%%.*}"
+  fi
+  case "$major" in ''|*[!0-9]*) major=0 ;; esac
+  if [ "$major" -ge 24 ] && command -v npm >/dev/null 2>&1; then
+    npm_program="$(command -v npm)"
+  else
+    case "$OS/$ARCH" in
+      Linux/x86_64|Linux/amd64) platform=linux-x64; expected=eb6728e77c576a35162c122c45ccadf224d89ff00abc8dae46cc2897c6002d7c ;;
+      Linux/aarch64|Linux/arm64) platform=linux-arm64; expected=33c37be234ba8bee041961047b19160f4d7d0f164e8e246f78bdd10feff148b3 ;;
+      Darwin/arm64|Darwin/aarch64) platform=darwin-arm64; expected=89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7 ;;
+      Darwin/x86_64) platform=darwin-x64; expected=d132557e7ee2b85af08b0c8c34338e65c6430f2238d01f727728ef42dc83b035 ;;
+      *) echo "error: automatic Node.js installation is unsupported on $OS/$ARCH; install Node.js 24+ or use --no-runtime for native tools only" >&2; return 1 ;;
+    esac
+    node_dir="$runtime/node-v$node_version-$platform"
+    if [ ! -x "$node_dir/bin/node" ]; then
+      echo "[1/3] Installing verified Node.js $node_version ($platform), without sudo..."
+      new_download_tmpd
+      archive="$DOWNLOAD_TMPD/node.tar.gz"
+      curl -fL --retry 2 --connect-timeout 15 --max-time 600 "https://nodejs.org/dist/v$node_version/node-v$node_version-$platform.tar.gz" -o "$archive" || return 1
+      actual="$(sha256_file "$archive")" || return 1
+      [ "$actual" = "$expected" ] || { echo "error: Node.js checksum mismatch; nothing was executed" >&2; return 1; }
+      tar -xzf "$archive" -C "$DOWNLOAD_TMPD" || return 1
+      mkdir -p "$runtime"
+      mv "$DOWNLOAD_TMPD/node-v$node_version-$platform" "$node_dir" || return 1
+    fi
+    node_program="$node_dir/bin/node"
+    "$node_program" --version >/dev/null || { echo "error: the verified Node.js binary cannot run on this host" >&2; return 1; }
+    export PATH="$node_dir/bin:$PATH"
+    npm_program="$node_dir/bin/npm"
+  fi
+  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1 && [ "$need_dsh" = 0 ] && [ "$WITH_CODEX" = 0 ]; then
+    echo "[1/3] Node.js, pnpm and dsh are already available; keeping them."
+    return 0
+  fi
+  echo "[2/3] Preparing private pnpm and DSH runtime..."
+  spec="pnpm@$pnpm_version"
+  if [ "$need_dsh" = 1 ]; then spec="$spec @deepseek-ai/dsh@$dsh_version"; fi
+  if [ "$WITH_CODEX" = 1 ]; then spec="$spec @openai/codex@0.166.0"; fi
+  mkdir -p "$runtime/bin" "$PREFIX" "$HOME/.config/rdsh"
+  # Fixed package specs only; never install into a global npm prefix or run hooks.
+  # shellcheck disable=SC2086
+  "$npm_program" install --prefix "$runtime" --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true $spec || return 1
+  # quote paths for the generated shell wrapper (HOME may contain spaces/quotes).
+  runtime_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+  if [ -f "$runtime/node_modules/pnpm/bin/pnpm.cjs" ]; then
+    package="$runtime/node_modules/pnpm/bin/pnpm.cjs"
+    [ -f "$package" ] || { echo "error: pnpm package is incomplete" >&2; return 1; }
+    {
+      printf '#!/bin/sh\nexec '; runtime_quote "$node_program"; printf ' '; runtime_quote "$package"; printf ' "$@"\n'
+    } > "$runtime/bin/pnpm"
+    chmod 755 "$runtime/bin/pnpm"
+    if [ ! -e "$PREFIX/pnpm" ] && [ ! -L "$PREFIX/pnpm" ]; then ln -s "$runtime/bin/pnpm" "$PREFIX/pnpm"; fi
+  fi
+  if [ "$need_dsh" = 1 ]; then
+    package="$runtime/node_modules/@deepseek-ai/dsh/lib/bin.js"
+    [ -f "$package" ] || { echo "error: DSH package is incomplete" >&2; return 1; }
+    {
+      printf '#!/bin/sh\nPATH='; runtime_quote "$runtime/bin:$(dirname "$node_program")"; printf ':$PATH\nexport PATH\nexec '
+      runtime_quote "$node_program"; printf ' '; runtime_quote "$package"; printf ' "$@"\n'
+    } > "$runtime/bin/dsh"
+    chmod 755 "$runtime/bin/dsh"
+    if [ ! -e "$PREFIX/dsh" ] && [ ! -L "$PREFIX/dsh" ]; then ln -s "$runtime/bin/dsh" "$PREFIX/dsh"; fi
+    MANAGED_DSH_ENTRY="$package"
+    printf '%s\n' "$package" > "$HOME/.config/rdsh/origin"
+  fi
+  if [ "$WITH_CODEX" = 1 ]; then
+    package="$runtime/node_modules/@openai/codex/bin/codex.js"
+    [ -f "$package" ] || { echo "error: login helper is incomplete" >&2; return 1; }
+    { printf '#!/bin/sh\nexec '; runtime_quote "$node_program"; printf ' '; runtime_quote "$package"; printf ' "$@"\n'; } > "$runtime/bin/codex"
+    chmod 755 "$runtime/bin/codex"
+    "$runtime/bin/codex" --version >/dev/null || return 1
+  fi
+  export PATH="$runtime/bin:$PREFIX:$PATH"
+  "$runtime/bin/pnpm" --version >/dev/null || return 1
+  if command -v dsh >/dev/null 2>&1; then dsh --version || return 1
+  elif [ ! -f "${DSH_ORIG_BIN:-${RDSH_ORIG_BIN:-}}" ]; then echo "error: original DSH entry is missing" >&2; return 1; fi
+  echo "[3/3] Agent runtime ready. Next: model setup."
+}
+
 preflight_runtime() {
+  # Default installs prepare these automatically below; avoid contradictory manual steps.
+  [ "${RDSH_SKIP_RUNTIME:-0}" = 1 ] || return 0
   # rdsh is one native binary; conversations and agent runs delegate to the
   # original dsh, which needs Node.js 22+. Native commands keep working without
   # either one, so these stay notes.
@@ -742,6 +847,22 @@ preflight_checks() {
   preflight_prefix
   preflight_tools
   preflight_runtime
+}
+# The curl installer cannot modify its parent shell. Persist one quoted PATH
+# include for future terminals and keep using the full binary path in this run.
+configure_user_path() {
+  [ "${RDSH_SKIP_RUNTIME:-0}" != 1 ] || return 0
+  case ":$INSTALL_INITIAL_PATH:" in *":$PREFIX:"*) return 0 ;; esac
+  local env_file="$HOME/.config/rdsh/env" startup="" line="" quoted="" env_line=""
+  quoted="$(printf '%s' "$PREFIX" | sed "s/'/'\\\\''/g")"
+  env_line="export PATH='$quoted':\$PATH # rdsh install PATH"
+  if ! grep -Fqx "$env_line" "$env_file" 2>/dev/null; then printf '\n%s\n' "$env_line" >> "$env_file"; fi
+  quoted="$(printf '%s' "$env_file" | sed "s/'/'\\\\''/g")"
+  line=". '$quoted' # rdsh user PATH"
+  for startup in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if ! grep -Fqx "$line" "$startup" 2>/dev/null; then printf '\n%s\n' "$line" >> "$startup"; fi
+  done
+  echo "PATH prepared for new terminals. This session uses $PREFIX/rdsh."
 }
 # The user-facing "what now?" block after a successful install: PATH, the
 # optional rpm-family packages, and how the release build was chosen.
@@ -784,6 +905,12 @@ post_install_notes() {
     fi
   fi
 }
+if [ "$RUNTIME_ONLY" = 1 ]; then
+  preflight_prefix
+  preflight_tools
+  install_agent_runtime
+  exit $?
+fi
 preflight_checks
 BIN_SRC="target/release/rdsh"
 if [ "$FROM_RELEASE" = 1 ]; then
@@ -803,6 +930,7 @@ else
   fi
 fi
 mkdir -p "$PREFIX" "$HOME/.config/rdsh"
+install_agent_runtime
 # Preserve a provable legacy shadow before replacing its only native anchor.
 # Unknown or already stale ownership does not block a standalone rdsh update.
 if [ ! -e "$SHADOW_RECEIPT" ] && [ ! -L "$SHADOW_RECEIPT" ] \
@@ -833,7 +961,8 @@ if [ "$MODE" = as-dsh ]; then
   SHADOW_TEMP=""
   SHADOW_BACKUP_PENDING=0
   SHADOW_RECEIPT_PENDING=0
-  if [ -e "$PREFIX/dsh-orig" ]; then printf '%s\n' "$PREFIX/dsh-orig" > "$HOME/.config/rdsh/origin"; fi
+  if [ -n "$MANAGED_DSH_ENTRY" ]; then printf '%s\n' "$MANAGED_DSH_ENTRY" > "$HOME/.config/rdsh/origin";
+  elif [ -e "$PREFIX/dsh-orig" ]; then printf '%s\n' "$PREFIX/dsh-orig" > "$HOME/.config/rdsh/origin"; fi
   echo "installed rdsh as $PREFIX/dsh (atomic replace; revert: ./install.sh --restore)"
   # Bounded scan: regular files directly under PREFIX only (no recursion,
   # no binaries), matching the Rust doctor's own offender listing.
@@ -883,6 +1012,7 @@ if [ -n "${PLUGINS_SCRIPT:-}" ] && [ "${RDSH_SKIP_PLUGINS:-0}" != "1" ]; then
     echo "note: plugin attach failed; rerun PROFILE=web $PLUGINS_SCRIPT" >&2
   fi
 fi
+configure_user_path
 post_install_notes
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
 # Detection is read-only and never fails the install.
@@ -902,7 +1032,7 @@ if printf '%s' "$desktop_status" | grep -q "desktop profile: .*(initialized)"; t
 fi
 # First run: at an interactive terminal (also when piped from curl, through
 # /dev/tty), open the browser setup screen; otherwise print the next step.
-if [ "$NO_SETUP" = 0 ] && [ -z "${CI:-}" ] && [ -t 1 ] && { [ -t 0 ] || { [ -r /dev/tty ] && [ -w /dev/tty ]; }; } && { [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; } && [ "$MODE" != "restore" ] && [ -x "$PREFIX/rdsh" ]; then
+if [ "$NO_SETUP" = 0 ] && [ -z "${CI:-}" ] && [ -t 1 ] && { [ -t 0 ] || { [ -r /dev/tty ] && [ -w /dev/tty ]; }; } && { [ "$OS" = Darwin ] || [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; } && [ "$MODE" != "restore" ] && [ -x "$PREFIX/rdsh" ]; then
   case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     ja*) echo "ブラウザでセットアップ画面を開きます。終わったら画面の「セットアップを終える」を押してください。" ;;
     *) echo "Opening the setup screen in your browser. Press \"Finish setup\" there when you are done." ;;

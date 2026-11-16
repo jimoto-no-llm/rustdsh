@@ -27,6 +27,7 @@ pub struct Model {
     pub api: String,
     pub base: String,
     pub max_tokens: u64,
+    pub context_window: Option<u64>,
     pub token_field: String,
     pub unavailable: Option<String>,
 }
@@ -130,6 +131,7 @@ fn claude_route(catalog: Option<&Path>, legacy: Option<&Value>, available: bool)
                 name: scalar(&model,"name").unwrap_or(id).into(),
                 api: "claude-cli".into(), base: "cli://claude".into(),
                 max_tokens: model["maxTokens"].as_u64().unwrap_or(4096).clamp(1,8192),
+                context_window: model["contextWindow"].as_u64(),
                 token_field: String::new(),
                 unavailable: (!available).then(|| "claude CLIが必要です（ログイン後にnative-web/native-tuiを再起動してください）".into()),
             })
@@ -337,6 +339,10 @@ impl Registry {
                     api: api.into(),
                     base: base.into(),
                     max_tokens,
+                    context_window: model
+                        .get("contextWindow")
+                        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+                        .or_else(|| base_model.and_then(|v| v["contextWindow"].as_u64())),
                     token_field,
                     unavailable,
                 });
@@ -364,6 +370,10 @@ impl Registry {
     pub fn allowed(&self, provider: &str, model: &str) -> bool {
         self.find(provider, model)
             .is_some_and(|(_, m)| m.unavailable.is_none())
+    }
+    pub fn capacity(&self, provider: &str, model: &str) -> Option<(u64, u64)> {
+        let (_, model) = self.find(provider, model)?;
+        Some((model.context_window?, model.max_tokens))
     }
     fn find(&self, provider: &str, model: &str) -> Option<(&Route, &Model)> {
         // Old saved native selections are aliases only, never published routes.
@@ -665,7 +675,7 @@ pub(super) mod tests {
     fn claude_catalog_discovery_survives_retiring_the_anthropic_api_route() {
         let root = Scratch::new();
         root.write("cordis.patch.yml","- id: llm-pi-ai\n  config:\n    providers:\n      test:\n        apiKeyEnv: TEST_KEY\n        api: openai-completions\n        baseURL: https://example.invalid/v1\n        models:\n          - id: test-model\n");
-        root.write("anthropic.json",&json!({"anthropic-messages":{"claude-catalog":{"id":"claude-catalog","name":"Catalog Claude","api":"anthropic-messages","baseUrl":"https://legacy.invalid","headers":{"Authorization":"must-not-copy"}}}}).to_string());
+        root.write("anthropic.json",&json!({"anthropic-messages":{"claude-catalog":{"id":"claude-catalog","name":"Catalog Claude","contextWindow":200000,"api":"anthropic-messages","baseUrl":"https://legacy.invalid","headers":{"Authorization":"must-not-copy"}}}}).to_string());
         let registry = Registry::load_with_transports(
             &root.0,
             Some(&root.0),
@@ -681,6 +691,7 @@ pub(super) mod tests {
         assert!(registry.allowed("dsh:claude-cli", "claude-catalog"));
         let (route, model) = registry.find("dsh:claude-cli", "claude-catalog").unwrap();
         assert_eq!(model.name, "Catalog Claude");
+        assert_eq!(model.context_window, Some(200_000));
         assert!(route.key.is_none());
         assert!(route.oauth.is_none());
         assert_eq!(model.base, "cli://claude");

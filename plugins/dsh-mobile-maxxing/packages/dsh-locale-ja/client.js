@@ -3074,7 +3074,18 @@ window.__ModuleLoader__.load({
 
 		const inject = ["locale"];
 
+		/**
+		 * DSH 0.2.2 and later define ja, with their own ja dictionaries, before the
+		 * locale service is provided. Defining the language or a ja dictionary a
+		 * second time throws, so this pack owns ja only while nothing else has
+		 * defined it (DSH 0.2.1-rc.2 / rc.3). Locale ids compare case-insensitively.
+		 */
+		function japaneseIsDefined(locale) {
+			return locale.getSnapshot().locales.some((definition) => definition.id.toLowerCase() === language.id);
+		}
+
 		function apply(ctx) {
+			if (japaneseIsDefined(ctx.locale)) return;
 			ctx.effect(() => ctx.locale.addLanguage(language), "dsh-locale-ja: addLanguage(ja)");
 
 			// agent-team: 25/25 translated, 0 development-only English fallbacks.

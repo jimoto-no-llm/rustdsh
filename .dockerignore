@@ -5,6 +5,7 @@
 !THIRD_PARTY_NOTICES.md
 !build.rs
 !install.sh
+!install.ps1
 !docker-compose.searxng.yml
 !docker/
 !docker/searxng/

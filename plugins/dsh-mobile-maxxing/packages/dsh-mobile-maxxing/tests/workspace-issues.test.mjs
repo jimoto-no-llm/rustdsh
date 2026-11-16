@@ -584,6 +584,27 @@ function filesTree(document) {
 	return { panel, root, header, path, body, src, app, readme };
 }
 
+
+/**
+ * The upstream presented (deliverable) file card, using its real data hooks:
+ * a conversation scope, [data-presented-file], a preview button whose title
+ * is the absolute path, and the deliverables actions slot.
+ */
+function presentedCard(document) {
+	const scope = element(document, "div", { "data-conversation-session": "session-1" });
+	const card = element(document, "div", { "data-presented-file": "true" });
+	const preview = element(document, "button", { title: "/work/repo/report.md" });
+	const name = element(document, "span");
+	name.append(document.createTextNode("report.md"));
+	const actions = element(document, "div", { "data-slot": "deliverables.file.actions" });
+	const more = element(document, "button", { "data-open-path-more": "" });
+	actions.append(more);
+	card.append(preview, name, actions);
+	scope.append(card);
+	document.body.append(scope);
+	return { scope, card, preview, actions, more };
+}
+
 // ---------------------------------------------------------------------------
 // #39 — picker: sync decoration, no inline anchoring, cleanup
 // ---------------------------------------------------------------------------
@@ -1469,6 +1490,272 @@ test("#42 contextmenu opens the copy menu and prevents the native one", () => {
 	assert.equal(run.document.querySelector("[data-rdsh-file-menu]"), null, "an unrelated contextmenu opened a menu");
 });
 
+
+// ---------------------------------------------------------------------------
+// Presented files — long-press download menu
+// ---------------------------------------------------------------------------
+
+test("presented: a 500ms press on a delivered file opens the download menu", async () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	// Share is only offered where the browser can share files.
+	run.sandbox.File = File;
+	run.sandbox.navigator.canShare = () => true;
+	run.sandbox.navigator.share = async () => {};
+
+	run.document.dispatchEvent(event("pointerdown", presented.preview, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.runTimers(500);
+	const menu = run.document.querySelector("[data-rdsh-presented-menu]");
+	assert.ok(menu, "the long press did not open a presented-file menu");
+	const items = [...menu.querySelectorAll("button")];
+	assert.deepEqual(items.map((item) => item.textContent), [
+		COPY.en["presented.download"],
+		COPY.en["presented.share"],
+		COPY.en["presented.preview"],
+		COPY.en["files.menu.copyPath"],
+	]);
+
+	items[3].dispatchEvent(event("click", items[3]));
+	await Promise.resolve();
+	await Promise.resolve();
+	assert.deepEqual(run.copied, ["/work/repo/report.md"], "copy path did not copy the presented file path");
+	assert.equal(run.document.querySelector("[data-rdsh-presented-menu]"), null, "the menu stayed open after choosing");
+});
+
+test("presented: movement cancels the press and the actions slot is not a target", () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+
+	run.document.dispatchEvent(event("pointerdown", presented.preview, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.document.dispatchEvent(event("pointermove", presented.preview, { pointerType: "touch", clientX: 40, clientY: 10 }));
+	run.runTimers(500);
+	assert.equal(run.document.querySelector("[data-rdsh-presented-menu]"), null, "a moved press still opened the menu");
+
+	run.document.dispatchEvent(event("pointerdown", presented.more, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.runTimers(500);
+	assert.equal(run.document.querySelector("[data-rdsh-presented-menu]"), null, "the upstream actions slot became a long-press target");
+});
+
+test("presented: a late pointercancel still completes a stationary press", () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	let now = 1000;
+	run.sandbox.Date = { now: () => now };
+
+	run.document.dispatchEvent(event("pointerdown", presented.preview, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	now = 1600;
+	run.document.dispatchEvent(event("pointercancel", presented.preview, { pointerType: "touch" }));
+	assert.ok(run.document.querySelector("[data-rdsh-presented-menu]"), "a late pointercancel dropped the press");
+});
+
+test("presented: transcript scroll while holding does not cancel the press", () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+
+	run.document.dispatchEvent(event("pointerdown", presented.preview, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	// The transcript streams and auto-scrolls under a resting finger.
+	run.document.dispatchEvent(event("scroll", run.document.body));
+	run.runTimers(500);
+	assert.ok(run.document.querySelector("[data-rdsh-presented-menu]"), "a transcript scroll cancelled the long press");
+});
+
+
+
+test("presented: file mentions and tool file links open the same menu", async () => {
+	const run = boot();
+	run.reset();
+	const scope = element(run.document, "div", { "data-conversation-session": "session-1" });
+	const mention = element(run.document, "button", { title: "/work/repo/notes.txt" });
+	mention.append(run.document.createTextNode("notes.txt"));
+	const tool = element(run.document, "div", { "data-tool": "run_code" });
+	const toolLink = element(run.document, "button");
+	toolLink.append(run.document.createTextNode("output/result.json"));
+	tool.append(toolLink);
+	const other = element(run.document, "button", { title: "Show the original image" });
+	scope.append(mention, tool, other);
+	run.document.body.append(scope);
+	run.tools.installWorkspaceTools();
+
+	run.document.dispatchEvent(event("pointerdown", mention, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.runTimers(500);
+	let menu = run.document.querySelector("[data-rdsh-presented-menu]");
+	assert.ok(menu, "a file mention did not open the menu");
+	const copyItem = [...menu.querySelectorAll("button")].find((item) => item.textContent === COPY.en["files.menu.copyPath"]);
+	copyItem.dispatchEvent(event("click", copyItem));
+	await Promise.resolve();
+	await Promise.resolve();
+	assert.deepEqual(run.copied, ["/work/repo/notes.txt"], "the mention path was not copied");
+
+	run.document.dispatchEvent(event("pointerdown", toolLink, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.runTimers(500);
+	menu = run.document.querySelector("[data-rdsh-presented-menu]");
+	assert.ok(menu, "a tool file link did not open the menu");
+	run.tools.closePresentedMenu();
+
+	run.document.dispatchEvent(event("pointerdown", other, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	run.runTimers(500);
+	assert.equal(run.document.querySelector("[data-rdsh-presented-menu]"), null, "a non-path titled button became a target");
+});
+
+test("presented: the download URL is the host route with an encoded path", () => {
+	const run = boot();
+	run.reset();
+	assert.equal(
+		run.tools.presentedDownloadUrl({ sessionId: "session 1", path: "/work/repo/a b.md", name: "a b.md" }),
+		"/api/rdsh-mobile-ux/download?sessionId=session%201&path=%2Fwork%2Frepo%2Fa%20b.md",
+	);
+});
+
+test("presented: Preview from the menu is not swallowed by the click guard", () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	let now = 1000;
+	run.sandbox.Date = { now: () => now };
+	let previewClicks = 0;
+	presented.preview.addEventListener("click", () => { previewClicks += 1; });
+	presented.preview.click = () => presented.preview.dispatchEvent(event("click", presented.preview));
+
+	// Complete the press through the pointercancel path, which arms the guard.
+	run.document.dispatchEvent(event("pointerdown", presented.preview, { pointerType: "touch", clientX: 10, clientY: 10 }));
+	now = 1600;
+	run.document.dispatchEvent(event("pointercancel", presented.preview, { pointerType: "touch" }));
+	const menu = run.document.querySelector("[data-rdsh-presented-menu]");
+	assert.ok(menu, "the pointercancel path did not open the menu");
+	const previewItem = [...menu.querySelectorAll("button")].find((item) => item.textContent === COPY.en["presented.preview"]);
+	assert.ok(previewItem, "the menu has no Preview item");
+	previewItem.dispatchEvent(event("click", previewItem));
+	assert.equal(previewClicks, 1, "the click guard swallowed the Preview action");
+});
+
+test("presented: Share falls back to a download when sharing is refused", async () => {
+	const run = boot();
+	run.reset();
+	presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	run.sandbox.Blob = Blob;
+	run.sandbox.File = File;
+	run.sandbox.navigator.canShare = () => true;
+	run.sandbox.navigator.share = async () => {
+		throw Object.assign(new Error("activation lost"), { name: "NotAllowedError" });
+	};
+	run.sandbox.fetch = async () => ({
+		ok: true,
+		status: 200,
+		headers: { get: () => "multipart/form-data; boundary=x" },
+		formData: async () => new Map([
+			["metadata", JSON.stringify({ type: "server-response", result: { ok: true, value: { bytes: 5, offset: 0, data: null, eof: true } }, attachments: [{ path: ["data"], codec: "bytes", part: "bytes-0" }] })],
+			["bytes-0", new Blob(["hello"])],
+		]),
+	});
+	const saved = [];
+	run.sandbox.URL.createObjectURL = (blob) => { saved.push(blob); return "blob:fake"; };
+	run.sandbox.URL.revokeObjectURL = () => {};
+
+	await run.tools.downloadPresentedFile({ sessionId: "", path: "/work/repo/report.md", name: "report.md" }, true);
+	assert.equal(saved.length, 1, "a refused share did not fall back to a download");
+	run.runTimers(60000);
+});
+
+test("presented: the injected remote reads chunks and the size cap stops huge files", async () => {
+	const run = boot();
+	run.reset();
+	presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	run.sandbox.Blob = Blob;
+	run.sandbox.fetch = async () => { throw new Error("fetch must not run when a remote is injected"); };
+	const saved = [];
+	run.sandbox.URL.createObjectURL = (blob) => { saved.push(blob); return "blob:fake"; };
+	run.sandbox.URL.revokeObjectURL = () => {};
+	const calls = [];
+	run.tools.setPresentedRemote({
+		workspaceFiles: {
+			readBytes: async (sessionId, path, options) => {
+				calls.push({ sessionId, path, options });
+				return { ok: true, value: { data: [104, 101, 108, 108, 111], bytes: 5, offset: options.range.offset, eof: true } };
+			},
+		},
+	});
+	await run.tools.downloadPresentedFile({ sessionId: "", path: "/work/repo/report.md", name: "report.md" }, true);
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0].sessionId, "");
+	assert.equal(calls[0].path, "/work/repo/report.md");
+	assert.equal(calls[0].options.range.offset, 0);
+	assert.equal(calls[0].options.range.length, 262144);
+	assert.equal(await saved[0].text(), "hello", "the remote chunk was not assembled");
+	run.runTimers(60000);
+
+	// A file whose declared size is past the cap is refused after one chunk.
+	run.tools.setPresentedRemote({
+		workspaceFiles: {
+			readBytes: async () => ({ ok: true, value: { data: [1], bytes: 100 * 1024 * 1024, offset: 0, eof: false } }),
+		},
+	});
+	await run.tools.downloadPresentedFile({ sessionId: "", path: "/work/repo/big.mp4", name: "big.mp4" });
+	assert.equal(saved.length, 1, "an over-cap file was still handed to the browser");
+	run.runTimers(60000);
+});
+
+test("presented: download assembles the file from readBytes chunks", async () => {
+	const run = boot();
+	run.reset();
+	const presented = presentedCard(run.document);
+	run.tools.installWorkspaceTools();
+	const calls = [];
+	run.sandbox.Blob = Blob;
+	run.sandbox.fetch = async (url, options) => {
+		calls.push({ url, body: JSON.parse(options.body) });
+		const metadata = JSON.stringify({
+			type: "server-response",
+			result: {
+				ok: true,
+				value: { absolutePath: "/work/repo/report.md", bytes: 5, offset: 0, data: null, eof: true },
+			},
+			attachments: [{ path: ["data"], codec: "bytes", part: "bytes-0" }],
+		});
+		return {
+			ok: true,
+			status: 200,
+			headers: { get: () => "multipart/form-data; boundary=x" },
+			formData: async () => new Map([
+				["metadata", metadata],
+				["bytes-0", new Blob(["hello"])],
+			]),
+		};
+	};
+	// The menu's save path clicks a temporary anchor; the fake DOM has none.
+	const saved = [];
+	run.sandbox.URL.createObjectURL = (blob) => {
+		saved.push(blob);
+		return "blob:fake";
+	};
+	run.sandbox.URL.revokeObjectURL = () => {};
+
+	await run.tools.downloadPresentedFile({
+		sessionId: "",
+		path: "/work/repo/report.md",
+		name: "report.md",
+	}, true);
+	assert.equal(calls.length, 1, "download did not stop at eof");
+	assert.equal(calls[0].url, "/api/workspaceFiles/readBytes");
+	assert.equal(calls[0].body.method, "workspaceFiles/readBytes");
+	assert.equal(calls[0].body.payload.args.workspaceFileScopeId, "");
+	assert.equal(calls[0].body.payload.args.path, "/work/repo/report.md");
+	assert.deepEqual(calls[0].body.payload.args.options, { range: { offset: 0, length: 262144 } });
+	assert.equal(saved.length, 1, "download did not hand a blob to the browser");
+	assert.equal(await saved[0].text(), "hello", "the assembled blob lost the file bytes");
+	run.runTimers(60000);
+});
+
 test("#43 the root path is a keyboard menu trigger only in mobile mode and restores its attributes", () => {
 	const run = boot();
 	run.reset();
@@ -1632,6 +1919,12 @@ test("every new string exists in both copy packs", () => {
 		"files.menu.copyPath",
 		"files.menu.copyName",
 		"files.copied",
+		"presented.menu",
+		"presented.download",
+		"presented.share",
+		"presented.preview",
+		"presented.downloadStarted",
+		"presented.downloadFailed",
 	];
 	for (const key of keys) {
 		assert.equal(typeof COPY.en[key], "string", `${key} is missing from en`);
