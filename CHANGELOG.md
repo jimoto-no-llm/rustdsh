@@ -5,6 +5,27 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- DSH `0.2.2-rc.5`（および `0.2.2-rc.4`）の保護付きツール委譲に対応しました。
+  監査済みアダプターに公開版の入口 SHA256 とツール本体のダイジェストを固定し、
+  初期セットアップの自動導入も `0.2.2-rc.5` に移しました。
+  上流の変更は `docs/upgrade-guide` と manifest だけで、`lib/` の入口ファイルは
+  rc.2 から byte-identical です。監査内容と未検証範囲は
+  [rc.5の記録](docs/evidence/dsh-rc5/README.md) にまとめています。
+
+### Fixed
+
+- 保護付き委譲のプリロードが `0.2.2-rc.1`〜`rc.3` のアダプターを持たず、
+  `RDSH_SECURITY[UNKNOWN_ADAPTER]` で拒否していた不一致を修正しました。
+  `0.2.2-rc.*` のアダプターとコンストラクターを登録し、監査対象にない
+  `dsh-tools-0.2.1-rc.5` の残骸を削除しました。監査済みアダプターと
+  プリロードの対応がずれたら失敗するテストを追加しています。
+
+- `0.2.2-rc.5` で実際に読み込みと契約テストを確認した `rdsh-llm-native`、
+  `rdsh-compaction`、`rdsh-subagent-optimizer` の peer 範囲を更新しました。
+  確認できていない `rdsh-mcp-exposure` などの範囲は変更していません。
+
 ## [0.16.0] - 2026-11-12
 
 ### Added

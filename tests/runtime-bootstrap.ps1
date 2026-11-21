@@ -19,7 +19,7 @@ try {
   $pnpm = & (Join-Path $private 'bin/pnpm.cmd') --version
   if ($LASTEXITCODE -ne 0 -or $pnpm -notmatch '^10\.34\.9$') { throw 'Private pnpm did not run' }
   $dsh = & (Join-Path $private 'bin/dsh.cmd') --version
-  if ($LASTEXITCODE -ne 0 -or $dsh -notmatch '^0\.2\.2-alpha\.3$') { throw 'Private DSH did not run' }
+  if ($LASTEXITCODE -ne 0 -or $dsh -notmatch '^0\.2\.2-rc\.5$') { throw 'Private DSH did not run' }
   $origin = ([IO.File]::ReadAllText((Join-Path $env:HOME '.config/rdsh/origin'))).Trim()
   if ($origin -ne (Join-Path $private 'node_modules/@deepseek-ai/dsh/lib/bin.js')) { throw 'Original JS entry not recorded' }
   Write-Host 'PASS: private Windows runtime bootstraps and runs without preinstalled pnpm/DSH'

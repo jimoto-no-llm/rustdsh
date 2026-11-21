@@ -14,7 +14,11 @@ const adapters = Object.freeze({
   'dsh-tools-0.2.1-rc.4': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
   'dsh-tools-0.2.2-alpha.2': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
   'dsh-tools-0.2.2-alpha.3': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
-  'dsh-tools-0.2.1-rc.5': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
+  'dsh-tools-0.2.2-rc.1': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
+  'dsh-tools-0.2.2-rc.2': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.3': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.4': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.5': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
 });
 // The boundary installs itself from the tool runtime's constructor. Each
 // upstream line moves that constructor around, so the anchor is per adapter:
@@ -25,7 +29,11 @@ const LEGACY_CONSTRUCTOR =
 const constructors = Object.freeze({
   'dsh-tools-0.2.2-alpha.2': '\t\tsuper(ctx, "tools");',
   'dsh-tools-0.2.2-alpha.3': '\t\tsuper(ctx, "tools");',
-  'dsh-tools-0.2.1-rc.5': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.1': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.2': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.3': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.4': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.5': '\t\tsuper(ctx, "tools");',
 });
 
 const language = (() => {

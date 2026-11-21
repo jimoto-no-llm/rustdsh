@@ -6,16 +6,19 @@
 
 | 機能 | 版・条件 | 根拠 |
 | --- | --- | --- |
-| Rustの保護付きツール委譲 | DSH / toolsが同一の `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2`。Linux x86_64と隔離用ツールが必要 | [`AUDITED_ADAPTERS`](../src/tool_security.rs)と[プリロード検証](../security/preload.mjs)。版名に加え、実際の入口・ツール本体のバイト列を検証する |
+| Rustの保護付きツール委譲 | DSH / toolsが同一の `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2`、`0.2.2-alpha.3`、`0.2.2-rc.1`..`0.2.2-rc.5`。Linux x86_64と隔離用ツールが必要 | [`AUDITED_ADAPTERS`](../src/tool_security.rs)と[プリロード検証](../security/preload.mjs)。版名に加え、実際の入口・ツール本体のバイト列を検証する |
 | DashboardのDSH ACPセッション操作 | `0.2.0-rc.2`。版のプローブに加えてACP初期化・能力確認が必要 | [`adapter-catalog.mjs`](../dashboard/adapter-catalog.mjs)と[CLIアダプター](CLI-ADAPTERS.md)。以前の文書にあったalpha.1は、現在のカタログにはない |
 | Dashboardのプロジェクト固定更新 | DSH `0.2.0-rc.2` と、取得・検証したNode、CLI、アダプター、プラグインの組み合わせ | [`release-artifacts.mjs`](../dashboard/release-artifacts.mjs)と[固定更新](STAGED-UPDATES.md#capture-trusted-runtime-code) |
-| 任意の `rdsh-mcp-exposure` | DSH関連peerの宣言は `0.2.0-rc.2`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`。Cordisの条件も別にある | [`package.json`](../plugins/rdsh-mcp-exposure/package.json)。peer範囲だけで実通信や全機能の検証成功を意味しない |
+| 任意の `rdsh-mcp-exposure` | DSH関連peerの宣言は `0.2.0-rc.2`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`。`0.2.2-rc.5` は未検証のため宣言に加えていない。Cordisの条件も別にある | [`package.json`](../plugins/rdsh-mcp-exposure/package.json)。peer範囲だけで実通信や全機能の検証成功を意味しない |
 | 同梱の `dsh-mobile-maxxing` v1.0.4 | 同梱READMEが明記する検証対象は `0.2.1-rc.2` / `0.2.1-rc.3` / `0.2.2-alpha.2` | [同梱README](../plugins/dsh-mobile-maxxing/README.md)。別コミットの上流READMEや次版PRでの検証を、同梱物へ自動適用しない |
 
 Rustの通常委譲は、保護付きツール委譲とは異なる起動経路です。
 通常起動できたことだけで、ACP・隔離・任意のプラグインが同じ版で使えるとは判断しません。
 DSH 0.2.2-alpha.3の保護付き委譲は [PR #1054](https://github.com/jimoto-no-llm/rustdsh/pull/1054) の追加対応で、公開版v0.15.0には含まれません。
+0.2.2-rc.1〜rc.5の追加は [rc.4/rc.5の監査記録](evidence/dsh-rc5/README.md) にまとめています。
 他の機能の対応範囲も、そのPRだけでは広がりません。
+`rdsh-llm-native`、`rdsh-compaction`、`rdsh-subagent-optimizer` のpeer範囲には、実際に読み込みと契約テストを確認した `0.2.2-rc.5` だけを加えました。
+`rdsh-mcp-exposure` など、確認できていないプラグインの範囲は広げていません。
 
 ## 導入・更新時の確認
 
@@ -40,6 +43,8 @@ npmの `latest`・`next`・`alpha` は更新される配布タグです。公開
 アダプター・プロトコル・プラグイン契約も再検証します。互換性を確かめずに依存を上書きしたり、
 起動前のバイト列検証を弱めて通したりする変更は、この修正には含めていません。
 
-自動導入PR #1059が固定する `0.2.2-alpha.3` でも同じ4ライブラリの影響を確認しました。
-[alpha.3の解決結果](evidence/doc-audit-20261105/upstream-alpha3-audit.json)を記録し、
-そのPRは依存修正・互換性の再検証までDraftに戻しています。
+自動導入PR #1059が固定していた `0.2.2-alpha.3` でも同じ4ライブラリの影響を確認しました。
+[alpha.3の解決結果](evidence/doc-audit-20261105/upstream-alpha3-audit.json)を記録しています。
+自動導入の固定先を `0.2.2-rc.5` に移した後も、解決した `undici 8.11.2`、`@modelcontextprotocol/client 2.2.0`、`fflate 0.8.2` が
+既知advisoryの対象に残ることを再確認しました（[rc.5の解決結果](evidence/dsh-rc5/rc5-audit.json)）。
+固定版の変更は依存の修正ではありません。`0.2.2-rc.5` の依存脆弱性が解消したとは扱わないでください。
