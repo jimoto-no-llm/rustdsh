@@ -128,7 +128,7 @@ async fn websocket_stream_uses_authenticated_gateway_and_sends_uplink_and_cancel
         .unwrap();
         let open: Value =
             serde_json::from_str(ws.next().await.unwrap().unwrap().to_text().unwrap()).unwrap();
-        assert_eq!(open["endpoint"], "terminal/follow");
+        assert_eq!(open["endpoint"], "example/stream");
         assert_eq!(open["payload"]["args"]["request"]["terminalId"], "fixture");
         ws.send(Message::text(
             json!({"type":"item","streamId":"job","value":{"text":"hello"}}).to_string(),
@@ -147,7 +147,7 @@ async fn websocket_stream_uses_authenticated_gateway_and_sends_uplink_and_cancel
     });
     let outcome = run_stream(
         &remote,
-        &json!({"id":"terminal/follow"}),
+        &json!({"id":"example/stream"}),
         json!({"request":{"terminalId":"fixture"}}),
         &state,
         "job",

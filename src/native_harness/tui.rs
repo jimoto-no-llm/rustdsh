@@ -7,7 +7,6 @@ mod editor;
 mod questions;
 mod recording;
 mod surface;
-mod terminal;
 mod view;
 
 use super::create_engine;
@@ -56,7 +55,6 @@ enum Overlay {
         selected: usize,
     },
     Admin,
-    Terminal,
     Surface,
     Recording,
     Help,
@@ -84,7 +82,6 @@ enum Overlay {
 struct App {
     editor: Editor,
     admin: Option<admin::Panel>,
-    terminal: Option<terminal::Pane>,
     surface: Option<surface::Pane>,
     recording: Option<recording::Pane>,
     pending_transcript: Option<String>,
@@ -139,9 +136,6 @@ impl App {
             self.allow = false;
             if let Some(panel) = &mut self.admin {
                 panel.clear_confirmation();
-            }
-            if let Some(pane) = &mut self.terminal {
-                pane.clear_confirmation();
             }
             if let Some(pane) = &mut self.surface {
                 pane.clear_confirmation();
@@ -260,9 +254,6 @@ impl App {
         }
         if let Some(mut panel) = self.admin.take() {
             panel.cancel(backend);
-        }
-        if let Some(mut pane) = self.terminal.take() {
-            pane.cancel(backend);
         }
     }
     fn open_details(&mut self, overlay: Overlay) {
@@ -387,9 +378,6 @@ impl App {
             if let Some(panel) = &mut self.admin {
                 panel.cancel(backend);
             }
-            if let Some(pane) = &mut self.terminal {
-                pane.cancel(backend);
-            }
             return true;
         }
         if !self.input_visible
@@ -467,18 +455,6 @@ impl App {
                         }
                         Ok(false) => {}
                         Err(e) => pane.report_error(backend.redact(&e.to_string())),
-                    }
-                }
-            }
-            return false;
-        }
-        if matches!(self.overlay, Overlay::Terminal) && !self.has_pending() {
-            if let Some(pane) = &mut self.terminal {
-                if self.input_visible {
-                    match pane.key(key, backend) {
-                        Ok(true) => self.overlay = Overlay::None,
-                        Ok(false) => {}
-                        Err(error) => self.notice = backend.redact(&error.to_string()),
                     }
                 }
             }
@@ -904,11 +880,6 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
         if let Some(panel) = &mut app.admin {
             panel.poll(backend);
         }
-        if let Some(pane) = &mut app.terminal {
-            let size = terminal.size()?;
-            pane.resize(size.width, size.height, backend);
-            pane.poll(backend);
-        }
         if let Some(pane) = &mut app.surface {
             let size = terminal.size()?;
             pane.resize(size.width, size.height, backend);
@@ -963,17 +934,6 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
                 }
             }
             Event::Paste(_) if matches!(app.overlay, Overlay::Recording) => {}
-            Event::Paste(value)
-                if matches!(app.overlay, Overlay::Terminal) && !app.has_pending() =>
-            {
-                if app.input_visible {
-                    if let Some(pane) = &mut app.terminal {
-                        if let Err(error) = pane.paste(&value, backend) {
-                            app.notice = backend.redact(&error.to_string());
-                        }
-                    }
-                }
-            }
             Event::Paste(value) => app.paste(&value),
             Event::Resize(width, height) => app.guard_input_size(width, height),
             Event::Mouse(mouse)
@@ -1048,9 +1008,6 @@ pub(super) fn run_screen(backend: &dyn HarnessBackend) -> Result<()> {
     }
     if let Some(panel) = &mut app.admin {
         panel.cancel(backend);
-    }
-    if let Some(pane) = &mut app.terminal {
-        pane.cancel(backend);
     }
     Ok(())
 }

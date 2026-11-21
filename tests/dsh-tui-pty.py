@@ -8,6 +8,10 @@ Usage: python3 tests/dsh-tui-pty.py /absolute/path/to/rdsh --ws-package PACKAGE
 
 RDSH_ORIG_BIN points exclusively at the embedded mock. HOME/DSH_HOME/config
 are disposable, inherited API credentials are excluded, and no model runs.
+
+Manual test: no workflow runs this suite (see docs/DEVELOPMENT.md). The wire
+fixture mirrors the DSH 0.2.2-alpha.3 Remote contract; update it together with
+that pinned version.
 """
 import argparse
 import codecs
@@ -35,7 +39,7 @@ const root=process.cwd(), logPath=root+'/wire.jsonl';
 const log=value=>fs.appendFileSync(logPath,JSON.stringify(value)+'\n');
 const check=(ok,message)=>{if(!ok){log({kind:'assertion',message});throw new Error(message);}};
 check(JSON.stringify(process.argv.slice(2))===JSON.stringify(['--profile','web','--no-open','--port','0']),'host CLI arguments');
-const sockets=new Set(), sessions=new Map(), terminals=new Map();
+const sockets=new Set(), sessions=new Map();
 let settingsRevision=7, settingsValue={label:'ADMIN_SETTING_INITIAL'};
 const object=(properties={},required=[])=>({type:'object',properties,required});
 const action=(id,schema=object(),extra={})=>({id,label:id,description:'Loopback management fixture',transport:'rpc',mode:'unary',schema,defaults:{},...extra});
@@ -46,11 +50,8 @@ const adminActions=[
  action('fixture/watch',object(),{mode:'stream',uplink:true}),
  action('fileUploads/upload',object({agentId:{type:'string'},request:{type:'object'}},['agentId','request'])),
  action('workspaceFiles/readBytes'),
- ...['create','follow','write','resize','close'].map(name=>action('terminal/'+name,object(),name==='follow'?{mode:'stream'}:{})),
  {id:'GET /api/rdsh-context',label:'RDSH HTTP fixture',description:'Existing authenticated HTTP handler',transport:'http',mode:'unary',method:'GET',path:'/api/rdsh-context',schema:object(),defaults:{}},
 ];
-const terminalInfo=t=>({id:t.id,title:'Fixture terminal',shell:{path:'/mock/sh',args:[],name:'Mock'},cwd:root,cols:t.cols,rows:t.rows,state:t.closed?'exited':'running',exitCode:t.closed?0:null,controllerId:t.attachment});
-const terminalOutput=(t,data)=>{t.screen+=data;const frame={type:'output',sequence:++t.seq,data};for(const ws of sockets)for(const [stream,info] of ws.terminalFollows??[])if(info.id===t.id)item(ws,stream,frame);};
 let creates=0, prompts=0, connections=0, failResume=true;const workspaceMembers=new Set();
 const fresh=id=>({id,seq:0,records:[],projections:{modelSelection:{next:{provider:'demo',model:'m1'}},plan:{active:false,pending:false},permissions:{currentValue:'safe'}}});
 const saved=fresh('saved-session');
@@ -144,21 +145,6 @@ async function rpc(method,args){
    const bytes=Buffer.from(args.request.data,'base64');check(bytes.toString()==='ADMIN_ATTACHMENT_BYTES','attachment bytes');log({kind:'attachment-uploaded',bytes:bytes.length});return {receiptId:'fixture-receipt',file:{attachmentId:'fixture-attachment',name:'attachment.txt',bytes:bytes.length}};
   }
   case 'workspaceFiles/readBytes':return {mockBinary:true};
-  case 'terminal/create':{
-   const r=args.request;check(sessions.has(args.agentId)&&typeof r?.id==='string'&&r.cols>0&&r.rows>0,'terminal create envelope');
-   check(!terminals.has(r.id),'terminal created only once');const t={id:r.id,agentId:args.agentId,cols:r.cols,rows:r.rows,seq:0,screen:'FIXTURE_SHELL_READY\r\nfixture$ ',line:'',closed:false};terminals.set(r.id,t);log({kind:'terminal-created',id:r.id});return terminalInfo(t);
-  }
-  case 'terminal/write':{
-   const t=terminals.get(args.id);check(t&&!t.closed&&args.agentId===t.agentId&&args.attachmentId===t.attachment&&typeof args.data==='string','terminal write exact attachment');
-   log({kind:'terminal-written',id:t.id,data:args.data});
-   for(const c of args.data){if(c==='\r'||c==='\n'){terminalOutput(t,'\r\nRESULT:'+(t.line.startsWith('echo ')?t.line.slice(5):t.line)+'\r\nfixture$ ');t.line='';}else{t.line+=c;terminalOutput(t,c);}}return {};
-  }
-  case 'terminal/resize':{
-   const t=terminals.get(args.id);check(t&&!t.closed&&args.agentId===t.agentId&&args.attachmentId===t.attachment&&args.cols>0&&args.rows>0,'terminal resize exact attachment');t.cols=args.cols;t.rows=args.rows;log({kind:'terminal-resized',id:t.id,cols:t.cols,rows:t.rows});return {};
-  }
-  case 'terminal/close':{
-   const t=terminals.get(args.id);check(t&&args.agentId===t.agentId,'terminal close identity');t.closed=true;log({kind:'terminal-closed',id:t.id});for(const ws of sockets)for(const[stream,info]of ws.terminalFollows??[])if(info.id===t.id){item(ws,stream,{type:'state',info:terminalInfo(t)});ws.send(JSON.stringify({type:'end',streamId:stream}));}return {};
-  }
   case 'session/modelCatalog':
    check(JSON.stringify(args)==='{}','catalog args');
    return {default:{provider:'demo',model:'m1'},groups:[{id:'demo',models:[{id:'m1'},{id:'m2'}]}]};
@@ -252,15 +238,12 @@ wss.on('connection',ws=>{
  ws.on('close',()=>sockets.delete(ws));
  ws.on('message',raw=>{try{
   const e=JSON.parse(raw.toString());
-  if(e.type==='cancel'){log({kind:'stream-cancel',streamId:e.streamId});ws.terminalFollows?.delete(e.streamId);return;}
+  if(e.type==='cancel'){log({kind:'stream-cancel',streamId:e.streamId});return;}
   if(e.type==='item'){check(ws.adminStream===e.streamId,'admin uplink stream identity');check(e.value?.proof==='ADMIN_UPLINK_PROOF','admin uplink value');log({kind:'admin-uplink'});item(ws,e.streamId,{proof:'ADMIN_UPLINK_ACK'});return;}
   check(e.type==='open'&&typeof e.streamId==='string'&&e.payload?.args,'WS open envelope');
   log({kind:'open',endpoint:e.endpoint,args:e.payload.args});
   if(e.endpoint==='fixture/watch'){
    check(JSON.stringify(e.payload.args)==='{}','admin stream args');ws.adminStream=e.streamId;item(ws,e.streamId,{proof:'ADMIN_STREAM_READY'});
-  }else if(e.endpoint==='terminal/follow'){
-   const r=e.payload.args,t=terminals.get(r.id);check(t&&!t.closed&&r.agentId===t.agentId&&typeof r.attachmentId==='string','terminal follow envelope');t.attachment=r.attachmentId;
-   if(!ws.terminalFollows)ws.terminalFollows=new Map();ws.terminalFollows.set(e.streamId,{id:t.id});item(ws,e.streamId,{type:'snapshot',sequence:t.seq,screen:t.screen,info:terminalInfo(t)});
   }else if(e.endpoint==='$events'){
    check(JSON.stringify(e.payload.args)==='{}','events args');ws.events=e.streamId;
    item(ws,e.streamId,{type:'ready',clientId});
@@ -512,7 +495,7 @@ def main():
             assert len([row for row in rows if row["kind"] == "questions-answered"]) == 1
             assert all(secret not in client.raw.decode("utf8", "replace") for secret in ("fixture-launch-token", "fixture-cookie", "FIXTURE_PRIVATE_SETTING"))
             assert any(row["kind"] == "shutdown" for row in rows), "mock host did not stop"
-            print("PASS DSH PTY: authenticated HTTP/WS wire, streaming, explicit deny/allow, hidden-dialog guards, timed questions and exact answers, usage, readonly views, model selection, cancel/reconnect, paginated resume, /new persistence, terminal/host restoration")
+            print("PASS DSH PTY: authenticated HTTP/WS wire, streaming, explicit deny/allow, hidden-dialog guards, timed questions and exact answers, usage, readonly views, model selection, cancel/reconnect, paginated resume, /new persistence, host restoration")
         finally:
             client.close()
 

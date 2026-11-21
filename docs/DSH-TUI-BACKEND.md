@@ -138,8 +138,6 @@ dsh plugin --profile web add ./plugins/rdsh-model-call
 - `/manage credentials/set`: credentialを登録。入力値を会話履歴や結果へ残しません。
 - `/manage fileUploads/upload`: `request.data` に `{"$file":"相対パス"}` を指定して添付をアップロード。
   返されたreceipt/fileは `session/prompt` のcontentへ渡します。
-- `/terminal`: 確認後に現在のセッションでシェルを起動。`/terminal ID` は既存端末へ接続。
-  Ctrl+]で会話へ戻り、もう一度 `/terminal` で復帰します。Ctrl+Cはシェルへ送信します。
 - `/webui`: 同じHostのWeb画面を専用headless Chrome経由でTUI内に表示。
   プラグイン独自画面、アップロード・ダウンロード、設定文書、確認・パス選択を操作できます。
 - `/record`: 明示確認して録音し、別途送信先を確認して文字起こし。結果は下書きへ戻ります。

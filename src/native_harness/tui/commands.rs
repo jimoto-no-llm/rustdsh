@@ -117,12 +117,6 @@ pub(super) const COMMANDS: &[Command] = &[
         needs_idle: false,
     },
     Command {
-        name: "terminal",
-        usage: "/terminal [ID]",
-        description: "DSH: ワークスペースの端末を開く",
-        needs_idle: false,
-    },
-    Command {
         name: "webui",
         usage: "/webui",
         description: "DSH: Web専用画面をTUI内で操作",
@@ -166,7 +160,6 @@ pub(super) enum Invocation {
     Recording,
     Dsh(Option<String>),
     Manage(String),
-    Terminal(Option<String>),
     Models,
     Model(String, String),
     Mode(Option<String>),
@@ -199,18 +192,6 @@ pub(super) fn parse(text: &str) -> Option<Result<Invocation>> {
         else {
             bail!("不明なコマンドです。/ で候補、/help で操作方法を表示します");
         };
-        if command.name == "terminal" && parts.len() <= 2 {
-            let id = parts.get(1).copied();
-            if id.is_some_and(|id| {
-                id.len() > 256
-                    || !id
-                        .bytes()
-                        .all(|c| c.is_ascii_alphanumeric() || b"_.-".contains(&c))
-            }) {
-                bail!("端末IDが不正です");
-            }
-            return Ok(Invocation::Terminal(id.map(str::to_owned)));
-        }
         if command.name == "manage" {
             let query = text[1 + "manage".len()..].trim();
             if query.len() > 512 || query.chars().any(char::is_control) {
@@ -342,7 +323,7 @@ impl App {
                 if key.code == KeyCode::Tab {
                     if matches!(
                         selected.name,
-                        "model" | "mode" | "plan" | "permission" | "dsh" | "manage" | "terminal"
+                        "model" | "mode" | "plan" | "permission" | "dsh" | "manage"
                     ) {
                         self.editor.text.push(' ');
                     }
@@ -370,7 +351,6 @@ impl App {
                 | Invocation::Settings
                 | Invocation::Dsh(..)
                 | Invocation::Manage(..)
-                | Invocation::Terminal(..)
                 | Invocation::Surface
                 | Invocation::Recording
         ) && snapshot["backend"] != "dsh"
@@ -422,22 +402,6 @@ impl App {
                     self.recording = Some(recording::Pane::new(backend));
                 }
                 self.overlay = Overlay::Recording;
-            }
-            Invocation::Terminal(existing_id) => {
-                let Some(session_id) = snapshot["sessionId"].as_str().filter(|id| !id.is_empty())
-                else {
-                    self.notice = "DSHセッションが準備できていません".into();
-                    return None;
-                };
-                if self.terminal.as_ref().is_none_or(|pane| pane.is_closed())
-                    || existing_id.is_some()
-                {
-                    if let Some(pane) = &mut self.terminal {
-                        pane.cancel(backend);
-                    }
-                    self.terminal = Some(terminal::Pane::new(session_id.to_owned(), existing_id));
-                }
-                self.overlay = Overlay::Terminal;
             }
             Invocation::Manage(query) => {
                 if self.admin.as_ref().is_some_and(|panel| panel.running())

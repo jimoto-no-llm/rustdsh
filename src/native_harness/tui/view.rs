@@ -242,11 +242,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, snapshot: &Value, elapsed: 
                     pane.draw(frame, area);
                 }
             }
-            Overlay::Terminal => {
-                if let Some(pane) = &mut app.terminal {
-                    pane.draw(frame, area);
-                }
-            }
             Overlay::Admin => {
                 if let Some(panel) = &mut app.admin {
                     panel.draw(frame, area);

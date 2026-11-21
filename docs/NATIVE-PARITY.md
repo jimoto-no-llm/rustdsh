@@ -57,7 +57,7 @@ nativeモードが自動継承するとは扱いません。nativeモードの�
 Rust TUIでDSHのツール・プラグインを使う場合は
 [`--backend dsh`](DSH-TUI-BACKEND.md)を指定します。DSHモードでは既存Webプロファイルを
 ホストとして使い、履歴保存・再開と逐次配信、承認、質問をRust画面で扱います。
-管理操作は `/manage`、対話シェルは `/terminal` で利用できます。
+管理操作は `/manage` で利用できます。
 Web独自画面は `/webui` でTUI内に表示し、マイク入力は `/record` で確認してから行います。
 公開APIとブラウザー固有画面の違いは [TUI管理機能](TUI-ADMIN.md) を参照してください。
 

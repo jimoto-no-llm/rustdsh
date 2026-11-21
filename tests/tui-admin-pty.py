@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""PTY management + terminal proof using the isolated DSH HTTP/WS fixture.
+"""PTY management proof using the isolated DSH HTTP/WS fixture.
 
 Requires pyte and Node ws. No model, real settings, credentials, or shell commands
-are used. The terminal Host is a protocol fixture; real-shell proof is separate.
+are used. This is a manual test: no workflow runs it (see docs/DEVELOPMENT.md).
 Usage: python3 tests/tui-admin-pty.py /path/to/rdsh --ws-package PACKAGE_JSON
 """
 import argparse
@@ -144,28 +144,6 @@ def main():
             client.wait("状態: cancelled")
             close_manage(client)
 
-            # VT screen, ordered input, resize, hide/reopen without a replacement shell.
-            client.command("/terminal")
-            client.wait("接続する")
-            client.send("\r")
-            client.wait_absent("接続する")
-            assert not any(r["kind"] == "terminal-created" for r in client.events())
-            client.command("/terminal")
-            client.wait("接続する")
-            client.send("\t\r")
-            client.wait("FIXTURE_SHELL_READY")
-            client.send("echo TERMINAL_ADMIN_E2E\r")
-            client.wait("RESULT:TERMINAL_ADMIN_E2E")
-            resized_before = len([r for r in client.events() if r["kind"] == "terminal-resized"])
-            client.resize(104, 36)
-            client.wait_wire(lambda rows: len([r for r in rows if r["kind"] == "terminal-resized"]) > resized_before)
-            client.send("\x1d")
-            client.wait_absent("DSH 端末")
-            client.command("/terminal")
-            client.wait("RESULT:TERMINAL_ADMIN_E2E")
-            assert len([r for r in client.events() if r["kind"] == "terminal-created"]) == 1
-            client.send("\x1d")
-            client.wait_absent("DSH 端末")
             client.command("/quit")
             try:
                 client.restored()
@@ -175,11 +153,10 @@ def main():
             rows = client.events()
             assert not [r for r in rows if r["kind"] == "assertion"]
             assert not fixture.rpc_rows(rows, "session/prompt"), "administrative commands became model prompts"
-            assert any(r["kind"] == "terminal-closed" for r in rows), "owned terminal was not closed on exit"
             assert any(r["kind"] == "stream-cancel" for r in rows)
             raw = client.raw.decode("utf8", "replace")
             assert all(secret not in raw for secret in ("ADMIN_SECRET_NEVER_ECHO", "FIXTURE_PRIVATE_SETTING", "fixture-launch-token", "fixture-cookie"))
-            print("PASS admin PTY: catalog, explicit confirmation, revision conflict, persisted redisplay, masked credential, exact binary upload/download, authenticated RDSH HTTP, stream/uplink/cancel, VT input/resize/reopen, owned terminal cleanup, raw-mode restoration")
+            print("PASS admin PTY: catalog, explicit confirmation, revision conflict, persisted redisplay, masked credential, exact binary upload/download, authenticated RDSH HTTP, stream/uplink/cancel, raw-mode restoration")
         finally:
             client.close()
 
