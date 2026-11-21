@@ -5,6 +5,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- `rdsh tui` がローカルの `tui` プロファイルを持たない環境で
+  `dsh: profile "tui" does not exist` で終了していた問題を修正しました。
+  DSH は `tui` テンプレートを同梱しないため、新しいインストールでは
+  この経路が必ず失敗していました。`tui` プロファイルが無い場合は、この
+  バイナリに組み込みの Rust TUI（`rdsh native-tui --backend dsh --dsh-profile web`
+  相当）を起動し、その旨を1行で案内します。`tui` プロファイルを導入済みの
+  環境は従来どおり DSH へ委譲し、明示的な `--profile tui` は切り替えません。
+
 ### Added
 
 - DSH `0.2.2-rc.5`（および `0.2.2-rc.4`）の保護付きツール委譲に対応しました。
