@@ -3,8 +3,15 @@
 This is a preserved setup example for DSH 0.2.0-rc.2. The pinned plugin below
 has not been revalidated against newer DSH releases.
 
-`rdsh tui` delegates to the `tui` profile in dsh. DSH 0.2.0-rc.2 does not ship
-that profile, so a fresh installation needs a TUI plugin first. The
+`rdsh tui` delegates to the `tui` profile in dsh when one is installed.
+DSH 0.2.0-rc.2 does not ship that profile, so without the plugin below a fresh
+installation has none; `rdsh tui` then starts the built-in Rust TUI
+(`rdsh native-tui --backend dsh --dsh-profile web`, same DSH web profile and
+the same boot layers) and prints one line saying so. An explicit
+`rdsh --profile tui` or `rdsh boot --profile tui` is never redirected.
+
+Creating the profile below is only needed when you want DSH's own TUI plugin
+instead. The
 [`@deepseek-harness-tui/dsh-tui` plugin](https://github.com/ccch1mneyyy/dsh-TUI)
 supports this runtime; its 0.14.0 release declares compatibility with
 DSH 0.2.0-rc.2.
@@ -28,5 +35,7 @@ configuration instead of installing another terminal UI alongside it.
 ## 日本語
 
 `tui` はdsh標準のプロファイルではありません。上記のプラグインを導入すると
-`rdsh tui` で起動できます。Web側の設定は変更しません。
-`profile "tui" does not exist` は、プロファイルが未導入の場合に出るエラーです。
+`rdsh tui` はDSHのTUIへ委譲します。Web側の設定は変更しません。
+未導入の場合、`rdsh tui` は組み込みのRust TUI（`rdsh native-tui --backend dsh
+--dsh-profile web` と同じDSH webプロファイル・同じ起動レイヤー）を起動し、その旨を
+1行で表示します。`rdsh --profile tui` のような明示指定は切り替えません。

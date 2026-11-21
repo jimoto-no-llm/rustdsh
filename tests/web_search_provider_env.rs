@@ -19,6 +19,10 @@ fn temp_dir(tag: &str) -> PathBuf {
         std::process::id()
     ));
     fs::create_dir_all(path.join("dsh")).unwrap();
+    // An installed tui profile keeps a bare `rdsh tui` on the delegation path.
+    // Without it the built-in Rust TUI starts instead and the delegated command
+    // these cases assert on never appears.
+    fs::create_dir_all(path.join("dsh/profiles/tui")).unwrap();
     // A shell stub is enough: --dry-run never executes it.
     let original = path.join("orig-dsh");
     fs::write(&original, "#!/bin/sh\nexit 0\n").unwrap();
