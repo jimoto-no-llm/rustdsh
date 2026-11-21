@@ -233,7 +233,13 @@ impl DshBackend {
             .enable_all()
             .build()?;
         let (remote, child, launch_secret) = runtime.block_on(async {
-            let mut command = crate::passthrough::tui_host_command(profile, locale)?;
+            let booted = crate::passthrough::tui_host_command(profile, locale)?;
+            // The assembled boot reports overlay/compaction notices on stderr.
+            // This runs before the alternate screen, so keep that channel.
+            for notice in booted.notices {
+                eprintln!("{notice}");
+            }
+            let mut command = booted.command;
             command
                 .current_dir(&workspace)
                 .stdin(Stdio::null())

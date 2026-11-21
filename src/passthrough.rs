@@ -882,18 +882,50 @@ fn base_cmd_inner(
     Ok(command)
 }
 
+/// The only launch difference the TUI host adds to `rdsh boot web`: it owns
+/// the window (no browser) and asks DSH for an ephemeral loopback port.
+fn tui_host_app_args() -> Vec<String> {
+    vec!["--no-open".into(), "--port".into(), "0".into()]
+}
+
 /// Rust-owned TUI uses the existing Web profile as a headless remote host.
-/// Keep the same privacy, runtime and optional tool-security boundary as boot.
+///
+/// The launch is assembled by `assemble_boot` exactly like `rdsh boot web`,
+/// so the TUI host keeps the same layers: the ZDR fail-closed guard, the
+/// `rdsh setup` model overlay, the gzip/web-asset overlays, the slim
+/// environment, auth pre-boot and the search bridge. Only the TUI-specific app
+/// arguments differ. Notices are returned to the caller instead of printed so
+/// the TUI decides where they go.
 pub(crate) fn tui_host_command(
     profile: &str,
     locale: crate::locale::Locale,
-) -> anyhow::Result<std::process::Command> {
-    let orig =
+) -> anyhow::Result<crate::harness_adapter::BootedCommand> {
+    let origin =
         find_original_dsh().ok_or_else(|| anyhow::anyhow!("DSH runtime が見つかりません"))?;
-    let mut command = base_cmd(&orig, false, false, locale)?;
-    apply_search_bridge(&mut command, profile, false);
-    command.args(["--profile", profile, "--no-open", "--port", "0"]);
-    Ok(command)
+    tui_host_command_with(&origin, profile, locale, assemble_boot)
+}
+
+/// Assemble the TUI host through the caller's assembler. Production passes
+/// `assemble_boot`; the test seam proves the TUI cannot bypass a boot layer.
+fn tui_host_command_with(
+    origin: &str,
+    profile: &str,
+    locale: crate::locale::Locale,
+    assemble: impl FnOnce(
+        &str,
+        &crate::harness_adapter::LaunchOptions,
+    ) -> anyhow::Result<crate::harness_adapter::BootedCommand>,
+) -> anyhow::Result<crate::harness_adapter::BootedCommand> {
+    let options = crate::harness_adapter::LaunchOptions {
+        profile: profile.to_string(),
+        from_default: None,
+        patches: Vec::new(),
+        app_args: tui_host_app_args(),
+        dry: false,
+        slim: false,
+        locale,
+    };
+    assemble(origin, &options)
 }
 
 /// Upstream provider id for delegated web search, set once from the settings
@@ -1338,6 +1370,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn tui_host_assembles_through_boot_and_only_adds_its_own_app_args() {
+        // The TUI host must never build from base_cmd() directly: that drops
+        // the ZDR fail-closed guard, the model overlay, the asset overlays,
+        // slim env, auth pre-boot and the search bridge.
+        let seen = std::cell::RefCell::new(None);
+        let booted = tui_host_command_with(
+            "/origin/dsh",
+            "web",
+            crate::locale::Locale::English,
+            |origin, options| {
+                *seen.borrow_mut() = Some((origin.to_string(), options.clone()));
+                Ok(crate::harness_adapter::BootedCommand {
+                    command: std::process::Command::new("assembled"),
+                    notices: vec!["notice".into()],
+                })
+            },
+        )
+        .unwrap();
+        assert_eq!(booted.command.get_program(), "assembled");
+        assert_eq!(booted.notices, ["notice"]);
+        let (origin, options) = seen.borrow().clone().unwrap();
+        assert_eq!(origin, "/origin/dsh");
+        assert_eq!(options.profile, "web");
+        assert_eq!(options.app_args, ["--no-open", "--port", "0"]);
+        assert!(!options.dry);
+        assert!(!options.slim);
+        assert!(options.patches.is_empty());
+        assert!(options.from_default.is_none());
+        assert_eq!(options.locale, crate::locale::Locale::English);
+    }
     #[test]
     fn frontend_assets_are_found_through_a_bin_symlink_layout() {
         // Mirror the installed layout: <tree>/bin/dsh plus the frontend bundle
