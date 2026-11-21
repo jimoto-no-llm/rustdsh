@@ -1,75 +1,110 @@
 # rdsh-update-banner
 
-Update notification banner for [rdsh](https://github.com/jimoto-no-llm/rustdsh) on the dsh web GUI.
+Update notice card for [rdsh](https://github.com/jimoto-no-llm/rustdsh) on the dsh
+web GUI. One overlay card carries every notice; it never opens a second fixed
+card per component.
 
-When `sync-dsh.sh` records an actual update in
-`~/.local/share/rdsh/update-state.json`, the open web GUI receives a notification
-through the authenticated `/api/rdsh-update/events` stream. File changes trigger
-push delivery; a one-second server check covers missed filesystem events. If the
-stream is unavailable, the client checks every five seconds and reconnects.
+## What it shows
 
-The card appears when an update is recorded. **Dismiss** and **×** close that
-update for good: the dismissal is remembered per update event (component, target
-and update time), so time passing, polling, project remounts and full page reloads
-do not bring it back. An actual new update — a different target or a different
-update time — appears again. Minimizing keeps the notification.
+| Row | Source |
+| --- | --- |
+| `rdsh` | an applied update recorded by `sync-dsh.sh` in `~/.local/share/rdsh/update-state.json` |
+| `rustxng` | the rustxng sidecar record in the same file |
+| `dsh` | a published `@deepseek-ai/dsh` release newer than the running host |
 
-The same stream carries the rustxng sidecar: rdsh's auto-update writes
-`kind: "rustxng"` records into the shared state file and the card's update
-button runs one accountable `rdsh rustxng update` through the authenticated
-`/api/rdsh-update/rustxng/run` endpoint (the resolved binary must be a regular
-file owned by the current user, like every other command this banner runs).
+Every row is in one of these states:
 
-A successful **update** / **update again** check closes the update that started
-the request, like Dismiss. Failed checks remain visible and retryable. A newer
-update arriving during the request remains visible.
-The release updater compares verified binary bytes with the installed binary:
-an unchanged payload neither reinstalls nor rewrites the notification time. A
-changed payload still updates even if its version label is the same. See
-[loop regression evidence](../../docs/evidence/update-notice-noop/README.md).
+- **available** — a newer release exists. Shows `current → latest`, the release
+  channel (stable / prerelease / next), and `Checked <relative time>`.
+- **applying** — the request is running; the row is `aria-busy` and the button is
+  disabled.
+- **applied** — a short confirmation (8 s). It is never a permanent alert, and it
+  is not replayed by a poll, a remount or a reload.
+- **restart-required** — `dsh` was installed but the running host still uses the
+  old build. This survives a reload for 24 h until it is dismissed.
+- **up-to-date** — shown for 5 s after a manual *Retry* finds nothing.
+- **error** — the check or the update failed. The card becomes `role="alert"` and
+  offers *Retry*; an error is never confused with "up to date".
 
-Same-origin tabs share close events through browser storage. Independent GUI
-ports running as the same OS user also share live close events through the private,
-atomically replaced `~/.local/share/rdsh/update-notice-close.json` file. The
-notification identifies the component, target and update time, so an old close
-cannot hide a newer update. The browser-storage record is replayed on page load,
-which is what keeps a dismissal closed across reloads. Separate OS accounts keep
-separate records.
+Priority inside the card is error > available > applied.
 
-Legacy permanent dismissal records are ignored and retained on disk. Closing
-works in memory when browser storage is disabled, including project remounts;
-that configuration cannot remember the dismissal for a full reload. Demo closes
-never write account state. Activate the new server/client code through the normal
-GUI restart/reload once; running user sessions are not restarted automatically.
+## Dismissal
 
-## dsh update notice
+Dismissing stores a record for **(component, from, to)** in browser storage under
+`rdsh-update-dismissals:v4` (legacy `rdsh-update-close:v3` and
+`rdsh-update-close:dsh:v3` keys are migrated and removed). The registry check
+time is *not* part of the identity, so the twelve-hour `npm view` re-check that
+only rewrites `checkedAt` cannot bring a dismissed release back. A different
+target release notifies again.
 
-The same card also reports an available harness release. When a newer
-`@deepseek-ai/dsh` is published, the card reads **dsh update available** and
-shows the active and newest version:
+The server accepts `POST /api/rdsh-update/dismiss` with `{ kind, from?, to }`,
+validates it against the live notice (the applied record for `rdsh`/`rustxng`,
+the currently advertised `dsh` target for `dsh`) and writes
+`~/.local/share/rdsh/update-notice-close.json` atomically (mode 0600, single
+hard link, no symlinks). The close is then streamed on
+`/api/rdsh-update/events`, so another tab or an independent GUI port running as
+the same OS user closes the same notice. A `dsh` dismissal can never close an
+`rdsh`/`rustxng` notice. Demo closes write no account state.
 
-- **update** runs `npm install -g @deepseek-ai/dsh@<newest>` on the host
-  (version string validated, no shell, five-minute timeout) and reports the
-  npm output. Restart the web service afterwards to run the new host.
-- **details** opens the npm page for that version and shows the exact command.
-- **dismiss** and **x** reuse the same close records and the two-hour remount
-  schedule as the rdsh notice.
+State file hardening: a record with `from === to`, a record older than 24 hours,
+or a `rustxng` record while no `rdsh` binary is on `PATH` is suppressed and
+reported as "no update" instead of rendering.
 
-The published version is cached for twelve hours in
-`~/.cache/rdsh-desktop/update-check.json`, shared with the native client. Set
-`RDSH_DESKTOP_UPDATE_CHECK=0` in the host environment to disable the registry
-query entirely; the card then stays hidden. The active version comes from the
-running `@deepseek-ai/dsh` package, so the card disappears as soon as the host
-runs the newer build.
+## dsh releases
 
-## Install
+`npm view @deepseek-ai/dsh dist-tags versions --json` is cached for twelve hours
+in `~/.cache/rdsh-desktop/update-check.json` (atomic write). The target comes
+from `dist-tags`, not from the maximum of every published version:
 
-```sh
-dsh plugin --profile web add rdsh-update-banner
-```
+- **stable** users get `dist-tags.latest` (or the newest stable version).
+- A user already running a prerelease may advance to `dist-tags.next` when it is
+  newer, labelled **next (prerelease)**.
+- Prerelease identifiers compare per SemVer, so `1.0.0-alpha.10` is newer than
+  `1.0.0-alpha.2`.
 
-Then add one block to your web profile `cordis.patch.yml` (or run
-`install-banner.sh` from the rdsh repo, which does both steps):
+Set `RDSH_DESKTOP_UPDATE_CHECK=0` to disable the registry query; the dsh row
+then stays hidden.
+
+### Installing a dsh update
+
+The running package decides the install target. `activeDshInstall()` always
+returns `{ version, prefix, managed, environmentVersion, packageDir }` (also when
+`DSH_VERSION` is set, which used to return a bare string). The npm prefix is
+derived from the package location for both layouts — `<prefix>/node_modules/@scope/pkg`
+(installer) and `<prefix>/lib/node_modules/@scope/pkg` (npm global) — and for
+scoped or unscoped packages.
+
+`POST /api/rdsh-update/dsh/run` runs `npm install --prefix <prefix> @deepseek-ai/dsh@<version>`
+(timeout five minutes, no shell, version string validated) and then reads
+`<prefix>/node_modules/@deepseek-ai/dsh/package.json` back. Only a matching
+version reports success, with `restartRequired: true`; the web service must be
+restarted to run the new host. When the running install cannot be located, the
+plugin refuses instead of falling back to `npm install -g`, which would update a
+different installation than the one serving the GUI.
+
+## Accessibility and layout
+
+- `role="status"` + `aria-live="polite"` for availability; `role="alert"` +
+  `aria-live="assertive"` only while an error is shown.
+- Every row header and action is a real `<button>`; expandable rows expose
+  `aria-expanded` and `aria-controls`. The card close button is 44×44 with a
+  localized `aria-label`; every action and link keeps a 44 px touch target.
+- Escape closes the card and focus returns to the element that was focused
+  before it appeared. `:focus-visible` outlines come from the DSH tokens.
+- The badge carries text, so state is never conveyed by color alone; SVG icons are
+  `aria-hidden`. Entry animation respects `prefers-reduced-motion`, the panel
+  background respects `prefers-reduced-transparency`, and
+  `prefers-contrast: more` strengthens borders.
+- Position uses `--dsh-frame-overlay-top` / `--dsh-frame-chrome-top` with a 64 px
+  fallback and sits 12 px below the DSH chrome, clear of DSH toasts. The card has a
+  `max-height` with internal scrolling. At or below 480 px it becomes a bottom
+  sheet with `env(safe-area-inset-bottom)`.
+
+Copy is English, Japanese and Chinese. The client registers its dictionaries with
+the DSH locale service (`ctx.locale.register`, slot `locale`), so the card follows
+the GUI language; without that service it uses `navigator.languages`.
+
+## Config
 
 ```yaml
 - insert:
@@ -79,43 +114,29 @@ Then add one block to your web profile `cordis.patch.yml` (or run
         demo: false
 ```
 
-Reload the web GUI to pick it up.
-
-## Config
-
-- `demo: true` shows a demo notification without touching any state file.
+- `demo: true` shows a demo notice without touching any state file.
 - `syncScript` optionally sets an absolute or plugin-relative updater path. The
-  bundled checkout resolves `../../sync-dsh.sh` from the installed plugin; a
-  missing script reports how to configure or reinstall it. Before execution,
-  the plugin requires one regular file owned by the current OS user.
-- Without updates recorded, the banner stays hidden.
-- All four API routes require the DSH GUI session and its Host/Origin checks.
-  DSH must provide `connection.requestRejection` (verified with 0.2.0-rc.2).
-  Without the `connection` service, the plugin is not loaded. If the service
-  lacks the authentication API, requests are refused with 503.
+  bundled checkout resolves `../../sync-dsh.sh`; a missing script reports how to
+  configure or reinstall it. Before execution the plugin requires one regular file
+  owned by the current OS user, executed without a shell.
+- Without updates recorded, the card stays hidden.
+- All five API routes require the DSH GUI session and its Host/Origin checks. DSH
+  must provide `connection.requestRejection`. Without the `connection` service the
+  plugin is not loaded; if the service lacks the authentication API, requests are
+  refused with 503.
 
-## Live GUI verification (Issue #5)
+## Tests
 
-The banner is wired into the live web profile (insert block + node_modules
-link) and serves real state via `/api/rdsh-update`, but the live `:3080`
-process predates the wiring, so it has never rendered there (verified only
-on the `:38080` demo instance).
-
-After the next GUI restart, confirm on `:3080`:
-
-1. An actual update appears in an open page without reloading.
-2. Dismiss/× close it; polls, a project switch and a full reload keep it hidden,
-   and it never reappears hours later.
-3. A newer update appears again; minimize and updater actions still work and no
-   boot errors appear in GUI logs.
-
-The earlier two-hour reminder captures in
-[docs/evidence/update-notice-repeat](../../docs/evidence/update-notice-repeat/README.md)
-are historical; the current `update-banner.mjs` flow asserts that a dismissed
-update never returns. It uses isolated authenticated hosts without restarting the
-live GUI.
-
-Then stop creating demo instances for this check.
+- `node --test tests/update-banner.test.mjs` — client state machine in a VM,
+  server contract (same-version suppression, 24 h TTL, orphaned rustxng record,
+  dsh dismissal matching the live target, cross-tab stream, planted symlinks),
+  SemVer/dist-tag selection, prefix detection, locale dictionaries, ARIA basics.
+- `cd tests/e2e && node update-banner.mjs` — Playwright against the real component
+  and the real routes: single card, dsh dismissal persistence across
+  `checkedAt` refreshes, ja/zh/en copy, 320/375/1100 px viewports, Escape and
+  focus, reduced motion, error and retry, restart-required. It uses a temporary
+  `HOME`, pins `DSH_VERSION`, seeds the dsh cache and mocks every updater
+  response; it never runs a real updater.
 
 ## npm package retirement (Issue #6)
 
@@ -123,16 +144,9 @@ Then stop creating demo instances for this check.
 (`plugins/rdsh-update-banner`, installed via `install-banner.sh`).
 Do not publish new versions to npm.
 
-Retirement steps (docs only; no code deleted here):
-
 1. `npm deprecate rdsh-update-banner "moved into jimoto-no-llm/rustdsh: plugins/rdsh-update-banner"`
-   (preferred; keeps installs resolving with a pointer).
 2. Only if deprecation is not enough: `npm unpublish rdsh-update-banner@1.0.0`
-   (needs a classic token + fresh OTP; granular 2FA-bypass tokens are
-   rejected for deletes).
-
-Acceptance: the registry entry is gone, or deprecated with a pointer to
-the repo copy.
+   (needs a classic token + fresh OTP).
 
 ## License
 

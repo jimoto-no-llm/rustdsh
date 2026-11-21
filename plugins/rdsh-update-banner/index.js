@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { accessSync, constants, existsSync, readFileSync, realpathSync, lstatSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { accessSync, constants, readFileSync, realpathSync, lstatSync } from "node:fs";
 import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -14,11 +14,30 @@ const DEFAULT_SYNC_SCRIPT = resolve(PLUGIN_DIRECTORY, "../../sync-dsh.sh");
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
 const updateDirectory = () => join(homedir(), ".local", "share", "rdsh");
 const closePath = () => join(updateDirectory(), "update-notice-close.json");
-const REMINDER_MS = 2 * 60 * 60 * 1000;
-const validTarget = (s) => typeof s?.to === "string" && s.to.length > 0 && s.to.length <= 512 &&
-  typeof s.kind === "string" && s.kind.length > 0 && s.kind.length <= 64;
+// An applied rdsh record is a confirmation, not a standing alert. Records older
+// than this are ignored so a stale update-state.json cannot keep announcing an
+// update nobody remembers.
+export const APPLIED_STATE_TTL_MS = 24 * 60 * 60 * 1000;
+const shortText = (value) => typeof value === "string" && value.length > 0 && value.length <= 512;
+const validTarget = (s) => shortText(s?.to) && typeof s?.kind === "string" && s.kind.length > 0 &&
+  s.kind.length <= 64 && (s.from === undefined || s.from === null || shortText(s.from));
 const validClose = (s) => validTarget(s) && typeof s.id === "string" && /^[a-f0-9-]{36}$/.test(s.id) &&
-  Number.isFinite(s.at) && s.at > 0 && Number.isSafeInteger(s.cycle) && s.cycle >= 0 && s.cycle <= 1000000;
+  (Number.isFinite(s.closedAt) || Number.isFinite(s.at));
+function normalizeClose(value) {
+  if (!validClose(value)) return null;
+  const at = Number(value.at);
+  const closedAt = Number(value.closedAt);
+  const time = Number.isFinite(closedAt) && closedAt > 0 ? closedAt
+    : Number.isFinite(at) && at > 0 ? at : Date.now();
+  return {
+    id: value.id,
+    kind: value.kind,
+    from: typeof value.from === "string" ? value.from : null,
+    to: value.to,
+    at: Number.isFinite(at) && at > 0 ? at : time,
+    closedAt: time,
+  };
+}
 
 // Feature switches live in $DSH_HOME/rdsh.json. An absent id (or a missing,
 // unreadable or corrupt file) keeps the fallback; an explicit false removes the
@@ -38,7 +57,7 @@ async function readClose() {
     const file = await lstat(closePath());
     if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 4096) return null;
     const value = JSON.parse(await readFile(closePath(), "utf8"));
-    return validClose(value) ? value : null;
+    return normalizeClose(value);
   } catch { return null; }
 }
 
@@ -202,8 +221,19 @@ export function apply(ctx, config) {
     if (!ctx.webServer) return;
     if (!updateCheck) return;
     const demoState = { ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true };
+    // getState stays the applied rdsh/rustxng record used to validate a
+    // dismissal; getClientState is what the browser reads and what the stream
+    // pushes, so the dsh availability travels with the same payload.
     const getState = () => demo ? Promise.resolve(demoState) : readState();
-    const stream = notificationStream(getState);
+    const getClientState = async () => {
+      if (demo) return getState();
+      const state = await readState();
+      if (!state.ok) return state;
+      let dsh;
+      try { dsh = await readDshStatus(); } catch { dsh = null; }
+      return dsh ? { ...state, dsh } : state;
+    };
+    const stream = notificationStream(getClientState);
     const off1 = ctx.webServer.register({
       kind: "exact",
       path: "/api/rdsh-update/run",
@@ -240,13 +270,7 @@ export function apply(ctx, config) {
           return;
         }
         try {
-          let body;
-          if (demo) {
-            body = JSON.stringify({ ...demoState, dsh: await readDshStatus() });
-          } else {
-            const state = await readState();
-            body = JSON.stringify({ ...state, dsh: await readDshStatus() });
-          }
+          const body = JSON.stringify(await getClientState());
           res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-length": Buffer.byteLength(body) });
           res.end(body);
         } catch (err) {
@@ -299,17 +323,37 @@ export function apply(ctx, config) {
             chunks.push(bytes);
           }
           input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          if (!input || typeof input.to !== "string" || !input.to || input.to.length > 512 ||
-              typeof input.kind !== "string" || !input.kind || input.kind.length > 64) throw new Error("invalid target");
+          if (!validTarget(input)) throw new Error("invalid target");
         } catch (error) { return json(res, 400, { ok: false, error: "invalid-target" }); }
         try {
-          const current = await getState();
-          if (!current.updated || current.to !== input.to || current.kind !== input.kind ||
-              (input.at !== undefined && input.at !== current.at)) {
-            return json(res, 409, { ok: false, error: "update-changed" });
+          let current;
+          if (input.kind === "dsh") {
+            // A dsh notice is availability, not an applied update-state.json
+            // record. Validate against the same live target the card shows:
+            // either a newer release is advertised, or the running install is
+            // exactly that release and only a restart is missing. The release
+            // (to) is the identity; "from" is display-only, so a stale client
+            // version cannot widen what this close matches.
+            const status = await readDshStatus();
+            const pending = Boolean(status.available);
+            const installed = Boolean(status.from && status.from === status.to);
+            // Npm may have installed the release while this host still runs the
+            // old build (a restart is pending): the package on disk proves it.
+            const onDisk = status.installPrefix ? installedDshVersion(status.installPrefix) : null;
+            if (!status.to || status.to !== input.to || !(pending || installed || onDisk === status.to)) {
+              return json(res, 409, { ok: false, error: "update-changed" });
+            }
+            current = { kind: "dsh", from: null, to: status.to, at: status.at };
+          } else {
+            const state = await getState();
+            if (!state.updated || state.to !== input.to || state.kind !== input.kind ||
+                (input.from !== undefined && input.from !== null && state.from !== input.from)) {
+              return json(res, 409, { ok: false, error: "update-changed" });
+            }
+            current = { kind: state.kind, from: state.from ?? null, to: state.to, at: state.at };
           }
-          const close = { id: randomUUID(), kind: current.kind, to: current.to, at: current.at,
-            cycle: input.cycle ?? Math.max(0, Math.floor((Date.now() - current.at) / REMINDER_MS)) };
+          const close = { id: randomUUID(), kind: current.kind, from: current.from ?? null,
+            to: current.to, at: current.at, closedAt: Date.now() };
           if (!validClose(close)) return json(res, 400, { ok: false, error: "invalid-target" });
           if (!demo) await writeClose(close);
           stream.close(close);
@@ -356,23 +400,81 @@ let dshRefreshing = false;
 
 const dshCachePath = () => join(homedir(), ".cache", "rdsh-desktop", "update-check.json");
 
-function compareVersions(left, right) {
-  const split = (value) => {
-    const parts = String(value).split("-");
-    return { base: parts[0].split(".").map((part) => Number(part) || 0), pre: parts.length > 1 ? parts.slice(1).join("-") : null };
-  };
-  const a = split(left);
-  const b = split(right);
+function parseVersion(value) {
+  const match = /^([0-9]+(?:\.[0-9]+)*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(String(value));
+  if (!match) return null;
+  return { base: match[1].split(".").map((part) => Number(part)), pre: match[2] ? match[2].split(".") : [] };
+}
+
+// SemVer precedence, including numeric prerelease identifiers: 1.0.0-alpha.10
+// sorts above 1.0.0-alpha.2. Build metadata is ignored.
+export function compareVersions(left, right) {
+  const a = parseVersion(left);
+  const b = parseVersion(right);
+  if (!a || !b) return String(left) === String(right) ? 0 : String(left) < String(right) ? -1 : 1;
   const length = Math.max(a.base.length, b.base.length);
   for (let index = 0; index < length; index += 1) {
     const x = a.base[index] || 0;
     const y = b.base[index] || 0;
     if (x !== y) return x < y ? -1 : 1;
   }
-  if (a.pre === b.pre) return 0;
-  if (a.pre === null) return 1;
-  if (b.pre === null) return -1;
-  return a.pre < b.pre ? -1 : 1;
+  if (a.pre.length === 0 || b.pre.length === 0) {
+    return a.pre.length === b.pre.length ? 0 : a.pre.length === 0 ? 1 : -1;
+  }
+  const count = Math.max(a.pre.length, b.pre.length);
+  for (let index = 0; index < count; index += 1) {
+    const x = a.pre[index];
+    const y = b.pre[index];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    if (x === y) continue;
+    const numericX = /^[0-9]+$/.test(x);
+    const numericY = /^[0-9]+$/.test(y);
+    if (numericX && numericY) {
+      const difference = Number(x) - Number(y);
+      if (difference !== 0) return difference < 0 ? -1 : 1;
+      continue;
+    }
+    if (numericX !== numericY) return numericX ? -1 : 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+const isPrerelease = (value) => String(value).includes("-");
+
+// Choose a target from npm dist-tags rather than the maximum of every published
+// version. Stable users only ever see stable releases; a user already on a
+// prerelease may continue on the next channel when it is newer.
+export function selectDshTarget(tags, versions, active) {
+  const list = (Array.isArray(versions) ? versions : []).filter((item) => typeof item === "string" && VERSION_PATTERN.test(item));
+  const stable = list.filter((item) => !isPrerelease(item));
+  const newestStable = stable.length
+    ? stable.reduce((best, item) => (compareVersions(item, best) > 0 ? item : best), stable[0]) : null;
+  const latest = typeof tags?.latest === "string" && VERSION_PATTERN.test(tags.latest) ? tags.latest : newestStable;
+  const next = typeof tags?.next === "string" && VERSION_PATTERN.test(tags.next) ? tags.next : null;
+  const activeIsPrerelease = typeof active === "string" && VERSION_PATTERN.test(active) && isPrerelease(active);
+  let target = latest && !isPrerelease(latest) ? latest : newestStable;
+  let channel = target ? (isPrerelease(target) ? "prerelease" : "stable") : null;
+  if (activeIsPrerelease && next && (!target || compareVersions(next, target) > 0)) {
+    target = next;
+    channel = "next";
+  }
+  if (target && !activeIsPrerelease && isPrerelease(target)) {
+    target = newestStable;
+    channel = target ? "stable" : null;
+  }
+  return target ? { target, channel } : null;
+}
+
+async function writeDshCache(value) {
+  const path = dshCachePath();
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = path + "." + randomUUID() + ".tmp";
+  try {
+    await writeFile(temporary, JSON.stringify(value), { flag: "wx", mode: 0o600 });
+    await rename(temporary, path);
+  } finally { await unlink(temporary).catch(() => {}); }
 }
 
 async function readDshCache() {
@@ -383,26 +485,33 @@ async function readDshCache() {
     const value = JSON.parse(await readFile(path, "utf8"));
     const newest = typeof value?.newest === "string" ? value.newest : "";
     if (!VERSION_PATTERN.test(newest)) return null;
-    return { newest, checkedAt: Number(value?.checkedAt) || 0 };
+    let channel = typeof value?.channel === "string" ? value.channel : "";
+    if (!["stable", "prerelease", "next"].includes(channel)) {
+      // An old cache entry without a channel may have been produced by the
+      // max-of-every-version logic. A prerelease there is not trusted.
+      if (isPrerelease(newest)) return null;
+      channel = "stable";
+    }
+    return { newest, checkedAt: Number(value?.checkedAt) || 0, channel };
   } catch (error) {
     return null;
   }
 }
 
-function queryPublishedDsh() {
+function queryPublishedDsh(active) {
   return new Promise((resolve) => {
-    execFile("npm", ["view", "@deepseek-ai/dsh", "versions", "--json"], { timeout: DSH_QUERY_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, async (error, stdout) => {
+    execFile("npm", ["view", "@deepseek-ai/dsh", "dist-tags", "versions", "--json"], { timeout: DSH_QUERY_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, async (error, stdout) => {
       if (error) { resolve(null); return; }
       try {
         const parsed = JSON.parse(stdout);
-        const list = (Array.isArray(parsed) ? parsed : [parsed]).filter((item) => typeof item === "string" && VERSION_PATTERN.test(item));
-        if (list.length === 0) { resolve(null); return; }
-        const newest = list.reduce((best, item) => (compareVersions(item, best) > 0 ? item : best), list[0]);
+        const tags = parsed && !Array.isArray(parsed) ? (parsed["dist-tags"] ?? parsed.distTags ?? {}) : {};
+        const versions = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.versions) ? parsed.versions : [];
+        const chosen = selectDshTarget(tags, versions, active);
+        if (!chosen) { resolve(null); return; }
         try {
-          await mkdir(dirname(dshCachePath()), { recursive: true });
-          await writeFile(dshCachePath(), JSON.stringify({ checkedAt: Date.now(), newest }));
+          await writeDshCache({ checkedAt: Date.now(), newest: chosen.target, channel: chosen.channel });
         } catch (writeError) {}
-        resolve(newest);
+        resolve(chosen);
       } catch (parseError) {
         resolve(null);
       }
@@ -410,16 +519,12 @@ function queryPublishedDsh() {
   });
 }
 
-// Returns { version, prefix } for the dsh install that is actually running.
-// The prefix matters because npm's global prefix here is /usr/local (root),
-// while this harness lives in a user-owned directory.
-function activeDshInstall() {
-  if (typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)) {
-    return process.env.DSH_VERSION;
-  }
-  // The plugin is loaded by the dsh host, so the host entry script sits inside
-  // the installed package. Walk up from it instead of resolving the dependency
-  // from this plugin's own directory, which has no dsh in its node_modules.
+// Returns { version, prefix, managed, packageDir } for the dsh install that is
+// actually running. The prefix matters because npm's global prefix is often
+// /usr/local (root), while this harness lives in a user-owned directory. The
+// package lives at <prefix>/node_modules/@scope/pkg in the installer layout and
+// at <prefix>/lib/node_modules/@scope/pkg in the npm-global layout.
+function findDshPackage() {
   const candidates = [];
   try {
     if (process.argv[1]) candidates.push(realpathSync(process.argv[1]));
@@ -430,13 +535,11 @@ function activeDshInstall() {
   } catch (error) {}
   for (const candidate of candidates) {
     let directory = dirname(candidate);
-    for (let depth = 0; depth < 8; depth += 1) {
+    for (let depth = 0; depth < 10; depth += 1) {
       try {
         const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
         if (value.name === "@deepseek-ai/dsh" && typeof value.version === "string" && VERSION_PATTERN.test(value.version)) {
-          const prefix = dirname(dirname(dirname(dirname(directory))));
-          const installable = existsSync(join(prefix, "lib", "node_modules"));
-          return { version: value.version, prefix: installable ? prefix : null };
+          return { version: value.version, packageDir: directory };
         }
       } catch (error) {}
       const parent = dirname(directory);
@@ -444,57 +547,123 @@ function activeDshInstall() {
       directory = parent;
     }
   }
-  return { version: "", prefix: null };
+  return null;
 }
 
-async function readDshStatus() {
+// Map a package directory to the npm prefix that owns it. Supports scoped and
+// unscoped packages under both <prefix>/node_modules and
+// <prefix>/lib/node_modules.
+export function installPrefixFor(packageDir) {
+  let directory = dirname(packageDir);
+  if (basename(directory).startsWith("@")) directory = dirname(directory);
+  if (basename(directory) !== "node_modules") return null;
+  const parent = dirname(directory);
+  return basename(parent) === "lib" ? dirname(parent) : parent;
+}
+
+export function activeDshInstall() {
+  const found = findDshPackage();
+  const environmentVersion = typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)
+    ? process.env.DSH_VERSION : "";
+  return {
+    version: environmentVersion || found?.version || "",
+    prefix: found ? installPrefixFor(found.packageDir) : null,
+    managed: found !== null,
+    environmentVersion: Boolean(environmentVersion),
+    packageDir: found?.packageDir || null,
+  };
+}
+
+// Re-read on every call: the cache file and the installed package can change
+// under a running GUI, and a memoized status would keep offering a stale target.
+export async function readDshStatus() {
+  const install = activeDshInstall();
   const cache = await readDshCache();
-  const stale = !cache || Date.now() - cache.checkedAt > DSH_REFRESH_MS;
+  const stale = !cache || !cache.checkedAt || Date.now() - cache.checkedAt > DSH_REFRESH_MS;
   if (stale && process.env.RDSH_DESKTOP_UPDATE_CHECK !== "0" && !dshRefreshing) {
     dshRefreshing = true;
-    queryPublishedDsh().catch(() => {}).finally(() => { dshRefreshing = false; });
+    queryPublishedDsh(install.version).catch(() => {}).finally(() => { dshRefreshing = false; });
   }
   const newest = cache ? cache.newest : "";
-  const install = activeDshInstall();
   const active = install.version;
   return {
     available: Boolean(newest && active && compareVersions(newest, active) > 0),
     from: active || null,
     to: newest || null,
-    at: (cache && cache.checkedAt) || Date.now(),
-    command: newest ? dshInstallCommand(install.prefix, newest) : null,
+    at: cache?.checkedAt || null,
+    checkedAt: cache?.checkedAt || null,
+    channel: cache?.channel || (newest ? (isPrerelease(newest) ? "prerelease" : "stable") : null),
+    command: newest ? dshInstallCommand(install, newest) : null,
     details: newest ? "https://www.npmjs.com/package/@deepseek-ai/dsh/v/" + newest : null,
     installPrefix: install.prefix,
+    managed: install.managed,
   };
 }
 
-function dshInstallCommand(prefix, version) {
+function dshInstallCommand(install, version) {
   const target = "@deepseek-ai/dsh@" + version;
-  return prefix ? "npm install --prefix " + prefix + " " + target : "npm install -g " + target;
+  if (install.prefix) return "npm install --prefix " + install.prefix + " " + target;
+  if (install.managed || install.environmentVersion) return null;
+  return "npm install -g " + target;
 }
 
-function runDshUpdate(version) {
-  if (!VERSION_PATTERN.test(version)) return Promise.resolve({ ok: false, message: "invalid version" });
-  const install = activeDshInstall();
-  if (install.prefix && !isWritable(install.prefix)) {
-    return Promise.resolve({
-      ok: false,
-      message: "the install directory is not writable; run: " + dshInstallCommand(install.prefix, version),
-    });
-  }
-  const args = install.prefix
-    ? ["install", "--prefix", install.prefix, "@deepseek-ai/dsh@" + version]
-    : ["install", "-g", "@deepseek-ai/dsh@" + version];
+function execNpm(args, timeout = RUN_TIMEOUT_MS) {
   return new Promise((resolve) => {
-    execFile("npm", args, { timeout: RUN_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile("npm", args, { timeout, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const tail = String(stderr || stdout || "").trim().split("\n").slice(-3).join(" ");
-      if (error) {
-        resolve({ ok: false, message: tail || String(error.message || "npm failed") });
-        return;
-      }
-      resolve({ ok: true, message: "installed dsh " + version + " into " + (install.prefix || "the global prefix") + " (restart the web service to use it)" });
+      resolve({ ok: !error, stdout: String(stdout || ""), stderr: String(stderr || ""), message: tail });
     });
   });
+}
+
+function installedDshVersion(root) {
+  if (!root) return null;
+  try {
+    const value = JSON.parse(readFileSync(join(root, "node_modules", "@deepseek-ai", "dsh", "package.json"), "utf8"));
+    return typeof value?.version === "string" && VERSION_PATTERN.test(value.version) ? value.version : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function runDshUpdate(version) {
+  if (!VERSION_PATTERN.test(version)) return { ok: false, message: "invalid version" };
+  const install = activeDshInstall();
+  let root;
+  let args;
+  if (install.managed) {
+    if (!install.prefix) {
+      return { ok: false, message: "could not determine the running dsh install prefix; update it with your installer and restart the DSH web service" };
+    }
+    if (!isWritable(install.prefix)) {
+      return { ok: false, message: "the install directory is not writable; run: " + dshInstallCommand(install, version) };
+    }
+    root = install.prefix;
+    args = ["install", "--prefix", root, "@deepseek-ai/dsh@" + version];
+  } else if (install.environmentVersion) {
+    // The host knows its version but not where the package lives. Falling back
+    // to "npm install -g" here would update a different install than the one
+    // the running web service uses.
+    return { ok: false, message: "could not locate the running dsh installation; update it with your installer and restart the DSH web service" };
+  } else {
+    const prefix = await execNpm(["root", "-g"], 30 * 1000);
+    if (!prefix.ok || !prefix.stdout.trim()) return { ok: false, message: prefix.message || "could not resolve the global npm prefix" };
+    root = prefix.stdout.trim();
+    args = ["install", "-g", "@deepseek-ai/dsh@" + version];
+  }
+  const result = await execNpm(args);
+  if (!result.ok) return { ok: false, message: result.message || "npm failed" };
+  const installed = installedDshVersion(root);
+  if (installed !== version) {
+    return { ok: false, message: "npm finished but the installed dsh is " + (installed || "unknown") + "; expected " + version };
+  }
+  return {
+    ok: true,
+    restartRequired: true,
+    version,
+    prefix: root,
+    message: "installed dsh " + version + " into " + root + "; restart the DSH web service to use it",
+  };
 }
 
 function isWritable(directory) {
@@ -515,20 +684,27 @@ async function readState() {
     const s = JSON.parse(raw);
     if (!s?.updated) return { ok: true, updated: false };
     const kind = typeof s.kind === "string" && s.kind ? s.kind : "update";
-    if (!validTarget({ kind, to: s.to })) return { ok: false };
+    const from = typeof s.from === "string" && s.from.length > 0 ? s.from.slice(0, 512) : null;
+    if (!validTarget({ kind, to: s.to, from })) return { ok: false };
+    // A record whose from and to are the same version would render "v1 to v1".
+    if (from !== null && from === s.to) return { ok: true, updated: false, suppressed: "same-version" };
     const timestamp = Number(s.at);
     const at = Number.isFinite(timestamp) && timestamp > 0 && timestamp <= file.mtimeMs + 60000
       ? timestamp : Math.floor(file.mtimeMs);
-    return { ok: true, updated: true, kind, from: typeof s.from === "string" ? s.from.slice(0, 512) : null, to: s.to, at };
+    // An applied update is only a confirmation; old state must not resurrect it.
+    if (Date.now() - at > APPLIED_STATE_TTL_MS) return { ok: true, updated: false, suppressed: "stale" };
+    // A rustxng record is meaningless when the managed sidecar binary is gone.
+    if (kind === "rustxng" && !findRdshBinary()) return { ok: true, updated: false, suppressed: "rustxng-binary-missing" };
+    return { ok: true, updated: true, kind, from, to: s.to, at };
   } catch (e) {
     return e.code === "ENOENT" ? { ok: true, updated: false } : { ok: false };
   }
 }
 
 // ---- rustxng sidecar update ----------------------------------------------
-// rdsh writes a banner record into update-state.json whenever its sidecar
-// update check/apply succeeds; the runner below is that record's action
-// button: one accounted-for rdsh rustxng update execution.
+// rdsh writes an applied record into update-state.json whenever its sidecar
+// update check/apply succeeds. The runner below remains an authenticated,
+// accounted-for "run it again" action for callers that still need it.
 
 function findRdshBinary(env) {
   const platform = process.platform;
