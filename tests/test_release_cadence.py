@@ -79,9 +79,13 @@ class CadenceTests(unittest.TestCase):
     def init_git_tag(self, tag="v1.2.3"):
         subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
         subprocess.run(["git", "add", "-A"], cwd=self.root, check=True)
+        # Do not inherit a developer's global commit/tag signing or editor
+        # configuration: an annotated tag would try to open an editor and fail
+        # in a headless test process.
         subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=test@example.com",
-                        "commit", "-qm", "init"], cwd=self.root, check=True)
-        subprocess.run(["git", "tag", tag], cwd=self.root, check=True)
+                        "-c", "commit.gpgSign=false", "commit", "-qm", "init"], cwd=self.root, check=True)
+        subprocess.run(["git", "-c", "tag.gpgSign=false", "-c", "core.editor=true",
+                        "tag", tag], cwd=self.root, check=True)
 
     def test_stable_tags_are_compared_numerically(self):
         tags = ["v0.6.0", "v0.9.0", "v0.10.0", "v0.10.0-rc.1", "v0.2.0", "junk"]
