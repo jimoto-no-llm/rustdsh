@@ -76,9 +76,14 @@ other managed worktree holds and records it in that worktree's admin dir, so
 `list`, `status` and `port <slug>` report the port that is really in use.
 Selection and recording share an atomic directory lock, so simultaneous `new`
 commands cannot reserve the same port. A busy lock is retried for a bounded
-period and then fails without reporting a port. If a process is forcibly killed
-and leaves `.rdsh-port-allocation.lock`, confirm no `new` is running before
-removing that empty lock directory and retrying with a new slug.
+period and then fails without reporting a port. Both this lock and the mirror
+lock are directories whose `owner` file records `<pid>:<nonce>` for the process
+that acquired them. A process removes the directory only while that token is
+still its own, and releasing a lock that is already gone succeeds, so a clean-up
+race cannot fail an otherwise finished `new`. A lock whose recorded pid no
+longer runs is reclaimed by the next command instead of blocking it; takeover is
+serialized too, so two waiters cannot delete each other's fresh lock. A lock
+held by a live process is waited for, never stolen.
 `port <slug>` for a worktree that does not exist yet prints the unshifted hash
 position; it is the same value once the worktree is created unless it collides.
 
@@ -119,6 +124,14 @@ The command refuses a slug that already has a worktree or a local branch. The
 default base ref follows `RDSH_PARALLEL_REMOTE`, so `RDSH_PARALLEL_REMOTE=upstream`
 bases the worktree on `upstream/main`; use `RDSH_PARALLEL_BASE_REF=origin/release`
 to base it on something else.
+
+Creating a worktree is one critical section under the shared mirror lock:
+`git worktree add`, the first `read-tree` of the new checkout, and writing the
+object-store alternates file all run inside it. `git worktree add` writes the
+mirror's worktree administration and `read-tree` reads it back through the
+shared object database, so another `new` interleaving between them can fail the
+checkout with `error: cannot check out <sha>`. The mirror lock is never held
+while the port lock is taken, so the two locks cannot deadlock.
 
 ### `list`
 
