@@ -2069,19 +2069,6 @@ fn setup_json_never_writes_detected_routes() {
 }
 
 #[test]
-fn setup_registers_a_detected_route_without_being_asked() {
-    let f = Fixture::new();
-    f.set_patch(PATCH);
-    // --open も --login も既定では無効なので、素の setup は案内だけを出す。
-    let out = f.run_with(&["setup"], &[("HAI_API_KEY", "sk-test")], b"");
-    ok(&out);
-    let body = text(&out);
-    assert!(body.contains("hai"), "{body}");
-    assert!(f.patch().contains("hai:"), "{}", f.patch());
-    assert!(f.patch().contains("https://hai-api.hcloud.ltd/v1"));
-}
-
-#[test]
 fn setup_no_auto_import_leaves_the_patch_untouched() {
     let f = Fixture::new();
     f.set_patch(PATCH);
@@ -2092,6 +2079,7 @@ fn setup_no_auto_import_leaves_the_patch_untouched() {
         b"",
     );
     ok(&out);
+    assert!(text(&out).contains("hai"), "{}", text(&out));
     assert_eq!(f.patch(), before);
 }
 

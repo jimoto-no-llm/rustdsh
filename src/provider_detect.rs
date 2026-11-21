@@ -638,7 +638,20 @@ pub(crate) fn auto_import(
     configured_default_profile: &str,
     locale: Locale,
 ) -> Vec<String> {
-    let detected = detect(&Scan::real());
+    auto_import_detected(
+        &detect(&Scan::real()),
+        profile,
+        configured_default_profile,
+        locale,
+    )
+}
+
+fn auto_import_detected(
+    detected: &Detected,
+    profile: &str,
+    configured_default_profile: &str,
+    locale: Locale,
+) -> Vec<String> {
     if detected.candidates.is_empty() {
         return Vec::new();
     }
@@ -815,6 +828,26 @@ mod tests {
         std::fs::write(path, body).expect("write");
     }
 
+    struct EnvVarGuard(&'static str, Option<std::ffi::OsString>);
+
+    impl EnvVarGuard {
+        fn set(name: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let previous = std::env::var_os(name);
+            std::env::set_var(name, value);
+            Self(name, previous)
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(value) = self.1.take() {
+                std::env::set_var(self.0, value);
+            } else {
+                std::env::remove_var(self.0);
+            }
+        }
+    }
+
     fn with_scan<R>(
         home: &Path,
         env: &HashMap<String, String>,
@@ -914,6 +947,41 @@ mod tests {
             hai.base_url.as_deref(),
             Some("https://hai-api.hcloud.ltd/v1")
         );
+    }
+
+    #[test]
+    fn auto_import_writes_a_detected_route_from_fixture_models() {
+        let _env_lock = crate::test_support::env_lock();
+        let home = temp_home("auto-import");
+        let _home = EnvVarGuard::set("DSH_HOME", home.as_os_str());
+        let _key = EnvVarGuard::set("HAI_API_KEY", "sk-test");
+        let profile_dir = home.join("profiles/tui");
+        let patch_path = profile_dir.join("cordis.patch.yml");
+        write(
+            &patch_path,
+            "- id: llm-pi-ai\n  config:\n    providers:\n      other:\n        apiKeyEnv: OTHER_API_KEY\n        models:\n          - id: x\n- id: agent-default-model\n  config:\n    provider: other\n    model: x\n",
+        );
+        let detected = Detected {
+            candidates: vec![Candidate {
+                preset: "hai".into(),
+                route_id: None,
+                label: "HAI".into(),
+                base_url: Some("https://hai-api.hcloud.ltd/v1".into()),
+                key_state: KeyState::Env,
+                // Supply discovery's result directly; the HAI endpoint stays untouched.
+                models: vec!["fixture-model".into()],
+                source: "env:HAI_API_KEY".into(),
+                note: None,
+            }],
+            ..Detected::default()
+        };
+
+        let added = auto_import_detected(&detected, "tui", "tui", Locale::English);
+
+        assert_eq!(added, vec!["hai".to_string()]);
+        let patch = std::fs::read_to_string(patch_path).expect("updated profile patch");
+        assert!(patch.contains("hai:"), "{patch}");
+        assert!(patch.contains("fixture-model"), "{patch}");
     }
 
     #[test]
