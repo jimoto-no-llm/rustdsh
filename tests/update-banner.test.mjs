@@ -589,6 +589,9 @@ test('a successful retry after a failed check reports up to date briefly, then h
 });
 
 test('a managed dsh install uses the running prefix, verifies package.json and requires a restart', async (t) => {
+  // The npm stub below is a POSIX shell script; the prefix logic itself is
+  // platform-independent and is covered on Linux/macOS.
+  if (process.platform === 'win32') return t.skip('POSIX shell npm stub');
   const fixture = await serverFixture(t);
   const prefix = path.join(fixture.root, 'runtime');
   const pkg = path.join(prefix, 'node_modules', '@deepseek-ai', 'dsh');
