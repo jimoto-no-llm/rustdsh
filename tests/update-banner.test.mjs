@@ -395,6 +395,13 @@ test('server suppresses same-version, stale and orphaned rustxng records', async
   assert.equal((await fixture.get()).data.updated, false);
   await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: now - 60000 });
   assert.equal((await fixture.get()).data.updated, true);
+  // sync-dsh.sh records a rebuilt payload with the same version label as a
+  // replacement (no 'from'): that is a real update and must still render.
+  await fixture.setState({ updated: true, kind: 'rdsh-release', to: 'v-2', at: now, replaced: true });
+  const replaced = (await fixture.get()).data;
+  assert.equal(replaced.updated, true);
+  assert.equal(replaced.from, null);
+  assert.equal(replaced.to, 'v-2');
   await fixture.setState({ updated: true, kind: 'rustxng', from: '1.0.0', to: '1.1.0', at: now });
   const emptyPath = path.join(fixture.root, 'empty', 'bin');
   await mkdir(emptyPath, { recursive: true });
