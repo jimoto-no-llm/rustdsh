@@ -71,17 +71,20 @@ adapter; 0.2.0/0.2.1 keep the single legacy `maxParallelSubCalls` anchor.
 
 Before this change, `security/preload.mjs` had no 0.2.2-rc.* adapter entry, so
 a protected run on rc.1-rc.5 exited with `RDSH_SECURITY[UNKNOWN_ADAPTER]`
-even though `src/tool_security.rs` already pinned rc.1-rc.3. The preload also
-carried a stray `dsh-tools-0.2.1-rc.5` constructor entry that matched no
-audited adapter.
+even though `src/tool_security.rs` already pinned rc.1-rc.3.
 
 After the change:
 
 - `security/preload.mjs` registers the rc.1..rc.5 adapters and their
-  constructors, and the stray 0.2.1-rc.5 entry is gone.
+  constructors. It also keeps the `dsh-tools-0.2.1-rc.5` entry that the
+  launcher does not audit: `plugins/rdsh-mcp-exposure` pins that release in
+  its devDependencies and runs this preload under it, and the release's entry
+  file is byte-identical to the audited 0.2.1-rc.3/rc.4. The launcher still
+  refuses the pair because it has no `AUDITED_ADAPTERS` row.
 - A Rust test (`preload_covers_every_audited_adapter`) reads the embedded
   preload and fails when an `AUDITED_ADAPTERS` id has no matching adapter
-  entry, when the preload lists an unaudited id, or when a legacy adapter
+  entry, when the preload lists an id that is neither audited nor named in the
+  explicit `PRELOAD_ONLY_ADAPTERS` list, or when an audited legacy adapter
   gains a per-adapter constructor key.
 - With `RDSH_AUDITED_RUNTIME_RC5_022`, `tests/dsh-rc5.test.mjs` constructs
   the Cordis tool service through the preload, executes the fixed
@@ -94,8 +97,14 @@ After the change:
 - `cargo clippy --all-targets -- -D warnings`: clean.
 - `cargo test --bin rdsh tool_security`: 10 passed.
 - `node --test tests/dsh-rc5.test.mjs tests/security-boundaries.test.mjs` with
-  `RDSH_AUDITED_RUNTIME_RC5_022` set: 17 passed, 7 skipped (the skipped ones
-  need runtimes that are not installed here).
+  `RDSH_AUDITED_RUNTIME_RC4_022` and `RDSH_AUDITED_RUNTIME_RC5_022` set to the
+  published runtimes: 19 passed, 5 skipped (the skipped ones need the other
+  runtimes). The resolved entry digests matched the pinned `bf71a6ce…` for
+  both releases.
+- `npm test --prefix plugins/rdsh-mcp-exposure` with the installed
+  `dsh-tools@0.2.1-rc.5` devDependency: 22 passed. Its guarded test runs the
+  preload under `dsh-tools-0.2.1-rc.5`, which is the real consumer of the
+  preload-only entry.
 - `node --test plugins/rdsh-subagent-optimizer/test/runtime.test.mjs` against
   the rc.5 public APIs: 1 passed.
 - `node --test plugins/rdsh-compaction/test/*.test.mjs` against the rc.5

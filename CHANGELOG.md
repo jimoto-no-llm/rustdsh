@@ -18,8 +18,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 - 保護付き委譲のプリロードが `0.2.2-rc.1`〜`rc.3` のアダプターを持たず、
   `RDSH_SECURITY[UNKNOWN_ADAPTER]` で拒否していた不一致を修正しました。
-  `0.2.2-rc.*` のアダプターとコンストラクターを登録し、監査対象にない
-  `dsh-tools-0.2.1-rc.5` の残骸を削除しました。監査済みアダプターと
+  `0.2.2-rc.*` のアダプターとコンストラクターを登録し、`dsh-tools-0.2.1-rc.5`
+  は `plugins/rdsh-mcp-exposure` の開発依存が固定する版としてプリロード専用に
+  維持しています（起動側の監査表には追加していません）。監査済みアダプターと
   プリロードの対応がずれたら失敗するテストを追加しています。
 
 - `0.2.2-rc.5` で実際に読み込みと契約テストを確認した `rdsh-llm-native`、

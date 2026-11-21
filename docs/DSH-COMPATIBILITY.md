@@ -19,6 +19,9 @@ DSH 0.2.2-alpha.3の保護付き委譲は [PR #1054](https://github.com/jimoto-n
 他の機能の対応範囲も、そのPRだけでは広がりません。
 `rdsh-llm-native`、`rdsh-compaction`、`rdsh-subagent-optimizer` のpeer範囲には、実際に読み込みと契約テストを確認した `0.2.2-rc.5` だけを加えました。
 `rdsh-mcp-exposure` など、確認できていないプラグインの範囲は広げていません。
+プリロードは、`rdsh-mcp-exposure` の開発依存が固定する `0.2.1-rc.5` の入口
+（監査済みの `0.2.1-rc.3`/`rc.4` と同一バイト列）も受け付けますが、
+起動側の監査表には追加していません。
 
 ## 導入・更新時の確認
 

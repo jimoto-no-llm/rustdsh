@@ -539,6 +539,14 @@ mod tests {
             .0
     }
 
+    /// Preload entries the launcher never selects. `plugins/rdsh-mcp-exposure`
+    /// pins the upstream runtime in its devDependencies and runs this preload
+    /// under that exact release, so the preload has to recognise it even though
+    /// the audit table does not. `dsh-tools-0.2.1-rc.5` ships the same entry
+    /// file as the audited 0.2.1-rc.3/rc.4 (`1e53932e…`); dropping the entry
+    /// failed that bundle's guarded test with `RDSH_SECURITY[UNKNOWN_ADAPTER]`.
+    const PRELOAD_ONLY_ADAPTERS: [&str; 1] = ["dsh-tools-0.2.1-rc.5"];
+
     #[test]
     fn preload_covers_every_audited_adapter() {
         let ids = AUDITED_ADAPTERS.map(|adapter| adapter.id);
@@ -551,8 +559,14 @@ mod tests {
         }
         for adapter in &adapters {
             assert!(
-                ids.contains(adapter),
+                ids.contains(adapter) || PRELOAD_ONLY_ADAPTERS.contains(adapter),
                 "security/preload.mjs adapters has an unaudited entry {adapter}"
+            );
+        }
+        for adapter in PRELOAD_ONLY_ADAPTERS {
+            assert!(
+                adapters.contains(&adapter),
+                "security/preload.mjs adapters is missing the preload-only {adapter}"
             );
         }
 
@@ -567,8 +581,8 @@ mod tests {
                     adapter.id
                 );
             } else {
-                // The legacy line shares one anchor; a per-adapter key would
-                // silently override it (the stray 0.2.1-rc.5 entry did).
+                // The legacy line shares one anchor; a per-adapter key for an
+                // audited legacy adapter would silently override it.
                 assert!(
                     !listed,
                     "security/preload.mjs constructors pins the legacy adapter {}",
@@ -578,7 +592,7 @@ mod tests {
         }
         for constructor in &constructors {
             assert!(
-                ids.contains(constructor),
+                ids.contains(constructor) || PRELOAD_ONLY_ADAPTERS.contains(constructor),
                 "security/preload.mjs constructors has an unaudited entry {constructor}"
             );
         }
