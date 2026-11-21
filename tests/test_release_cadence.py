@@ -128,6 +128,21 @@ class CadenceTests(unittest.TestCase):
         self.assertEqual(cadence.bump_decision(False, ["breaking"], major=0)[0], "minor")
         self.assertEqual(cadence.bump_decision(False, ["breaking"], major=1)[0], "major")
 
+    def test_changelog_entries_keep_wrapped_continuation_lines(self):
+        body = (
+            "### Added" + chr(10) + chr(10)
+            + "- A first bullet whose prose" + chr(10)
+            + "  continues on the next line." + chr(10)
+            + "- A second bullet." + chr(10)
+            + chr(10)
+            + "### Fixed" + chr(10) + chr(10)
+            + "- A fixed bullet." + chr(10))
+        self.assertEqual(
+            cadence.changelog_entries(body),
+            ["A first bullet whose prose continues on the next line.",
+             "A second bullet.",
+             "A fixed bullet."])
+
     def test_promote_bumps_every_metadata_file_to_the_minor(self):
         notes = cadence.promote(self.root, "v1.3.0", day="2026-10-17")
         self.assertEqual(notes.name, "v1.3.0.md")
