@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
@@ -69,7 +69,29 @@ impl Fixture {
         ));
         fs::create_dir_all(root.join("dsh/profiles/tui")).unwrap();
         fs::create_dir_all(root.join("home")).unwrap();
+        let stub = root.join("bin");
+        fs::create_dir_all(&stub).unwrap();
+        Self::write_curl_stub(&stub);
         Self(root)
+    }
+
+    fn stub_dir(&self) -> PathBuf {
+        self.0.join("bin")
+    }
+
+    /// Answer `GET {base}/models` like a compatible endpoint so `--discover`
+    /// never reaches the network. Every other curl call fails closed.
+    fn write_curl_stub(dir: &Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let source = include_str!("fixtures/curl-models-stub.sh");
+            let script = dir.join("curl");
+            fs::write(&script, source).unwrap();
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        #[cfg(windows)]
+        let _ = dir;
     }
 
     fn patch_path(&self) -> PathBuf {
@@ -96,6 +118,19 @@ impl Fixture {
                 cmd.env(key, v);
             }
         }
+        // Model discovery shells out to curl against a hosted endpoint. These
+        // tests must not depend on a third-party API (it is rate limited and
+        // answers 403 to a dummy key), so a fixture curl answers from a stub.
+        let path = std::env::var_os("PATH")
+            .map(|value| value.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        // The stub directory must come first, and PATH entries are separated
+        // by the platform separator (':' on Unix, ';' on Windows).
+        let separator = if cfg!(windows) { ';' } else { ':' };
+        cmd.env(
+            "PATH",
+            format!("{}{}{}", self.stub_dir().display(), separator, path),
+        );
         cmd.args(args)
             .current_dir(&self.0)
             .env("HOME", self.0.join("home"))
