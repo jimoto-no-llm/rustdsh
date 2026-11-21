@@ -106,10 +106,12 @@ cargo install rdsh
 archives. Debian/Ubuntu and Fedora/RHEL users can also install the release
 [`.deb`/`.rpm`](#native-packages-deb--rpm) with `apt`/`dnf`.
 
-The released v0.15.0 installers do not prepare Node.js or pnpm. Conversations
-through the bundled DSH adapter also need an existing DSH runtime: the Unix
-installer prints guidance, while the Windows installer can offer a global npm
-install at an interactive console when npm is already available. Check the
+Current installers provision a user-local Node.js, pnpm and DSH runtime when
+they are missing (no sudo and no global npm install; pass `--no-runtime` on
+Unix or `-NoRuntime` on Windows to keep an existing environment). The bundled
+DSH adapter still requires a DSH runtime for conversations; a Windows installer
+at an interactive console can offer a global npm install when npm is already
+available. Check the
 [feature-specific compatibility and upstream dependency audit](docs/DSH-COMPATIBILITY.md)
 before choosing a version or accepting an unpinned `latest` installation.
 

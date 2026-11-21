@@ -68,14 +68,14 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 & $f -FromRelease
 ```
 
-公開版 v0.15.0 のインストーラは `rdsh` 本体を `~/.local/bin`（Windows は
+現在のインストーラは `rdsh` 本体を `~/.local/bin`（Windows は
 `%LOCALAPPDATA%\rdsh\bin`）へ入れ、照合表に登録された同梱プラグインの導入を試みます。
-**Node.js・npm・pnpmをまとめて用意する処理はありません。** Unix版はDSHの導入も案内のみです。
-Windows版は、対話端末・CI外・`-NoSetup`なしで、npmがありDSHがない場合に、確認後 `npm install -g @deepseek-ai/dsh` を実行します。
-npmがない環境や非対話実行では、そのDSH導入も行いません。
-Windowsのこの確認はnpmのlatestを導入します。[現在の上流依存の監査結果](DSH-COMPATIBILITY.md#上流依存の監査)を確認し、
-導入する版・依存構成の確認が済むまでは `n` で見送ってください。不足している場合は
-[README の手順 A](../README.ja.md#手順-a-本家-dsh-の導入未導入の方)に従って別途用意してください。
+**不足する Node.js・pnpm・DSH は、利用者専用の場所へ自動導入します**（sudo・グローバル npm
+インストールは不要）。Unix では `--no-runtime`、Windows では `-NoRuntime` を付けると
+`rdsh` 本体だけを入れ、既存の環境をそのまま使います。
+Windows の対話インストーラは、npm があり DSH が見つからない場合に確認のうえ導入します。
+npm がない環境や非対話実行では DSH の導入を行いません。その場合は
+[README の手順 A](../README.ja.md#手順-a-本家-dsh-の導入未導入の方)に従って用意してください。
 DSH の版は [機能別の対応範囲](DSH-COMPATIBILITY.md)で選びます。
 
 - `rdsh` 本体を `~/.local/bin`（Windows は `%LOCALAPPDATA%\rdsh\bin`）へ入れる
