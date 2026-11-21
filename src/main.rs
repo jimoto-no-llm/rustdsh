@@ -2135,19 +2135,29 @@ fn main() {
                         && !explicit_profile
                         && !local_tui_profile()
                     {
-                        announce_builtin_tui(locale);
-                        native_harness::cmd_native_tui(
-                            "dsh".to_string(),
-                            std::env::current_dir()
-                                .unwrap_or_else(|_| std::path::PathBuf::from(".")),
-                            None,
-                            Some("web".to_string()),
-                            None,
-                            None,
-                            None,
-                            None,
-                            locale,
-                        )
+                        if dry {
+                            // --dry-run reports what would happen instead of
+                            // starting the terminal program, so it must not
+                            // stop at the built-in TUI's tty guard.
+                            println!(
+                                "[rdsh dry-run] native-tui --backend dsh --dsh-profile web (no local 'tui' profile: the built-in Rust TUI would start)"
+                            );
+                            Ok(())
+                        } else {
+                            announce_builtin_tui(locale);
+                            native_harness::cmd_native_tui(
+                                "dsh".to_string(),
+                                std::env::current_dir()
+                                    .unwrap_or_else(|_| std::path::PathBuf::from(".")),
+                                None,
+                                Some("web".to_string()),
+                                None,
+                                None,
+                                None,
+                                None,
+                                locale,
+                            )
+                        }
                     } else {
                         let mut all = cli.patch;
                         all.extend(patches);

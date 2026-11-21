@@ -91,3 +91,21 @@ fn an_explicit_profile_flag_never_falls_back() {
         "an explicit --profile tui must not be replaced: {stderr}"
     );
 }
+
+#[test]
+fn a_dry_run_without_a_local_profile_reports_the_builtin_tui() {
+    let fixture = Fixture::new("dry", false);
+    let output = fixture.run(&["--dry-run", "tui"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // --dry-run reports the planned command; it must not stop at the built-in
+    // TUI's terminal guard.
+    assert!(
+        stdout.contains("[rdsh dry-run] native-tui"),
+        "expected the planned built-in TUI command, got stdout: {stdout} stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains("requires an interactive terminal"),
+        "--dry-run must not reach the tty guard: {stderr}"
+    );
+}
