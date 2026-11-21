@@ -16,6 +16,10 @@ BIN="${BIN:-$PWD/target/release/rdsh}"
 # only via DSH_ORIG_BIN / RDSH_ORIG_BIN / PATH. Tests that need fixtures override
 # HOME/DSH_HOME explicitly. rdsh's auth autosync is off for the same reason.
 export RDSH_AUTH_AUTOSYNC=0
+# These checks assert rdsh-owned English diagnostics. Pin the language so a
+# Japanese/Chinese developer shell does not fail them; individual checks that
+# exercise localization still pass RDSH_LANG explicitly.
+RDSH_LANG="${RDSH_LANG:-en}"; export RDSH_LANG
 unset RDSH_DEFAULT_PROFILE
 RG_TMP="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-regress)" || exit 1
 trap 'rm -rf "$RG_TMP"' EXIT
