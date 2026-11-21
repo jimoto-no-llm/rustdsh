@@ -1,0 +1,32 @@
+{
+  "name": "rdsh-devin-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Approval-gated Devin CLI delegation for rustdsh DSH profiles, without model SDK dependencies",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test index.test.mjs package.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "Devin CLI",
+    "description": "承認後、現在のワークスペース内でDevin CLIへタスクを委譲します。"
+  }
+}

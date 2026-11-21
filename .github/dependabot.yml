@@ -1,6 +1,14 @@
 version: 2
 updates:
   - package-ecosystem: npm
+    directories:
+      - /plugins/rdsh-model-call
+      - /plugins/rdsh-tui-admin
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
     directory: /plugins/rdsh-llm-native
     schedule:
       interval: weekly
@@ -149,4 +157,10 @@ updates:
       day: monday
     commit-message:
       prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-devin-cli
+    schedule:
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 5

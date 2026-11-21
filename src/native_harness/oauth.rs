@@ -20,12 +20,12 @@ pub(super) fn supported(provider: &str, api: &str, base: &str) -> bool {
     }
 }
 
-pub(super) async fn generate(
+pub(super) async fn generate_with_usage(
     grant: &Grant,
     provider: &str,
     model: &str,
     prompt: &str,
-) -> Result<String> {
+) -> Result<super::usage::Generation> {
     let endpoint = match provider {
         "openai-codex" => "https://chatgpt.com/backend-api/codex/responses",
         _ => bail!("NATIVE_OAUTH_PROVIDER_UNSUPPORTED"),
@@ -39,7 +39,7 @@ async fn generate_at(
     model: &str,
     prompt: &str,
     endpoint: &str,
-) -> Result<String> {
+) -> Result<super::usage::Generation> {
     if grant.expires <= now_ms().saturating_add(30_000) {
         bail!("NATIVE_OAUTH_EXPIRED");
     }
@@ -91,7 +91,7 @@ async fn generate_at(
         }
         bytes.extend_from_slice(&chunk);
     }
-    codex_text(&bytes)
+    codex_generation(&bytes)
 }
 
 fn content_text(content: &Value) -> Result<String> {
@@ -116,7 +116,11 @@ fn content_text(content: &Value) -> Result<String> {
     Ok(text)
 }
 
+#[cfg(test)]
 fn codex_text(bytes: &[u8]) -> Result<String> {
+    Ok(codex_generation(bytes)?.text)
+}
+fn codex_generation(bytes: &[u8]) -> Result<super::usage::Generation> {
     let stream =
         std::str::from_utf8(bytes).map_err(|_| anyhow::anyhow!("NATIVE_OAUTH_INVALID_RESPONSE"))?;
     let normalized = stream.replace("\r\n", "\n");
@@ -154,7 +158,10 @@ fn codex_text(bytes: &[u8]) -> Result<String> {
                 if text.is_empty() {
                     bail!("NATIVE_OAUTH_EMPTY_RESPONSE");
                 }
-                result = Some(text);
+                result = Some(super::usage::Generation {
+                    text,
+                    usage: super::usage::Usage::parse("openai-responses", &event["response"]),
+                });
             }
             Some("response.failed" | "response.incomplete" | "error") => {
                 bail!("NATIVE_OAUTH_INCOMPLETE_RESPONSE")
@@ -168,6 +175,13 @@ fn codex_text(bytes: &[u8]) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn final_sse_event_supplies_actual_usage() {
+        let event = json!({"type":"response.completed","response":{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":100,"output_tokens":9,"input_tokens_details":{"cached_tokens":70}}}});
+        let result = codex_generation(format!("data: {event}\n\n").as_bytes()).unwrap();
+        assert_eq!(result.usage.input_tokens, Some(100));
+        assert_eq!(result.usage.cache_read_tokens, Some(70));
+    }
     #[test]
     fn subscription_tokens_are_pinned_to_provider_origin_and_protocol() {
         assert!(supported(
@@ -286,7 +300,7 @@ mod tests {
             )
             .await;
             if status == 200 {
-                assert_eq!(result.unwrap(), "fixture answer");
+                assert_eq!(result.unwrap().text, "fixture answer");
             } else {
                 assert_eq!(
                     result.err().unwrap().to_string(),

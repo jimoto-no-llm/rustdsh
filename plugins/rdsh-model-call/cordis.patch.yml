@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-model-call
+      name: "rdsh-model-call"
+      config: {}

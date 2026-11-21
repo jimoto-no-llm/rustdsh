@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
+
+const source=fileURLToPath(new URL('.',import.meta.url));
+test('packed plugin loads alone without SDK or sibling package dependencies',async t=>{
+  const root=await mkdtemp(path.join(tmpdir(),'rdsh-devin-package-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const manifest=JSON.parse(await readFile(path.join(source,'package.json'),'utf8'));
+  assert.equal(manifest.name,'rdsh-devin-cli');
+  assert.deepEqual(manifest.dependencies??{},{});
+  assert.deepEqual(manifest.peerDependencies??{},{});
+  const env={...process.env,npm_config_cache:path.join(root,'npm-cache'),npm_config_offline:'true',npm_config_audit:'false',npm_config_fund:'false'};
+  const [packed]=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',root],{cwd:source,env,encoding:'utf8'}));
+  assert.ok(packed.files.some(file=>file.path==='index.mjs'));
+  assert.ok(!packed.files.some(file=>file.path.endsWith('.test.mjs')||file.path.includes('node_modules')));
+  const extracted=path.join(root,'isolated');await mkdir(extracted);
+  execFileSync('tar',['-xzf',path.join(root,packed.filename),'-C',extracted]);
+  const entry=await import(pathToFileURL(path.join(extracted,'package','index.mjs')).href);
+  assert.equal(entry.name,'rdsh-devin-cli');assert.deepEqual(entry.inject,['tools']);
+  const tools=new Map([['devin_cli',{legacy:true}]]),state={};
+  const dispose=entry.apply({on(event,policy){assert.equal(event,'tools/pre-execute');state.policy=policy;return ()=>{state.policyRemoved=true;};},tools:{register(tool){assert.ok(!tools.has(tool.name));tools.set(tool.name,tool);return ()=>tools.delete(tool.name);}}});
+  assert.ok(tools.has('devin'));assert.ok(tools.has('devin_cli'));
+  assert.equal((await state.policy({name:'devin',arguments:{prompt:'report only'},agent:{session:{header:{cwd:extracted}}}},async()=>({kind:'allow'}))).kind,'ask');
+  const patch=await readFile(path.join(extracted,'package','cordis.patch.yml'),'utf8');
+  assert.match(patch,/name: rdsh-devin-cli/);
+  dispose();assert.ok(!tools.has('devin'));assert.ok(tools.has('devin_cli'));assert.ok(state.policyRemoved);
+});

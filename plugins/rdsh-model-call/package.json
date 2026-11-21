@@ -1,0 +1,12 @@
+{
+  "name": "rdsh-model-call",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Delegate model_call through the existing DSH subagent workspace and permission runtime",
+  "exports": { ".": "./index.js" },
+  "files": ["index.js", "cordis.patch.yml", "README.md"],
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

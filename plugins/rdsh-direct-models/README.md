@@ -1,6 +1,6 @@
-# rdsh official SDK bridge
+# rdsh official SDK / Claude CLI bridge
 
-CursorとAntigravityの公式SDKをDSHのモデルプロバイダーとして利用し、会話ループ・ツール実行・承認をrdsh/DSH側で維持する、任意導入のプラグインです。Devinは承認必須の `devin_cli` ツールとして登録します。
+CursorとAntigravityの公式SDK、およびClaude Code CLIをDSHのモデルプロバイダーとして利用し、会話ループ・ツール実行・承認をrdsh/DSH側で維持する、任意導入のプラグインです。Devinは承認必須の `devin_cli` ツールとして登録します。
 
 ## 動作
 
@@ -48,6 +48,7 @@ Antigravityの確認済みの組み合わせは `provider: agy-sdk` / `model: ge
 ## 認証
 
 - Cursor: `CURSOR_API_KEY` または公式SDKが管理する `~/.cursor/sdk/auth.json` を使用します。キーの発行・保存はこのプラグインでは行いません。
+- Claude: `claude-cli` プロバイダーを選ぶと、インストール済みの `claude -p` が管理する既存ログインを利用します。DSHへ複製したOAuth値は読み取り・更新しません。`claude auth status` でログインを確認してください。
 - Antigravity: 呼出しごとにDSHの credential service から `GEMINI_API_KEY`、`GOOGLE_API_KEY` を解決し、SDK子プロセスの環境へ渡します。環境変数の同名キーや、`GOOGLE_GENAI_USE_VERTEXAI` / `GOOGLE_GENAI_USE_ENTERPRISE`、`GOOGLE_CLOUD_PROJECT`、`GOOGLE_CLOUD_LOCATION`、`GOOGLE_APPLICATION_CREDENTIALS` も使用できます。接続設定の `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（小文字名も可）、`SSL_CERT_FILE` / `SSL_CERT_DIR` も保持します。子プロセスへはこれらと必要なOS実行環境だけを渡し、他のプロバイダーのキーやコード注入用の環境設定、TLS秘密情報の記録設定は継承しません。Antigravity CLIのOAuthやサブスクリプションを引き継ぐ経路ではありません。
 - Devin: CLI自身の既存の認証とワークスペース信頼設定を使用します。追加の信頼や権限を自動で付与することはありません。
 
@@ -65,7 +66,27 @@ python3 -I -B plugins/rdsh-direct-models/agy-sdk.test.py
 node plugins/rdsh-direct-models/sdk-runtime-smoke.mjs
 ```
 
-Nodeの66件のテストとPythonの4件のテストで、JSON境界、SDK機能の無効化、タイムアウト、キャンセル、出力上限、秘密情報の隔離境界、ワークスペース制限、子プロセスの環境制限と接続設定の保持、Windowsにおける大文字・小文字にまたがるproxyの上書き、生成制御の拒否、Enterprise認証判定、強制終了後の一時領域の削除を確認します。実際のDSH ToolRuntime/Cordisを使用し、不正な引数の遮断、承認拒否、承認後のファイル読み取り、結果の履歴への反映、Devin拒否時の非起動も検証します。通常のテストでは外部APIやCLIを呼び出しません。
+NodeとPythonのテストで、JSON境界、SDK/CLI機能の無効化、タイムアウト、キャンセル、出力上限、秘密情報の隔離境界、ワークスペース制限、子プロセスの環境制限と接続設定の保持、Windowsにおける大文字・小文字にまたがるproxyの上書き、生成制御の拒否、Enterprise認証判定、強制終了後の一時領域の削除を確認します。実際のDSH ToolRuntime/Cordisを使用し、不正な引数の遮断、承認拒否、承認後のファイル読み取り、結果の履歴への反映、Devin拒否時の非起動も検証します。通常のテストでは外部APIやCLIを呼び出しません。
+
+## Claude CLI経路
+
+Anthropicの実行経路は `Claude (claude -p, DSH tools)` に統一します。Rust TUIでは
+`/model claude-cli claude-opus-5-5` を選択します。モデルIDはインストール済みの
+認証不要カタログから直接取得し、旧Anthropicプロバイダーの登録は必要ありません。
+利用可否はCLIでの実生成時に確認します。
+選択はDSH Web GUIと同様に既定モデルへ保存されます。
+
+旧OAuth経路を退役する際は、対象プロファイルの`llm-pi-ai.providers.anthropic`を
+設定APIから取り除きます。他のプロバイダーや保存済み認証値は削除しません。
+Rust TUIは旧`anthropic`を一覧へ出さず、旧コマンド指定や保存会話の選択を
+同じモデルの`claude-cli`へ読み替えます。CLIにモデルがなければエラーにします。
+
+CLIは空の一時ディレクトリで生成のみ行い、tools・MCP・hooks・設定読込・会話保存を
+無効にします。CLI側へ許可の迂回オプションを渡しません。JSONのツール提案は
+DSHが検証・承認・実行し、その結果を次の独立CLI呼出しへ渡します。
+CLIが報告する通常入力・cache read/write・出力tokenをそのまま返し、JSON修復が
+必要な場合は最大1回の追加呼出しの実測値も加算します。未報告の値は推定しません。
+CLIの診断本文には認証情報が含まれる可能性があるため、DSHへ転送しません。
 
 実Devinを検証する場合は、CLIで信頼済みの検証専用フォルダーを指定してください。通常の信頼設定を迂回することはありません。検証fixture内の承認サービスは、固定の無害な確認要求1件のみを許可し、本番の承認設定を変更しません。
 

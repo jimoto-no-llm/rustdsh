@@ -11,6 +11,7 @@
 //!   RUSTXNG_URL       use the instance already running there (never spawns)
 //!   RUSTXNG_PORT      port for the sidecar this module starts
 //!   RUSTXNG_SETTINGS  settings file passed as --config when it is a real file
+//!   RUSTXNG_PROFILE   standard|full|clean, overriding search.rustxng_profile
 //!   RUSTXNG_SKIP_INSTALL  set to 1 to stop ensure() auto-installing the sidecar
 //!   RUSTXNG_SKIP_UPDATE   set to 1 to stop the automatic update of the sidecar
 //!   RUSTXNG_UPDATE_INTERVAL_HOURS  hours between update checks (default 24)
@@ -441,7 +442,7 @@ fn spawn_detached(
 ) -> std::io::Result<std::process::Child> {
     use std::os::unix::process::CommandExt;
     let mut command = std::process::Command::new(binary);
-    build_command(&mut command, port);
+    build_command(&mut command, port)?;
     command
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::from(log.try_clone()?))
@@ -465,7 +466,7 @@ fn spawn_detached(
     log: std::fs::File,
 ) -> std::io::Result<std::process::Child> {
     let mut command = std::process::Command::new(binary);
-    build_command(&mut command, port);
+    build_command(&mut command, port)?;
     command
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::from(log.try_clone()?))
@@ -474,8 +475,19 @@ fn spawn_detached(
 }
 
 /// The documented rustxng CLI contract: --config (only a real file),
-/// --bind 127.0.0.1, --port PORT.
-fn build_command(command: &mut std::process::Command, port: u16) {
+/// --bind 127.0.0.1, --port PORT, --profile standard|full|clean.
+fn build_command(command: &mut std::process::Command, port: u16) -> std::io::Result<()> {
+    let explicit = std::env::var("RUSTXNG_PROFILE")
+        .map(Some)
+        .or_else(|error| match error {
+            std::env::VarError::NotPresent => Ok(None),
+            std::env::VarError::NotUnicode(_) => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "RUSTXNG_PROFILE must be standard, full, or clean",
+            )),
+        })?;
+    let settings = crate::rdsh_config::try_load().map_err(std::io::Error::other)?;
+    let profile = resolved_profile(explicit.as_deref(), &settings.search.rustxng_profile)?;
     if let Some(settings) = env("RUSTXNG_SETTINGS") {
         let path = PathBuf::from(settings);
         if path.is_file() {
@@ -486,7 +498,21 @@ fn build_command(command: &mut std::process::Command, port: u16) {
         .arg("--bind")
         .arg(BIND)
         .arg("--port")
-        .arg(port.to_string());
+        .arg(port.to_string())
+        .arg("--profile")
+        .arg(profile);
+    Ok(())
+}
+
+/// Explicit environment values are validated rather than silently falling back.
+/// Healthy instances are still reused by ensure(); this only affects new starts.
+fn resolved_profile(explicit: Option<&str>, configured: &str) -> std::io::Result<&'static str> {
+    crate::rdsh_config::canonical_rustxng_profile(explicit.unwrap_or(configured)).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "RUSTXNG_PROFILE must be standard, full, or clean",
+        )
+    })
 }
 
 /// Terminate the instance this module recorded: SIGTERM, a short grace period,
@@ -1704,18 +1730,32 @@ pub(crate) mod tests {
         let dir = test_dir("config");
         let config = dir.join("settings.yml");
         std::fs::write(&config, "search: {}\n").unwrap();
-        let _env = EnvGuard::apply(&[("RUSTXNG_SETTINGS", None)]);
+        let _env = EnvGuard::apply(&[
+            ("RUSTXNG_SETTINGS", None),
+            ("RUSTXNG_PROFILE", None),
+            ("DSH_HOME", Some(dir.to_string_lossy().as_ref())),
+        ]);
         let mut command = std::process::Command::new(BIN_NAME);
-        build_command(&mut command, 45123);
+        build_command(&mut command, 45123).unwrap();
         let args: Vec<String> = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
             .collect();
-        assert_eq!(args, vec!["--bind", "127.0.0.1", "--port", "45123"]);
+        assert_eq!(
+            args,
+            vec![
+                "--bind",
+                "127.0.0.1",
+                "--port",
+                "45123",
+                "--profile",
+                "standard"
+            ]
+        );
 
         std::env::set_var("RUSTXNG_SETTINGS", &config);
         let mut command = std::process::Command::new(BIN_NAME);
-        build_command(&mut command, 45124);
+        build_command(&mut command, 45124).unwrap();
         let args: Vec<String> = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
@@ -1728,8 +1768,64 @@ pub(crate) mod tests {
                 "--bind",
                 "127.0.0.1",
                 "--port",
-                "45124"
+                "45124",
+                "--profile",
+                "standard"
             ]
+        );
+    }
+
+    #[test]
+    fn profile_resolution_obeys_explicit_environment_and_rejects_invalid_values() {
+        assert_eq!(resolved_profile(None, "standard").unwrap(), "standard");
+        assert_eq!(resolved_profile(None, "full").unwrap(), "full");
+        assert_eq!(resolved_profile(Some("clean"), "full").unwrap(), "clean");
+        assert_eq!(
+            resolved_profile(Some("standard"), "full").unwrap(),
+            "standard"
+        );
+        for invalid in ["", "custom", "FULL", " full ", "full --bind 0.0.0.0"] {
+            assert_eq!(
+                resolved_profile(Some(invalid), "full").unwrap_err().kind(),
+                std::io::ErrorKind::InvalidInput
+            );
+        }
+    }
+
+    #[test]
+    fn managed_launch_passes_saved_profile_and_environment_override() {
+        let _lock = env_lock();
+        let dir = test_dir("profile");
+        std::fs::write(
+            dir.join("rdsh.json"),
+            r#"{"search":{"rustxng_profile":"full"}}"#,
+        )
+        .unwrap();
+        let _env = EnvGuard::apply(&[
+            ("DSH_HOME", Some(dir.to_string_lossy().as_ref())),
+            ("RUSTXNG_PROFILE", None),
+            ("RUSTXNG_SETTINGS", None),
+        ]);
+        let arguments = || {
+            let mut command = std::process::Command::new(BIN_NAME);
+            build_command(&mut command, 45125).map(|()| {
+                command
+                    .get_args()
+                    .map(|a| a.to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+            })
+        };
+        assert!(arguments()
+            .unwrap()
+            .ends_with(&["--profile".into(), "full".into()]));
+        std::env::set_var("RUSTXNG_PROFILE", "clean");
+        assert!(arguments()
+            .unwrap()
+            .ends_with(&["--profile".into(), "clean".into()]));
+        std::env::set_var("RUSTXNG_PROFILE", "invalid");
+        assert_eq!(
+            arguments().unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
         );
     }
 
