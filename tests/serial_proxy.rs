@@ -421,9 +421,17 @@ impl ProxyProcess {
                 }
             }
         });
-        let line = receiver
-            .recv_timeout(Duration::from_secs(10))
-            .unwrap_or_else(|error| panic!("serial-proxy did not start: {error}"));
+        // Self is built only after the ready line, so a timeout would otherwise
+        // skip Drop and leave the spawned proxy running for the rest of the
+        // session (ten leaked processes were observed behind one failing run).
+        let line = match receiver.recv_timeout(Duration::from_secs(10)) {
+            Ok(line) => line,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("serial-proxy did not start: {error}");
+            }
+        };
         let start = line.find("http://").unwrap();
         let address = line[start..].split(" -> ").next().unwrap();
         Self {
