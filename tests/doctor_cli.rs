@@ -28,6 +28,9 @@ fn run_doctor(root: &Path, cwd: &Path, path: &Path, original: &str) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_rdsh"));
     command
         .arg("doctor")
+        // The assertions below use the English diagnostics. Pin the language
+        // rather than inheriting the developer's LANG/LC_ALL.
+        .env("RDSH_LANG", "en")
         .current_dir(cwd)
         .env("HOME", &home)
         .env("USERPROFILE", &home)

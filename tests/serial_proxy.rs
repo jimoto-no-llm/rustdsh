@@ -389,7 +389,10 @@ impl ProxyProcess {
         original_dsh: Option<&Path>,
     ) -> Self {
         let mut command = Command::new(binary);
+        // The ready line is localized; this harness waits for its English text,
+        // so pin the language instead of inheriting the developer's LANG/LC_ALL.
         command
+            .env("RDSH_LANG", "en")
             .args(["serial-proxy", "--upstream", upstream, "--port", "0"])
             .args(options);
         if let Some(original_dsh) = original_dsh {
