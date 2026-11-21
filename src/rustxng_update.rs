@@ -233,6 +233,7 @@ const BANNER_KIND: &str = "rustxng";
 /// The production location. Tests point the writer at their own temporary
 /// directory through the direct entry below, so the environment stays untouched
 /// and parallel tests never share a write target.
+#[cfg_attr(test, allow(dead_code))]
 fn banner_state_path() -> Option<PathBuf> {
     crate::inspect::home_dir().map(|home| {
         std::path::Path::new(&home)
@@ -246,19 +247,23 @@ fn banner_state_path() -> Option<PathBuf> {
 /// Publish one sidecar update event for the Web UI banner. The file belongs to
 /// the banner plugin, so the write follows the same contract sync-dsh.sh uses:
 /// atomic-or-absent, mode 0600, and only fields a client is allowed to render.
-pub(crate) fn record_banner_report(from: Option<&str>, to: &str) {
-    let Some(path) = banner_state_path() else {
+/// A no-op is not an event: `from == to` is refused here as a last line of
+/// defence, even if a caller gets its bookkeeping wrong.
+fn record_banner_report_for(path: &Path, from: Option<&str>, to: &str) {
+    if from == Some(to) {
         return;
-    };
-    write_banner_report(&path, from, to);
+    }
+    write_banner_report(path, from, to);
 }
 
 /// The writer proper: one directory target plus the two content fields, so a
 /// test can point the record at its own temporary directory.
-#[cfg_attr(not(test), allow(dead_code))]
 fn write_banner_report(path: &Path, from: Option<&str>, to: &str) {
     use serde_json::Value;
 
+    if from == Some(to) {
+        return;
+    }
     let mut document = serde_json::Map::new();
     document.insert("updated".into(), Value::Bool(true));
     document.insert("kind".into(), Value::String(BANNER_KIND.into()));
@@ -286,16 +291,6 @@ fn write_banner_report(path: &Path, from: Option<&str>, to: &str) {
         let _ = std::fs::rename(&tmp, path);
     }
     let _ = std::fs::remove_file(&tmp);
-}
-
-/// Publish the report of one succeeded check, unless the engine is current.
-/// The Available shape is what a --check run sees; the Updated shape replaces
-/// it so the banner never advertises a superseded tag.
-fn record_banner_report_for(state: &UpdateState, report: &Report) {
-    if matches!(report.action, Action::UpToDate) {
-        return;
-    }
-    record_banner_report(state.installed_tag.as_deref(), &report.latest_tag);
 }
 
 pub(crate) fn load_state(path: &Path) -> UpdateState {
@@ -782,10 +777,36 @@ pub(crate) struct Report {
 }
 
 /// Check against the latest release and, unless `check_only`, update `dest`.
-/// `state` is updated in place (the caller persists it).
+/// `state` is updated in place (the caller persists it). The production caller
+/// resolves the banner path; unit tests use the `_with_banner` entry with an
+/// explicit temporary path (or None) so a test can never write the real HOME.
 pub(crate) fn run_update(
     fetch: &dyn Fetch,
     dest: &Path,
+    check_only: bool,
+    probe: &dyn Fn(&Path) -> Probe,
+    state: &mut UpdateState,
+    now: u64,
+) -> Result<Report> {
+    #[cfg(not(test))]
+    let banner = banner_state_path();
+    #[cfg(test)]
+    let banner: Option<PathBuf> = None;
+    run_update_with_banner(
+        fetch,
+        dest,
+        banner.as_deref(),
+        check_only,
+        probe,
+        state,
+        now,
+    )
+}
+
+fn run_update_with_banner(
+    fetch: &dyn Fetch,
+    dest: &Path,
+    banner: Option<&Path>,
     check_only: bool,
     probe: &dyn Fn(&Path) -> Probe,
     state: &mut UpdateState,
@@ -800,6 +821,13 @@ pub(crate) fn run_update(
     };
     record_success(state, &release.tag, now);
     let current = probe(dest);
+    // The old version is what the banner should show on the left. Capture it
+    // before the successful branch overwrites installed_tag.
+    let installed_before = current
+        .version
+        .as_ref()
+        .map(ToString::to_string)
+        .or_else(|| state.installed_tag.clone());
     let file_len = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
     let report = |action| Report {
         action,
@@ -810,9 +838,10 @@ pub(crate) fn run_update(
         return Ok(report(Action::UpToDate));
     }
     if check_only {
-        let report = report(Action::Available);
-        record_banner_report_for(state, &report);
-        return Ok(report);
+        // A check is not an applied update. Availability is surfaced by the
+        // status commands and the harness card, never by writing an "updated"
+        // banner record.
+        return Ok(report(Action::Available));
     }
     let outcome = download_verified(fetch, &release).and_then(|bytes| {
         install_verified(dest, &bytes, probe)?;
@@ -823,9 +852,10 @@ pub(crate) fn run_update(
             state.installed_tag = Some(release.tag.clone());
             state.installed_len = len;
             state.restart_pending = true;
-            let report = report(Action::Updated);
-            record_banner_report_for(state, &report);
-            Ok(report)
+            if let Some(path) = banner {
+                record_banner_report_for(path, installed_before.as_deref(), &release.tag);
+            }
+            Ok(report(Action::Updated))
         }
         Err(e) => {
             record_failure(state, now);
@@ -1728,6 +1758,7 @@ mod tests {
     fn update_downloads_verifies_installs_and_flags_a_restart() {
         let dir = temp_dir("run-ok");
         let dest = dir.join(exe_name("rustxng"));
+        let banner = dir.join("update-state.json");
         std::fs::write(&dest, b"OLD").unwrap();
         let digest = sha(ELF);
         let fetch = fake_release("v0.14.0", ELF, Some(&digest), Some(&digest));
@@ -1735,9 +1766,10 @@ mod tests {
             failures: 3,
             ..Default::default()
         };
-        let report = run_update(
+        let report = run_update_with_banner(
             &fetch,
             &dest,
+            Some(&banner),
             false,
             &probe_reading("0.4.1"),
             &mut state,
@@ -1754,6 +1786,11 @@ mod tests {
             (state.failures, state.last_check, state.restart_pending),
             (0, 500, true)
         );
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&banner).unwrap()).unwrap();
+        assert_eq!(value["updated"], serde_json::json!(true));
+        assert_eq!(value["from"], serde_json::json!("0.4.1"));
+        assert_eq!(value["to"], serde_json::json!("v0.14.0"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1761,21 +1798,41 @@ mod tests {
     fn check_only_never_downloads_or_writes() {
         let dir = temp_dir("run-check");
         let dest = dir.join(exe_name("rustxng"));
+        let banner = dir.join("update-state.json");
         std::fs::write(&dest, b"OLD").unwrap();
         let digest = sha(ELF);
         let fetch = fake_release("v0.14.0", ELF, Some(&digest), None);
         let mut state = UpdateState::default();
-        let report =
-            run_update(&fetch, &dest, true, &probe_reading("0.4.1"), &mut state, 9).unwrap();
+        let report = run_update_with_banner(
+            &fetch,
+            &dest,
+            Some(&banner),
+            true,
+            &probe_reading("0.4.1"),
+            &mut state,
+            9,
+        )
+        .unwrap();
         assert_eq!(report.action, Action::Available);
         assert_eq!(fetch.calls.borrow().as_slice(), [latest_api_url()]);
         assert_eq!(std::fs::read(&dest).unwrap(), b"OLD");
         assert!(!prev_path(&dest).exists());
         assert!(!state.restart_pending);
+        // A check is not an applied update: it must not publish a banner.
+        assert!(!banner.exists());
 
-        let report =
-            run_update(&fetch, &dest, true, &probe_reading("0.14.0"), &mut state, 9).unwrap();
+        let report = run_update_with_banner(
+            &fetch,
+            &dest,
+            Some(&banner),
+            true,
+            &probe_reading("0.14.0"),
+            &mut state,
+            9,
+        )
+        .unwrap();
         assert_eq!(report.action, Action::UpToDate);
+        assert!(!banner.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1947,6 +2004,16 @@ mod tests {
         assert!(!state.restart_pending);
         assert_eq!(state.failures, 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn banner_report_refuses_a_noop_version_change() {
+        let home = temp_dir("banner-noop");
+        let path = home.join("update-state.json");
+        write_banner_report(&path, Some("v0.15.1"), "v0.15.1");
+        record_banner_report_for(&path, Some("v0.15.1"), "v0.15.1");
+        assert!(!path.exists());
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]
