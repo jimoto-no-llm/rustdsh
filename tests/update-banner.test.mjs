@@ -10,35 +10,61 @@ import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../plugins/rdsh-update-banner/client.js', import.meta.url), 'utf8');
-const PERIOD = 7200000, START = 1700000000000, CLOSE_KEY = 'rdsh-update-close:v3';
-const update = (to = 'v-next', extra = {}) => ({ ok: true, updated: true, kind: 'rustdsh', from: 'v-old', to, at: START, ...extra });
-const response = (value) => ({ ok: true, json: async () => value });
-const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((resolve) => setImmediate(resolve)); };
+const START = 1700000000000;
+const CLOSE_KEY = 'rdsh-update-dismissals:v4';
+const { compareVersions, selectDshTarget, installPrefixFor, activeDshInstall, APPLIED_STATE_TTL_MS } =
+  await import('../plugins/rdsh-update-banner/index.js');
 
-function host({ storage = new Map(), storageFails = false, initial = update(), now = START, streaming = false } = {}) {
-  let state = [], cursor = 0, component, current = initial, requestOverride, postOverride, clock = now, waiting;
+const dsh = (extra = {}) => ({
+  available: true, from: '0.9.0', to: '1.0.0', at: START, channel: 'stable',
+  command: 'npm install --prefix /tmp/runtime @deepseek-ai/dsh@1.0.0',
+  details: 'https://www.npmjs.com/package/@deepseek-ai/dsh/v/1.0.0', installPrefix: '/tmp/runtime', managed: true, ...extra,
+});
+const applied = (to = 'v-next', extra = {}) => ({ ok: true, updated: true, kind: 'rustdsh', from: 'v-old', to, at: START, ...extra });
+const state = (extra = {}) => ({ ok: true, updated: false, dsh: null, ...extra });
+const response = (value) => ({ ok: true, json: async () => value });
+const settle = async () => { for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve)); };
+
+function host({ storage = new Map(), storageFails = false, locale = null, language = 'en-US',
+  current = state(), streaming = false, failFetch = false, now = START } = {}) {
+  let cursor = 0, component, requestOverride, postOverride, clock = now, waiting, failureCount = 0;
   const effects = new Map(), listeners = new Map(), intervals = new Set(), timers = new Map(), posts = [], chunks = [];
+  const stateSlots = [];
   const React = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat() }),
-    useState(initial) { const i = cursor++; if (!(i in state)) state[i] = initial;
-      return [state[i], (v) => { state[i] = typeof v === 'function' ? v(state[i]) : v; }]; },
-    useRef(initial) { const i = cursor++; if (!(i in state)) state[i] = { current: initial }; return state[i]; },
-    useCallback: (callback) => callback,
-    useEffect(callback) { const i = cursor++; if (!effects.has(i)) effects.set(i, callback()); },
+    useState(initial) { const i = cursor++; if (!(i in stateSlots)) stateSlots[i] = typeof initial === 'function' ? initial() : initial;
+      return [stateSlots[i], (v) => { stateSlots[i] = typeof v === 'function' ? v(stateSlots[i]) : v; }]; },
+    useRef(initial) { const i = cursor++; if (!(i in stateSlots)) stateSlots[i] = { current: initial }; return stateSlots[i]; },
+    useCallback(callback, deps) {
+      const i = cursor++;
+      const previous = stateSlots[i];
+      if (previous && (!deps || !previous.deps || deps.every((value, index) => Object.is(value, previous.deps[index])))) return previous.callback;
+      stateSlots[i] = { callback, deps };
+      return callback;
+    },
+    useEffect(callback, deps) {
+      const i = cursor++;
+      const previous = effects.get(i);
+      if (previous && deps && previous.deps && deps.length === previous.deps.length &&
+        deps.every((value, index) => Object.is(value, previous.deps[index]))) return;
+      if (previous && typeof previous.cleanup === 'function') previous.cleanup();
+      effects.set(i, { deps, cleanup: callback() });
+    },
   };
-  const events = {
-    addEventListener(name, f) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(f); },
-    removeEventListener(name, f) { listeners.get(name)?.delete(f); },
-  };
+  const documentEvents = new EventEmitter();
+  const windowEvents = new EventEmitter();
+  windowEvents.setMaxListeners(40); documentEvents.setMaxListeners(40);
   const reader = {
     read: () => chunks.length ? Promise.resolve(chunks.shift()) : new Promise((resolve) => { waiting = resolve; }),
     cancel: async () => { waiting?.({ done: true }); waiting = null; },
   };
+  let moduleExports;
   vm.runInNewContext(source, {
     Date: class extends Date { static now() { return clock; } }, AbortController, TextDecoder,
     localStorage: {
-      getItem(k) { if (storageFails) throw new Error('storage disabled'); return storage.get(k) ?? null; },
-      setItem(k, v) { if (storageFails) throw new Error('storage disabled'); storage.set(k, v); },
+      getItem(key) { if (storageFails) throw new Error('storage disabled'); return storage.get(key) ?? null; },
+      setItem(key, value) { if (storageFails) throw new Error('storage disabled'); storage.set(key, value); },
+      removeItem(key) { if (storageFails) throw new Error('storage disabled'); storage.delete(key); },
     },
     fetch: async (url, options) => {
       if (options.method === 'POST') {
@@ -50,289 +76,405 @@ function host({ storage = new Map(), storageFails = false, initial = update(), n
         options.signal.addEventListener('abort', () => reader.cancel(), { once: true });
         return { ok: true, body: { getReader: () => reader } };
       }
+      if (failFetch && failureCount++ >= 0) throw new Error('offline');
       return requestOverride ? requestOverride() : response(current);
     },
-    setInterval: (f) => { intervals.add(f); return f; }, clearInterval: (f) => intervals.delete(f),
-    setTimeout: (f, ms) => { const id = {}; timers.set(id, { f, at: clock + ms }); return id; },
+    setInterval: (fn) => { intervals.add(fn); return fn; }, clearInterval: (fn) => intervals.delete(fn),
+    setTimeout: (fn, ms) => { const id = {}; timers.set(id, { fn, at: clock + ms }); return id; },
     clearTimeout: (id) => timers.delete(id),
-    document: { ...events, visibilityState: 'visible' },
-    window: { ...events, __ModuleLoader__: { load(module) {
-      module.factory(() => React).apply({ slots: { inject: (_name, f) => f(), register: (_options, c) => { component = c; } } });
-    } } },
+    document: { addEventListener: (n, f) => documentEvents.on(n, f), removeEventListener: (n, f) => documentEvents.off(n, f),
+      visibilityState: 'visible', documentElement: { lang: '' }, activeElement: { focus() { API.focused = true; } } },
+    window: { addEventListener: (n, f) => windowEvents.on(n, f), removeEventListener: (n, f) => windowEvents.off(n, f),
+      __ModuleLoader__: { load(module) {
+        moduleExports = module.factory(() => React);
+        moduleExports.apply({ slots: { inject: (_name, fn) => fn(), register: (_options, c) => { component = c; } },
+          locale: locale ? {
+            getLocale: () => ({ active: locale }),
+            bind: () => (key, params) => {
+              const dictionary = moduleExports.__internals.dictionaries[locale] || moduleExports.__internals.dictionaries.en;
+              const template = dictionary[key] !== undefined ? dictionary[key] : moduleExports.__internals.dictionaries.en[key];
+              return String(template === undefined ? key : template).replace(/\{(\w+)\}/g, (m, name) => params && name in params ? String(params[name]) : m);
+            },
+            register: () => {},
+          } : undefined,
+        });
+      } } },
+    navigator: { language, languages: [language] },
   });
-  return {
-    render() { cursor = 0; return component(); },
-    async poll() { await Promise.all([...intervals].map((f) => f())); await settle(); },
+  const API = {
+    get component() { return component; },
+    get module() { return moduleExports; },
+    focused: false,
+    render() {
+      cursor = 0;
+      let node = component();
+      // The plugin registers a small localization wrapper; render through it.
+      for (let depth = 0; depth < 4 && node && typeof node.tag === 'function'; depth += 1) node = node.tag(node.props);
+      return node;
+    },
+    async poll() { await Promise.all([...intervals].map((fn) => fn())); await settle(); },
     async advance(ms) {
       const end = clock + ms;
-      for (;;) { const entry = [...timers].filter(([, t]) => t.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
-        if (!entry) break; clock = entry[1].at; timers.delete(entry[0]); entry[1].f(); await settle(); }
+      for (;;) { const entry = [...timers].filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!entry) break; clock = entry[1].at; timers.delete(entry[0]); entry[1].fn(); await settle(); }
       clock = end; await settle();
     },
-    remount() { for (const f of effects.values()) f?.(); effects.clear(); state = []; this.render(); },
-    dispose() { for (const f of effects.values()) f?.(); effects.clear(); },
-    setUpdate(value) { current = value; }, setRequest(f) { requestOverride = f; },
-    setPostRequest(f) { postOverride = f; },
-    setStreaming(value) { streaming = value; },
-    async disconnect() { await reader.cancel(); await settle(); },
-    jump(ms) { clock += ms; },
-    event(event, name = 'storage') { for (const f of listeners.get(name) || []) f(event); },
+    remount() { for (const entry of effects.values()) entry.cleanup?.(); effects.clear(); stateSlots.length = 0; cursor = 0; this.render(); },
+    dispose() { for (const entry of effects.values()) entry.cleanup?.(); effects.clear(); },
+    setCurrent(value) { current = value; }, setRequest(fn) { requestOverride = fn; }, setPostRequest(fn) { postOverride = fn; },
+    setFailFetch(value) { failFetch = value; failureCount = 0; },
     async push(event, value) {
-      const chunk = { value: new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`), done: false };
+      const chunk = { value: new TextEncoder().encode('event: ' + event + '\ndata: ' + JSON.stringify(value) + '\n\n'), done: false };
       if (waiting) { const resolve = waiting; waiting = null; resolve(chunk); } else chunks.push(chunk);
       await settle();
     },
-    posts, storage, timers, intervals,
+    key(key) { windowEvents.emit('keydown', { key, preventDefault() {} }); },
+    storageEvent(key, newValue) { windowEvents.emit('storage', { key, newValue }); },
+    storage, posts, intervals, timers,
   };
+  return API;
 }
-function find(node, predicate) {
-  if (!node || typeof node !== 'object') return null;
-  if (predicate(node)) return node;
-  return node.children.map((child) => find(child, predicate)).find(Boolean);
+function findAll(node, predicate, found = []) {
+  if (!node || typeof node !== 'object') return found;
+  if (predicate(node)) found.push(node);
+  for (const child of node.children || []) findAll(child, predicate, found);
+  return found;
 }
+function find(node, predicate) { return findAll(node, predicate)[0] || null; }
+const text = (node) => {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(text).join('');
+  if (node.tag === 'style') return '';
+  return (node.children || []).map(text).join('');
+};
+const byTestId = (id) => (node) => node.props && node.props['data-testid'] === id;
 async function shown(t, options) {
   const fixture = host(options); t.after(() => fixture.dispose()); fixture.render(); await settle();
-  assert.ok(fixture.render()); return fixture;
+  return fixture;
 }
-function close(fixture, which = 'dismiss') {
-  const button = find(fixture.render(), (n) => n.tag === 'button' &&
-    (which === 'close' ? n.props['aria-label'] === 'close' : n.children.includes('dismiss')));
-  assert.ok(button); button.props.onClick(); assert.equal(fixture.render(), null);
+function press(fixture, testId) {
+  const button = find(fixture.render(), byTestId(testId));
+  assert.ok(button, 'expected button ' + testId);
+  button.props.onClick();
 }
-for (const which of ['dismiss', 'close']) {
-  test(`${which} is final for that update through polls, remount and a full reload`, async (t) => {
-    const fixture = await shown(t); close(fixture, which); await fixture.poll(); assert.equal(fixture.render(), null);
-    fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-    await fixture.advance(PERIOD * 2); await fixture.poll(); assert.equal(fixture.render(), null);
-    const reload = host({ storage: fixture.storage, now: START + 2 * PERIOD });
-    t.after(() => reload.dispose()); reload.render(); await settle();
-    assert.equal(reload.render(), null);
-    reload.setUpdate(update('v-next', { at: START + 1 })); await reload.poll();
-    assert.ok(reload.render());
-    assert.equal(fixture.posts[0].at, START); assert.equal(fixture.posts[0].cycle, 0);
-  });
-}
-test('a dismissal posts the server-validated cycle for the update it closes', async (t) => {
-  const fixture = await shown(t, { now: START + 2 * PERIOD + 5000 });
-  close(fixture);
-  const post = fixture.posts.find((p) => p.url.endsWith('/dismiss'));
-  assert.equal(post.kind, 'rustdsh'); assert.equal(post.to, 'v-next'); assert.equal(post.at, START);
-  assert.ok(Number.isSafeInteger(post.cycle) && post.cycle >= 0 && post.cycle <= 1000000);
-  assert.equal(post.cycle, 2);
-});
-test('time passing never reopens a dismissed update; a new at or to notifies again', async (t) => {
-  const fixture = await shown(t, { now: START + PERIOD - 600000 }); close(fixture);
-  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
-  await fixture.advance(PERIOD * 5); await fixture.poll(); assert.equal(fixture.render(), null);
-  fixture.setUpdate(update('v-next', { at: START + 1 })); await fixture.poll();
-  assert.ok(fixture.render()); close(fixture);
-  fixture.setUpdate(update('v-other', { at: START + 1 })); await fixture.poll();
-  assert.ok(fixture.render()); close(fixture);
-  fixture.setUpdate(update('v-other', { at: START + 2 })); await fixture.poll();
-  assert.ok(fixture.render()); close(fixture);
-  await fixture.advance(PERIOD * 3); assert.equal(fixture.render(), null);
-});
-test('live state reaches an idle page without polling; a new update time starts a new occurrence', async (t) => {
-  const fixture = host({ initial: { ok: true, updated: false }, streaming: true }); t.after(() => fixture.dispose());
-  fixture.render(); await settle(); assert.equal(fixture.render(), null);
-  await fixture.push('state', update()); assert.ok(fixture.render()); close(fixture);
-  await fixture.push('state', update()); assert.equal(fixture.render(), null);
-  await fixture.push('state', update('v-next', { at: START + 1 })); assert.ok(fixture.render());
-});
-test('late reads cannot resurrect a close or overwrite a streamed newer update', async (t) => {
-  const fixture = await shown(t); let finish;
-  fixture.setRequest(() => new Promise((resolve) => { finish = resolve; }));
-  const pending = fixture.poll(); close(fixture); finish(response(update())); await pending; assert.equal(fixture.render(), null);
-  const live = await shown(t, { streaming: true });
-  live.setRequest(() => new Promise((resolve) => { finish = resolve; }));
-  live.event({}, 'focus'); await settle();
-  await live.push('state', update('v-newest')); finish(response(update('v-stale'))); await settle();
-  assert.ok(JSON.stringify(live.render()).includes('v-newest'));
-});
-test('storage and stream closes match the current update and never return for it', async (t) => {
-  const fixture = await shown(t, { streaming: true });
-  const ack = { kind: 'rustdsh', to: 'v-next', at: START, cycle: 0 };
-  fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify({ ...ack, to: 'wrong' }) }); assert.ok(fixture.render());
-  fixture.event({ key: CLOSE_KEY, newValue: '{broken' }); assert.ok(fixture.render());
-  fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify(ack) }); assert.equal(fixture.render(), null);
-  await fixture.advance(PERIOD); assert.equal(fixture.render(), null);
-  await fixture.push('state', update('v-newer')); assert.ok(fixture.render());
-  await fixture.push('close', ack); assert.ok(fixture.render());
-  await fixture.push('close', { ...ack, to: 'v-newer', cycle: 7 }); assert.equal(fixture.render(), null);
-});
-test('legacy permanent dismissals are ignored; storage failures still support close and remount', async (t) => {
-  await shown(t, { initial: update('v-next', { dismissed: true }), storage: new Map([
-    ['rdsh-update-dismissed', JSON.stringify({ key: 'v-next@1', at: 1 })],
-    ['rdsh-update-dismissed:v2:["rustdsh","v-next"]', '1'],
-  ]) });
-  const fixture = await shown(t, { storageFails: true }); close(fixture); fixture.remount(); await settle();
-  assert.equal(fixture.render(), null);
-  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
-  fixture.setUpdate(update('v-later', { at: START + PERIOD })); await fixture.poll();
-  assert.ok(fixture.render());
-});
-test('disconnected streams fall back to polling and reconnect without reopening a closed occurrence', async (t) => {
-  const fixture = await shown(t, { streaming: true }); close(fixture);
-  fixture.setStreaming(false); await fixture.disconnect();
-  fixture.setUpdate(update('v-during-disconnect')); await fixture.poll(); assert.ok(fixture.render()); close(fixture);
-  fixture.setStreaming(true); await fixture.advance(1000);
-  await fixture.push('state', update('v-during-disconnect')); assert.equal(fixture.render(), null);
-  await fixture.push('state', update('v-after-reconnect')); assert.ok(fixture.render());
-});
-test('returning to a suspended page keeps a dismissed update closed until a new one arrives', async (t) => {
-  const fixture = await shown(t); close(fixture); fixture.jump(PERIOD + 3600000);
-  fixture.event({}, 'visibilitychange'); await settle(); assert.equal(fixture.render(), null);
-  await fixture.poll(); assert.equal(fixture.render(), null);
-  fixture.setUpdate(update('v-next', { at: START + PERIOD + 3600000 })); await fixture.poll();
-  assert.ok(fixture.render());
-});
-test('successful updater check closes its occurrence for good and a new update still notifies', async (t) => {
-  const fixture = await shown(t);
-  await fixture.advance(PERIOD - 600000);
-  await run(fixture); await settle(); assert.equal(fixture.render(), null);
-  await fixture.poll(); assert.equal(fixture.render(), null);
-  fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-  const reload = host({ storage: fixture.storage }); t.after(() => reload.dispose());
-  reload.render(); await settle(); assert.equal(reload.render(), null);
-  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
-  fixture.setUpdate(update('v-next', { at: START + PERIOD })); await fixture.poll();
-  assert.ok(fixture.render());
-});
-function run(fixture, label = 'update') {
-  const button = find(fixture.render(), (n) => n.tag === 'button' && n.children.includes(label));
-  assert.ok(button); return button.props.onClick();
-}
-test('failed updater remains retryable; success closes the card; HTTP errors never acknowledge it', async (t) => {
-  const fixture = await shown(t); fixture.setPostRequest(() => response({ ok: false, message: 'DUMMY failure' }));
-  await run(fixture); await settle(); assert.ok(JSON.stringify(fixture.render()).includes('DUMMY failure'));
-  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/dismiss')).length, 0);
-  fixture.setPostRequest(() => ({ ...response({ ok: true }), ok: false }));
-  await run(fixture, 'update again'); await settle(); assert.ok(fixture.render());
-  fixture.setPostRequest(null); await run(fixture, 'update again'); await settle(); assert.equal(fixture.render(), null);
-  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 3);
-});
-test('an in-flight updater blocks duplicate clicks and cannot dismiss a newer update', async (t) => {
-  const fixture = await shown(t, { streaming: true }); let finish;
-  fixture.setPostRequest(() => new Promise((resolve) => { finish = resolve; }));
-  const button = find(fixture.render(), (n) => n.tag === 'button' && n.children.includes('update'));
-  const pending = button.props.onClick(); await button.props.onClick();
-  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 1);
-  await fixture.push('state', update('v-during-run')); fixture.setUpdate(update('v-during-run'));
-  finish(response({ ok: true })); await pending; await settle(); assert.ok(fixture.render());
-  assert.ok(JSON.stringify(fixture.render()).includes('v-during-run'));
-  assert.ok(find(fixture.render(), (n) => n.tag === 'button' && n.children.includes('update')));
-  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/dismiss')).length, 0);
-  fixture.setPostRequest(null); await run(fixture); await settle(); assert.equal(fixture.render(), null);
-  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 2);
-});
-test('minimize persists for the update; the next update expands the card; cleanup removes timers', async (t) => {
-  const fixture = await shown(t);
-  find(fixture.render(), (n) => n.props.className === 'rub-row1').props.onClick(); await fixture.poll();
-  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-mini')); assert.equal(fixture.posts.length, 0);
-  await fixture.advance(PERIOD); await fixture.poll();
-  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-mini'));
-  fixture.setUpdate(update('v-next', { at: START + PERIOD })); await fixture.poll();
-  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-card'));
-  fixture.dispose(); assert.equal(fixture.timers.size, 0); assert.equal(fixture.intervals.size, 0);
+
+test('one overlay card holds every notice; dsh never nests a second card', async (t) => {
+  const fixture = await shown(t, { current: state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START, dsh: dsh() }) });
+  const tree = fixture.render();
+  assert.equal(findAll(tree, byTestId('update-card')).length, 1);
+  assert.equal(findAll(tree, byTestId('update-row-dsh')).length, 1);
+  assert.equal(findAll(tree, byTestId('update-row-rustdsh')).length, 1);
+  assert.equal(tree.props.role, 'status');
+  assert.equal(tree.props['aria-live'], 'polite');
+  // One dismissal control exists per row plus the card-level close.
+  const dismissals = findAll(tree, (n) => n.props && /^dismiss-/.test(n.props['data-testid'] || ''));
+  assert.deepEqual(dismissals.map((n) => n.props['data-testid']).sort(), ['dismiss-dsh', 'dismiss-rustdsh']);
+  assert.equal(findAll(tree, byTestId('close-notices')).length, 1);
 });
 
-test('authenticated occurrence-close API keeps updater state intact and streams bounded', async (t) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-close-'));
-  const originalHome = os.homedir; os.homedir = () => root; syncBuiltinESMExports();
-  t.after(async () => { os.homedir = originalHome; syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); });
-  const { apply } = await import('../plugins/rdsh-update-banner/index.js');
-  const directory = path.join(root, '.local/share/rdsh'), closePath = path.join(directory, 'update-notice-close.json');
+test('from == to and to-less payloads never render; malformed notices are ignored', async (t) => {
+  const fixture = await shown(t, { current: state({ updated: true, kind: 'rustdsh', from: 'v-same', to: 'v-same', at: START }) });
+  assert.equal(fixture.render(), null);
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: null, at: START }));
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START,
+    dsh: dsh({ from: '1.0.0', to: '1.0.0' }) }));
+  await fixture.poll();
+  const tree = fixture.render();
+  assert.ok(find(tree, byTestId('update-row-rustdsh')));
+  assert.equal(find(tree, byTestId('update-row-dsh')), null);
+});
+
+test('a dsh dismissal is stable across registry re-checks and only a new release notifies again', async (t) => {
+  const fixture = await shown(t, { current: state({ dsh: dsh() }) });
+  press(fixture, 'dismiss-dsh');
+  const post = fixture.posts.find((p) => p.url.endsWith('/dismiss'));
+  assert.equal(post.kind, 'dsh'); assert.equal(post.to, '1.0.0'); assert.equal(post.from, '0.9.0');
+  assert.equal(fixture.render(), null);
+  fixture.setCurrent(state({ dsh: dsh({ at: START + 12 * 3600 * 1000 }) }));
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.remount(); await settle(); assert.equal(fixture.render(), null);
+  const reload = host({ storage: fixture.storage, now: START + 24 * 3600 * 1000,
+    current: state({ dsh: dsh({ at: START + 24 * 3600 * 1000 }) }) });
+  t.after(() => reload.dispose()); reload.render(); await settle(); assert.equal(reload.render(), null);
+  fixture.setCurrent(state({ dsh: dsh({ from: '1.0.0', to: '1.1.0' }) }));
+  await fixture.poll();
+  const tree = fixture.render();
+  assert.ok(tree); assert.match(text(tree), /1\.0\.0/); assert.match(text(tree), /1\.1\.0/);
+});
+
+test('a dismissed applied confirmation never returns; a different release notifies once', async (t) => {
+  const fixture = await shown(t, { current: state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START }) });
+  press(fixture, 'dismiss-rustdsh');
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.remount(); await settle(); assert.equal(fixture.render(), null);
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-later', at: START + 1 }));
+  await fixture.poll(); assert.ok(fixture.render());
+});
+
+test('an applied update is a short-lived confirmation, not a permanent alert', async (t) => {
+  const fixture = await shown(t, { current: state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START }) });
+  assert.match(text(fixture.render()), /rustdsh updated/);
+  await fixture.advance(9000); await fixture.poll();
+  assert.equal(fixture.render(), null);
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  // A poll carrying the same record does not resurrect it.
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START }));
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  const other = host({ storage: fixture.storage, now: START + 60000,
+    current: state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START }) });
+  t.after(() => other.dispose()); other.render(); await settle(); assert.equal(other.render(), null);
+});
+
+test('restart-required survives a reload, is announced, and is cleared by dismissing it', async (t) => {
+  const fixture = await shown(t, { current: state({ dsh: dsh() }) });
+  fixture.setPostRequest(() => response({ ok: true, restartRequired: true, version: '1.0.0', prefix: '/tmp/runtime' }));
+  const update = find(fixture.render(), byTestId('update-dsh'));
+  assert.ok(update); await update.props.onClick(); await settle(); await fixture.poll();
+  const tree = fixture.render();
+  assert.match(text(tree), /Restart required/);
+  assert.match(text(tree), /restart the DSH web service/i);
+  assert.equal(find(tree, byTestId('update-dsh')), null);
+  const reload = host({ storage: fixture.storage, current: state({ dsh: dsh() }) });
+  t.after(() => reload.dispose()); reload.render(); await settle(); await reload.poll();
+  const reloaded = reload.render();
+  assert.ok(reloaded); assert.match(text(reloaded), /Restart required/);
+  press(reload, 'dismiss-dsh'); assert.equal(reload.render(), null);
+});
+
+test('a failed apply is an error state with retry, role=alert and localized copy', async (t) => {
+  const fixture = await shown(t, { current: state({ dsh: dsh() }), locale: 'ja' });
+  fixture.setPostRequest(() => response({ ok: false, message: 'DUMMY npm failure' }));
+  await find(fixture.render(), byTestId('update-dsh')).props.onClick(); await settle();
+  const tree = fixture.render();
+  assert.equal(tree.props.role, 'alert');
+  assert.equal(tree.props['aria-live'], 'assertive');
+  assert.match(text(tree), /DUMMY npm failure/);
+  assert.match(text(tree), /再試行/);
+  assert.ok(find(tree, byTestId('update-dsh')));
+  fixture.setPostRequest(null);
+  await find(fixture.render(), byTestId('update-dsh')).props.onClick(); await settle();
+  const recovered = fixture.render();
+  assert.equal(recovered.props.role, 'status');
+  assert.equal(findAll(recovered, byTestId('update-row-dsh')).length, 1);
+  // A successful apply is a transient confirmation, not a permanent alert.
+  await fixture.advance(9000); await fixture.poll();
+  assert.equal(fixture.render(), null);
+});
+
+test('a failed check is an error with retry instead of looking up to date', async (t) => {
+  const fixture = host({ failFetch: true }); t.after(() => fixture.dispose());
+  fixture.render(); await settle(); await fixture.poll(); await fixture.poll();
+  const tree = fixture.render();
+  assert.ok(tree); assert.equal(tree.props.role, 'alert');
+  assert.match(text(tree), /Could not check for updates/);
+  assert.ok(find(tree, byTestId('retry-check')));
+});
+
+test('locale dictionaries cover every key and render Japanese, Chinese and English copy', async (t) => {
+  const dictionaries = host({}).module.__internals.dictionaries;
+  const english = Object.keys(dictionaries.en).sort();
+  assert.deepEqual(Object.keys(dictionaries.ja).sort(), english);
+  assert.deepEqual(Object.keys(dictionaries.zh).sort(), english);
+  const cases = [['ja', /dsh のアップデートがあります/], ['zh', /dsh 有可用更新/], ['en', /dsh update available/]];
+  for (const [locale, pattern] of cases) {
+    const fixture = await shown(t, { current: state({ dsh: dsh() }), locale });
+    const tree = fixture.render();
+    assert.match(text(tree), pattern);
+    assert.equal(find(tree, byTestId('close-notices')).props['aria-label'],
+      locale === 'ja' ? '更新のお知らせをすべて閉じる' : locale === 'zh' ? '关闭所有更新通知' : 'Dismiss all update notifications');
+  }
+  // Without a DSH locale the browser language decides.
+  const browser = await shown(t, { current: state({ dsh: dsh() }), language: 'zh-CN' });
+  assert.match(text(browser.render()), /dsh 有可用更新/);
+});
+
+test('accessibility: expansion state, Escape closes, and focus returns to the page', async (t) => {
+  const fixture = await shown(t, { current: state({ dsh: dsh() }) });
+  const toggle = find(fixture.render(), byTestId('toggle-dsh'));
+  assert.equal(toggle.props['aria-expanded'], false);
+  toggle.props.onClick();
+  const expanded = find(fixture.render(), byTestId('toggle-dsh'));
+  assert.equal(expanded.props['aria-expanded'], true);
+  assert.ok(find(fixture.render(), (n) => n.tag === 'a' && n.props.href === dsh().details));
+  fixture.key('Escape');
+  assert.equal(fixture.render(), null);
+  assert.equal(fixture.focused, true);
+  assert.ok(fixture.posts.some((p) => p.url.endsWith('/dismiss') && p.kind === 'dsh'));
+  assert.match(source, /\.rub-close\{[^}]*width:44px;height:44px/);
+  assert.match(source, /\.rub-btn,\.rub-link\{[^}]*min-height:44px/);
+});
+
+test('dsh channel and relative checked time are shown, and same versions are not repeated', async (t) => {
+  const fixture = await shown(t, { current: state({ dsh: dsh({ channel: 'prerelease', at: START - 2 * 3600 * 1000 }) }) });
+  const tree = fixture.render();
+  assert.match(text(tree), /Prerelease/);
+  assert.match(text(tree), /Checked 2 h ago/);
+  assert.doesNotMatch(text(tree), /0\.9\.0 → 0\.9\.0/);
+});
+
+// ---- server contract -------------------------------------------------------
+
+async function serverFixture(t, config = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-server-'));
+  const originalHome = os.homedir;
+  os.homedir = () => root; syncBuiltinESMExports();
+  const { apply } = await import('../plugins/rdsh-update-banner/index.js?' + Math.random());
+  const directory = path.join(root, '.local/share/rdsh');
   await mkdir(directory, { recursive: true });
-  const statePath = path.join(directory, 'update-state.json');
-  const setState = (value) => writeFile(statePath, JSON.stringify(value));
   const routes = new Map();
   const ctx = { effect: (f) => f(), connection: { requestRejection: (req) => req.rejection },
     webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } };
-  const dispose = apply(ctx, {}); t.after(dispose);
+  const dispose = apply(ctx, config);
+  t.after(async () => { dispose?.(); os.homedir = originalHome; syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); });
+  const setState = async (value) => writeFile(path.join(directory, 'update-state.json'), JSON.stringify(value));
+  const setDshCache = async (value) => {
+    const cache = path.join(root, '.cache/rdsh-desktop/update-check.json');
+    await mkdir(path.dirname(cache), { recursive: true });
+    await writeFile(cache, JSON.stringify(value));
+  };
   async function request(route, { method = 'GET', body = '{}', rejection } = {}) {
-    const req = Readable.from([Buffer.from(body)]); Object.assign(req, { method, rejection });
-    let status, data; await routes.get(route)(req, { writeHead(v) { status = v; }, end(v) { data = JSON.parse(v); } });
-    return { status, data, consumed: req.readableEnded };
+    const req = Readable.from(body === '' ? [] : [Buffer.from(body)]); Object.assign(req, { method, rejection });
+    let status, data;
+    await routes.get(route)(req, { writeHead(value) { status = value; }, end(value) { data = value ? JSON.parse(value) : undefined; } });
+    return { status, data };
   }
   const dismiss = (value) => request('/api/rdsh-update/dismiss', { method: 'POST', body: JSON.stringify(value) });
   const get = () => request('/api/rdsh-update');
-  await setState(update()); const initialRaw = await readFile(statePath, 'utf8');
-  await t.test('authentication precedes stream/body access; methods, bodies and occurrence inputs are bounded', async () => {
-    for (const rejection of [401, 403, 503]) for (const route of ['/api/rdsh-update/dismiss', '/api/rdsh-update/events']) {
-      const result = await request(route, { method: 'POST', rejection, body: '{bad' });
-      assert.equal(result.status, rejection); assert.equal(result.consumed, false);
+  return { root, directory, routes, setState, setDshCache, request, dismiss, get, dispose };
+}
+
+test('dsh publish target comes from dist-tags, with correct prerelease ordering', () => {
+  assert.equal(compareVersions('1.0.0-alpha.10', '1.0.0-alpha.2'), 1);
+  assert.equal(compareVersions('1.0.0-alpha.2', '1.0.0-alpha.10'), -1);
+  assert.equal(compareVersions('1.0.0', '1.0.0-rc.1'), 1);
+  assert.equal(compareVersions('1.0.0-rc.1', '1.0.0'), -1);
+  assert.equal(compareVersions('1.0.0-beta.2', '1.0.0-beta.11'), -1);
+  assert.equal(compareVersions('1.0.0-alpha', '1.0.0-alpha.1'), -1);
+  assert.equal(compareVersions('2.0.0', '2.0.0'), 0);
+  const versions = ['1.0.0', '1.1.0-rc.1', '1.0.5'];
+  assert.equal(selectDshTarget({ latest: '1.0.0', next: '1.1.0-rc.1' }, versions, '0.9.0').target, '1.0.0');
+  assert.equal(selectDshTarget({ latest: '1.0.0', next: '1.1.0-rc.1' }, versions, '0.9.0').channel, 'stable');
+  assert.equal(selectDshTarget({ latest: '1.0.0', next: '1.1.0-rc.1' }, versions, '1.1.0-rc.0').target, '1.1.0-rc.1');
+  assert.equal(selectDshTarget({ latest: '1.0.0', next: '1.1.0-rc.1' }, versions, '1.1.0-rc.0').channel, 'next');
+  assert.equal(selectDshTarget({ latest: '1.1.0-rc.1' }, versions, '0.9.0').target, '1.0.5');
+});
+
+test('active install shape is consistent and both npm layouts resolve a prefix', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-prefix-'));
+  try {
+    const flat = path.join(root, 'flat', 'node_modules', '@deepseek-ai', 'dsh');
+    const nested = path.join(root, 'nested', 'lib', 'node_modules', '@deepseek-ai', 'dsh');
+    const unscoped = path.join(root, 'plain', 'node_modules', 'dsh');
+    for (const directory of [flat, nested, unscoped]) {
+      await mkdir(directory, { recursive: true });
+      await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '1.2.3' }));
     }
-    assert.equal((await request('/api/rdsh-update/dismiss')).status, 405);
-    assert.equal((await request('/api/rdsh-update/events', { method: 'POST' })).status, 405);
-    for (const body of ['{bad', 'null', '[]', '{}', JSON.stringify({ to: 'v-next', kind: '' }), JSON.stringify({ to: 'x'.repeat(513), kind: 'dsh' }), ' '.repeat(4097)]) {
-      assert.equal((await request('/api/rdsh-update/dismiss', { method: 'POST', body })).status, 400);
-    }
-    for (const cycle of [-1, 0.5, '0', 1000001]) assert.equal((await dismiss({ ...update(), cycle })).status, 400);
-    assert.equal((await dismiss(update('wrong'))).status, 409);
-    assert.equal((await dismiss(update('v-next', { at: START + 1 }))).status, 409);
-    assert.equal(await readFile(statePath, 'utf8'), initialRaw);
-  });
-  await t.test('atomic private closes never suppress reload or mutate update state; legacy markers stay intact', async () => {
-    const markers = path.join(directory, 'update-dismissals'); await mkdir(markers);
-    await writeFile(path.join(markers, 'legacy'), 'DUMMY_LEGACY');
-    assert.equal((await dismiss({ ...update(), cycle: 0 })).status, 200);
-    assert.equal(await readFile(statePath, 'utf8'), initialRaw);
-    assert.equal((await get()).data.dismissed, undefined);
-    await Promise.all(Array.from({ length: 8 }, () => dismiss({ ...update(), cycle: 1 })));
-    const value = JSON.parse(await readFile(closePath, 'utf8')); assert.equal(value.cycle, 1);
-    assert.equal((await readdir(directory)).filter((n) => n.endsWith('.tmp')).length, 0);
-    assert.equal(await readFile(path.join(markers, 'legacy'), 'utf8'), 'DUMMY_LEGACY');
-    if (process.platform !== 'win32') assert.equal((await stat(closePath)).mode & 0o777, 0o600);
-    await setState(update('v-without-kind', { kind: '', at: -1 }));
-    const legacy = (await get()).data; assert.equal(legacy.kind, 'update'); assert.ok(legacy.at > 0);
-    assert.equal((await get()).data.at, legacy.at);
-    await setState(update());
-  });
-  if (process.platform !== 'win32') await t.test('planted state and close links cannot read or modify outside files', async () => {
-    const outside = path.join(root, 'DUMMY-outside'); await writeFile(outside, 'DUMMY_UNCHANGED');
-    await rm(closePath); await symlink(outside, closePath);
-    assert.equal((await dismiss(update())).status, 500); assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
-    await rm(closePath); await link(outside, closePath); assert.equal((await dismiss(update())).status, 500);
-    assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED'); await rm(closePath);
-    const outsideState = path.join(root, 'DUMMY-update-state-outside'); await writeFile(outsideState, initialRaw);
-    await rm(statePath); await symlink(outsideState, statePath);
-    // A planted state link reports the failure and leaks no update fields; the
-    // dsh half of the card is independent of the rdsh state file.
-    const blocked = (await get()).data;
-    assert.equal(blocked.ok, false); assert.equal(blocked.updated, undefined); assert.equal(blocked.to, undefined);
-    assert.equal(await readFile(outsideState, 'utf8'), initialRaw);
-    await rm(statePath); await setState(update());
-    const real = path.join(root, 'real'); await mkdir(real); await writeFile(path.join(real, 'update-state.json'), initialRaw);
-    await rm(directory, { recursive: true }); await symlink(real, directory);
-    assert.equal((await dismiss(update())).status, 500); assert.deepEqual(await readdir(real), ['update-state.json']);
-    await rm(directory); await mkdir(directory); await setState(update());
-  });
-  await t.test('streams cap subscribers, disconnect slow readers, bootstrap without old closes, and dispose', async () => {
-    const streams = [];
-    class Sink extends EventEmitter {
-      frames = []; status; blocked = false;
-      writeHead(status) { this.status = status; }
-      write(frame) { this.frames.push(frame); return !this.blocked; }
-      end(frame) { if (frame) this.frames.push(frame); this.emit('close'); }
-      destroy() { this.emit('close'); }
-    }
-    const subscribe = async (sink) => { await routes.get('/api/rdsh-update/events')({ method: 'GET' }, sink); return sink; };
-    for (let i = 0; i < 32; i++) streams.push(await subscribe(new Sink()));
-    const excess = await subscribe(new Sink()); assert.equal(excess.status, 429);
-    assert.ok(streams.every((s) => s.frames.some((v) => v.includes('event: state'))));
-    assert.ok(streams.every((s) => !s.frames.some((v) => v.includes('event: close'))));
-    streams[0].blocked = true; await dismiss({ ...update(), cycle: 0 });
-    assert.ok(streams[1].frames.some((v) => v.includes('event: close')));
-    const fresh = await subscribe(new Sink()); assert.equal(fresh.status, 200);
-    assert.ok(!fresh.frames.some((v) => v.includes('event: close')));
-    dispose(); assert.equal(routes.size, 0);
-  });
-  await t.test('demo closes never write account files and use a stable update time', async () => {
-    const before = await readdir(directory), disposeDemo = apply(ctx, { demo: true });
-    const demo = (await get()).data; assert.equal((await get()).data.at, demo.at);
-    assert.equal((await dismiss({ ...demo, cycle: 0 })).status, 200);
-    assert.deepEqual(await readdir(directory), before); disposeDemo();
-  });
+    assert.equal(installPrefixFor(flat), path.join(root, 'flat'));
+    assert.equal(installPrefixFor(nested), path.join(root, 'nested'));
+    assert.equal(installPrefixFor(unscoped), path.join(root, 'plain'));
+    assert.equal(installPrefixFor(path.join(root, 'flat', 'node_modules')), null);
+    const shape = activeDshInstall();
+    assert.equal(typeof shape, 'object');
+    for (const key of ['version', 'prefix', 'managed', 'environmentVersion']) assert.ok(key in shape, key);
+    const previous = process.env.DSH_VERSION;
+    process.env.DSH_VERSION = '9.9.9';
+    assert.deepEqual(Object.keys(activeDshInstall()).sort(), Object.keys(shape).sort());
+    assert.equal(activeDshInstall().version, '9.9.9');
+    if (previous === undefined) delete process.env.DSH_VERSION; else process.env.DSH_VERSION = previous;
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('server suppresses same-version, stale and orphaned rustxng records', async (t) => {
+  const fixture = await serverFixture(t);
+  const now = Date.now();
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-1', at: now });
+  assert.equal((await fixture.get()).data.updated, false);
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: now - APPLIED_STATE_TTL_MS - 60000 });
+  assert.equal((await fixture.get()).data.updated, false);
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: now - 60000 });
+  assert.equal((await fixture.get()).data.updated, true);
+  // sync-dsh.sh records a rebuilt payload with the same version label as a
+  // replacement (no 'from'): that is a real update and must still render.
+  await fixture.setState({ updated: true, kind: 'rdsh-release', to: 'v-2', at: now, replaced: true });
+  const replaced = (await fixture.get()).data;
+  assert.equal(replaced.updated, true);
+  assert.equal(replaced.from, null);
+  assert.equal(replaced.to, 'v-2');
+  await fixture.setState({ updated: true, kind: 'rustxng', from: '1.0.0', to: '1.1.0', at: now });
+  const emptyPath = path.join(fixture.root, 'empty', 'bin');
+  await mkdir(emptyPath, { recursive: true });
+  const previousPath = process.env.PATH;
+  process.env.PATH = emptyPath;
+  t.after(() => { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath; });
+  assert.equal((await fixture.get()).data.updated, false);
+  const withBinary = path.join(emptyPath, 'rdsh');
+  if (typeof process.getuid === 'function') {
+    await writeFile(withBinary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+    assert.equal((await fixture.get()).data.updated, true);
+  }
+});
+
+test('a dsh dismissal matches the live target, survives a cache refresh and never closes rdsh notices', async (t) => {
+  const fixture = await serverFixture(t);
+  const now = Date.now();
+  await fixture.setState({ updated: false });
+  const previousVersion = process.env.DSH_VERSION;
+  process.env.DSH_VERSION = '0.9.0';
+  t.after(() => { if (previousVersion === undefined) delete process.env.DSH_VERSION; else process.env.DSH_VERSION = previousVersion; });
+  await fixture.setDshCache({ checkedAt: now, newest: '1.0.0', channel: 'stable' });
+  const status = (await fixture.get()).data;
+  assert.ok(status.dsh, 'dsh availability travels with the client state');
+  // The release (to) is the identity; "from" is display-only. A stale client
+  // version must not make the dismissal fail, and it cannot widen the target.
+  assert.equal((await fixture.dismiss({ kind: 'dsh', from: '9.9.9', to: '1.0.0' })).status, 200);
+  assert.equal((await fixture.dismiss({ kind: 'dsh', to: '2.0.0' })).status, 409);
+  assert.equal((await fixture.dismiss({ kind: 'rdsh', from: 'v-1', to: '1.0.0' })).status, 409);
+  assert.equal((await fixture.dismiss({ kind: 'dsh', from: '9.9.9', to: '2.0.0' })).status, 409);
+  assert.equal((await fixture.dismiss({ kind: 'dsh', to: '1.0.0' })).status, 200);
+  const close = JSON.parse(await readFile(path.join(fixture.directory, 'update-notice-close.json'), 'utf8'));
+  assert.equal(close.kind, 'dsh'); assert.equal(close.to, '1.0.0'); assert.ok(close.closedAt > 0);
+  await fixture.setDshCache({ checkedAt: now - 12 * 3600 * 1000, newest: '1.0.0', channel: 'stable' });
+  assert.equal((await fixture.get()).data.dsh.to, '1.0.0');
+  assert.equal((await fixture.dismiss({ kind: 'dsh', from: status.dsh.from || undefined, to: '1.0.0' })).status, 200);
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: now });
+  assert.equal((await fixture.dismiss({ kind: 'dsh', to: '1.0.0' })).status, 200);
+  assert.equal((await fixture.dismiss({ kind: 'rustdsh', from: 'v-1', to: 'v-2' })).status, 200);
+});
+
+test('dismiss streams reach other GUI tabs and the old cycle field is no longer required', async (t) => {
+  const fixture = await serverFixture(t);
+  const now = Date.now();
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: now });
+  class Sink extends EventEmitter {
+    frames = []; status;
+    writeHead(status) { this.status = status; }
+    write(frame) { this.frames.push(frame); return true; }
+    end(frame) { if (frame) this.frames.push(frame); this.emit('close'); }
+    destroy() { this.emit('close'); }
+  }
+  const sink = new Sink(); await fixture.routes.get('/api/rdsh-update/events')({ method: 'GET' }, sink);
+  assert.ok(sink.frames.some((frame) => frame.includes('event: state')));
+  assert.equal((await fixture.dismiss({ kind: 'rustdsh', from: 'v-1', to: 'v-2' })).status, 200);
+  assert.ok(sink.frames.some((frame) => frame.includes('event: close')));
+  for (const body of ['{bad', 'null', '[]', JSON.stringify({ to: '', kind: 'dsh' }),
+    JSON.stringify({ to: 'x'.repeat(513), kind: 'dsh' }), JSON.stringify({ to: '1.0.0', kind: '' }), ' '.repeat(4097)]) {
+    assert.equal((await fixture.request('/api/rdsh-update/dismiss', { method: 'POST', body })).status, 400);
+  }
+  for (const rejection of [401, 403, 503]) {
+    const denied = await fixture.request('/api/rdsh-update/dismiss', { method: 'POST', rejection, body: '{bad' });
+    assert.equal(denied.status, rejection);
+  }
+});
+
+test('demo closes still write nothing and every update route is authenticated', async (t) => {
+  const fixture = await serverFixture(t, { demo: true });
+  const before = await readdir(fixture.directory);
+  await fixture.dismiss({ kind: 'demo', from: '0.2.0-rc.2', to: '0.2.1-rc.1' });
+  assert.deepEqual(await readdir(fixture.directory), before);
+  assert.deepEqual([...fixture.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss',
+    '/api/rdsh-update/dsh/run', '/api/rdsh-update/events', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
 });
 
 test('feature switches gate every update route and keep polling when notifications are off', async (t) => {
@@ -344,39 +486,23 @@ test('feature switches gate every update route and keep polling when notificatio
     else process.env.DSH_HOME = previousHome;
     await rm(home, { recursive: true, force: true });
   });
-  const { apply } = await import('../plugins/rdsh-update-banner/index.js');
+  const { apply } = await import('../plugins/rdsh-update-banner/index.js?features');
   const server = () => {
     const routes = new Map();
     const ctx = { effect: (f) => f(), connection: { requestRejection: (req) => req.rejection },
       webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } };
     return { routes, ctx };
   };
-  const get = async (routes) => {
-    const req = Readable.from([Buffer.from('')]); Object.assign(req, { method: 'GET' });
-    let status, data;
-    await routes.get('/api/rdsh-update')(req, { writeHead(value) { status = value; }, end(value) { data = JSON.parse(value); } });
-    return { status, data };
-  };
-  // update_check=false: no routes at all, even while the demo state says an update exists.
   await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_check: false } }));
   const off = server();
-  apply(off.ctx, { demo: true });
+  const disposeOff = apply(off.ctx, { demo: true });
   assert.equal(off.routes.size, 0);
-  // A corrupt rdsh.json falls back to defaults: all four routes return.
-  await writeFile(path.join(home, 'rdsh.json'), '{not json');
-  const broken = server();
-  const disposeBroken = apply(broken.ctx, { demo: true });
-  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/events', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
-  const demo = await get(broken.routes);
-  assert.equal(demo.status, 200); assert.equal(demo.data.updated, true);
-  disposeBroken?.();
-  // update_notifications=false: /events is gone but /api/rdsh-update still reports the update.
+  disposeOff?.();
   await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_notifications: false } }));
   const polling = server();
   const disposePolling = apply(polling.ctx, { demo: true });
-  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
-  const state = await get(polling.routes);
-  assert.equal(state.status, 200); assert.equal(state.data.updated, true);
+  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss',
+    '/api/rdsh-update/dsh/run', '/api/rdsh-update/run', '/api/rdsh-update/rustxng/run']);
   disposePolling?.();
 });
 
@@ -399,7 +525,6 @@ test('updater resolves from its installed plugin and refuses missing or unsafe s
     dispose();
     return data;
   }
-
   const syncScript = path.join(root, 'sync-dsh.sh');
   const missing = await runWith();
   assert.equal(missing.ok, false); assert.match(missing.message, /updater not found/);
@@ -413,14 +538,131 @@ test('updater resolves from its installed plugin and refuses missing or unsafe s
     await writeFile(syncScript, await readFile(target, 'utf8'), { mode: 0o700 });
     const result = await runWith();
     assert.equal(result.ok, true); assert.match(result.message, /DUMMY updater ran/);
-    // A failing updater that reports the reason on stderr only must not lose it.
-    await writeFile(syncScript, "printf '%s\\n' 'stdout noise'; printf '%s\\n' 'fatal: registry unreachable' >&2; exit 1\n", { mode: 0o700 });
-    const failed = await runWith();
-    assert.equal(failed.ok, false);
-    assert.match(failed.message, /registry unreachable/);
-  } else {
-    await writeFile(syncScript, await readFile(target, 'utf8'), { mode: 0o700 });
-    const unverified = await runWith();
-    assert.equal(unverified.ok, false); assert.match(unverified.message, /owned by the current user/);
   }
+});
+
+test('close records accept the previous on-disk shape and stay private and atomic', async (t) => {
+  const fixture = await serverFixture(t);
+  const file = path.join(fixture.directory, 'update-notice-close.json');
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: Date.now() });
+  await writeFile(file, JSON.stringify({ id: '00000000-0000-4000-8000-000000000000', kind: 'rustdsh',
+    to: 'v-2', at: START, cycle: 3 }), { mode: 0o600 });
+  assert.equal((await fixture.dismiss({ kind: 'rustdsh', from: 'v-1', to: 'v-2' })).status, 200);
+  const value = JSON.parse(await readFile(file, 'utf8'));
+  assert.ok(value.closedAt > 0);
+  if (process.platform !== 'win32') assert.equal((await stat(file)).mode & 0o777, 0o600);
+  assert.equal((await readdir(fixture.directory)).filter((name) => name.endsWith('.tmp')).length, 0);
+});
+
+test('planted state and close links cannot read or modify outside files', async (t) => {
+  if (process.platform === 'win32') return;
+  const fixture = await serverFixture(t);
+  await fixture.setState({ updated: true, kind: 'rustdsh', from: 'v-1', to: 'v-2', at: Date.now() });
+  const outside = path.join(fixture.root, 'DUMMY-outside');
+  await writeFile(outside, 'DUMMY_UNCHANGED');
+  const close = path.join(fixture.directory, 'update-notice-close.json');
+  await symlink(outside, close);
+  assert.equal((await fixture.dismiss({ kind: 'rustdsh', from: 'v-1', to: 'v-2' })).status, 500);
+  assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
+  await rm(close); await link(outside, close); assert.equal((await fixture.dismiss({ kind: 'rustdsh', from: 'v-1', to: 'v-2' })).status, 500);
+  await rm(close);
+  const statePath = path.join(fixture.directory, 'update-state.json');
+  await writeFile(outside, 'DUMMY_STATE');
+  await rm(statePath, { force: true });
+  await symlink(outside, statePath);
+  const blocked = (await fixture.get()).data;
+  assert.equal(blocked.ok, false); assert.equal(blocked.to, undefined);
+});
+
+test('a successful retry after a failed check reports up to date briefly, then hides', async (t) => {
+  const fixture = host({ failFetch: true }); t.after(() => fixture.dispose());
+  fixture.render(); await settle(); await fixture.poll(); await fixture.poll();
+  assert.equal(fixture.render().props.role, 'alert');
+  fixture.setFailFetch(false);
+  fixture.setCurrent(state({ dsh: { available: false, from: '1.0.0', to: '1.0.0', at: START } }));
+  await find(fixture.render(), byTestId('retry-check')).props.onClick(); await settle();
+  const tree = fixture.render();
+  assert.ok(tree); assert.equal(tree.props.role, 'status');
+  assert.match(text(tree), /up to date/i);
+  await fixture.advance(6000); await fixture.poll();
+  assert.equal(fixture.render(), null);
+});
+
+test('a managed dsh install uses the running prefix, verifies package.json and requires a restart', async (t) => {
+  // The npm stub below is a POSIX shell script; the prefix logic itself is
+  // platform-independent and is covered on Linux/macOS.
+  if (process.platform === 'win32') return t.skip('POSIX shell npm stub');
+  const fixture = await serverFixture(t);
+  const prefix = path.join(fixture.root, 'runtime');
+  const pkg = path.join(prefix, 'node_modules', '@deepseek-ai', 'dsh');
+  await mkdir(path.join(pkg, 'lib'), { recursive: true });
+  await writeFile(path.join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.9.0' }));
+  await writeFile(path.join(pkg, 'lib', 'cli.js'), '');
+  const bin = path.join(fixture.root, 'bin');
+  await mkdir(bin, { recursive: true });
+  const log = path.join(fixture.root, 'npm.log');
+  const npm = path.join(bin, 'npm');
+  const script = [
+    '#!/bin/sh',
+    'printf "%s\\n" "$*" >> "' + log + '"',
+    'root=""',
+    'prev=""',
+    'last=""',
+    'for a in "$@"; do',
+    '  if [ "$prev" = "--prefix" ]; then root="$a"; fi',
+    '  prev="$a"',
+    '  last="$a"',
+    'done',
+    'if [ -z "$root" ]; then exit 3; fi',
+    'ver=${last##*@}',
+    'mkdir -p "$root/node_modules/@deepseek-ai/dsh"',
+    'printf \x27{"name":"@deepseek-ai/dsh","version":"%s"}\x27 "$ver" > "$root/node_modules/@deepseek-ai/dsh/package.json"',
+    '',
+  ].join('\n');
+  await writeFile(npm, script, { mode: 0o700 });
+  const previousArgv = process.argv[1], previousPath = process.env.PATH, previousVersion = process.env.DSH_VERSION;
+  delete process.env.DSH_VERSION;
+  process.argv[1] = path.join(pkg, 'lib', 'cli.js');
+  // The stub comes first; the real PATH keeps sh utilities (mkdir) resolvable.
+  process.env.PATH = bin + path.delimiter + (previousPath || '');
+  t.after(() => {
+    process.argv[1] = previousArgv;
+    if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath;
+    if (previousVersion === undefined) delete process.env.DSH_VERSION; else process.env.DSH_VERSION = previousVersion;
+  });
+  await fixture.setDshCache({ checkedAt: Date.now(), newest: '1.0.0', channel: 'stable' });
+  assert.equal((await fixture.get()).data.dsh.available, true);
+  const result = await fixture.request('/api/rdsh-update/dsh/run', { method: 'POST' });
+  assert.equal(result.status, 200);
+  assert.equal(result.data.ok, true, result.data.message);
+  const args = (await readFile(log, 'utf8')).trim();
+  assert.equal(result.data.restartRequired, true);
+  assert.match(result.data.message, /restart/i);
+  assert.match(args, /install --prefix /);
+  const written = await readFile(path.join(pkg, 'package.json'), 'utf8');
+  assert.match(written, /1\.0\.0/, 'stub npm wrote the requested version: ' + written);
+  assert.doesNotMatch(args, /(^| )-g( |$)/);
+  const installed = JSON.parse(await readFile(path.join(pkg, 'package.json'), 'utf8'));
+  assert.equal(installed.version, '1.0.0');
+});
+
+test('a dsh install refuses to fall back to npm -g when the running prefix is unknown', async (t) => {
+  const fixture = await serverFixture(t);
+  const previousVersion = process.env.DSH_VERSION, previousPath = process.env.PATH;
+  process.env.DSH_VERSION = '0.9.0';
+  const bin = path.join(fixture.root, 'bin');
+  await mkdir(bin, { recursive: true });
+  const marker = path.join(fixture.root, 'npm-ran');
+  await writeFile(path.join(bin, 'npm'), '#!/bin/sh\ntouch "' + marker + '"\nexit 0\n', { mode: 0o700 });
+  process.env.PATH = bin;
+  t.after(() => {
+    if (previousVersion === undefined) delete process.env.DSH_VERSION; else process.env.DSH_VERSION = previousVersion;
+    if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath;
+  });
+  await fixture.setDshCache({ checkedAt: Date.now(), newest: '1.0.0', channel: 'stable' });
+  const result = await fixture.request('/api/rdsh-update/dsh/run', { method: 'POST' });
+  assert.equal(result.status, 200);
+  assert.equal(result.data.ok, false);
+  assert.match(result.data.message, /could not locate the running dsh installation/);
+  await assert.rejects(readFile(marker), /ENOENT/);
 });

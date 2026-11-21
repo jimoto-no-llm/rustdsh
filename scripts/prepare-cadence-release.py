@@ -177,11 +177,30 @@ def resolve_bump(changelog, latest, labels=None):
 
 
 def changelog_entries(body):
+    """One entry per top-level bullet, including its continuation lines.
+
+    CHANGELOG entries are wrapped prose. Taking only the "- " line truncated
+    every multi-line entry mid-sentence in the published release notes, so an
+    indented (or wrapped) block belongs to the bullet above it until the next
+    bullet or heading.
+    """
     entries = []
+    current = None
     for line in body.splitlines():
         stripped = line.strip()
+        if stripped.startswith("#"):
+            if current is not None:
+                entries.append(current)
+                current = None
+            continue
         if stripped.startswith("- "):
-            entries.append(stripped[2:].strip())
+            if current is not None:
+                entries.append(current)
+            current = stripped[2:].strip()
+        elif stripped and current is not None:
+            current = f"{current} {stripped}".strip()
+    if current is not None:
+        entries.append(current)
     return entries
 
 

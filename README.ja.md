@@ -80,7 +80,7 @@ https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
 
 ### 手順 A. 本家 `dsh` の導入（未導入の方）
 
-Node.js・npm・pnpm を別途用意し、npm registry の `@deepseek-ai/dsh`（bin 名: `dsh`）をグローバルに導入します。
+いまの `rdsh` インストーラは、不足している Node.js・pnpm・DSH を利用者専用の場所へ自動導入します（手順 B）。手動で入れる場合は、npm registry の `@deepseek-ai/dsh`（bin 名: `dsh`）をグローバルに導入します。
 
 ```sh
 npm install -g "@deepseek-ai/dsh@<version>"   # 対応範囲と依存監査を確認した版に置き換える

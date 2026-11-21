@@ -155,18 +155,26 @@ else
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 write_state() {
+  # A no-op is not an update event. A rebuilt binary can have different bytes
+  # while reporting the same version label; that is a payload replacement, not
+  # "v1 -> v1", so it is recorded without a from version and the banner renders
+  # it as a plain "updated to <version>" confirmation.
+  [ -n "$3" ] || return 0
   node - "$LOGDIR/update-state.json" "$1" "$2" "$3" "$(date +%s)000" <<'JSON'
 const fs = require('node:fs');
 const [target, kind, from, to, at] = process.argv.slice(2);
 const timestamp = Number(at);
 if (!Number.isSafeInteger(timestamp)) process.exit(1);
 const temporary = `${target}.${process.pid}.tmp`;
+const record = from === to
+  ? { updated: true, kind, to, at: timestamp, replaced: true }
+  : { updated: true, kind, from, to, at: timestamp };
 let created = false;
 let fd;
 try {
   fd = fs.openSync(temporary, 'wx', 0o600);
   created = true;
-  fs.writeFileSync(fd, `${JSON.stringify({updated:true,kind,from,to,at:timestamp})}\n`);
+  fs.writeFileSync(fd, `${JSON.stringify(record)}\n`);
   fs.closeSync(fd);
   fd = undefined;
   fs.renameSync(temporary, target);

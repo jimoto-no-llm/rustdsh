@@ -313,7 +313,11 @@ impl Fixture {
 
     fn command_for(&self, executable: &Path) -> Command {
         let mut cmd = Command::new(executable);
-        cmd.env("HOME", self.root.join("home"))
+        // The CLI localizes its diagnostics from the process locale. These
+        // assertions are about the English messages, so pin the language
+        // instead of depending on the developer's LANG/LC_ALL.
+        cmd.env("RDSH_LANG", "en")
+            .env("HOME", self.root.join("home"))
             .env("USERPROFILE", self.root.join("home"))
             .env("APPDATA", self.root.join("data"))
             .env("XDG_DATA_HOME", self.root.join("data"))
