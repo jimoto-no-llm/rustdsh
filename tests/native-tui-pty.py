@@ -2,6 +2,8 @@
 """Unix full-screen PTY smoke. Requires pyte (install in a disposable venv).
 Usage: python3 tests/native-tui-pty.py /absolute/path/to/rdsh
 No external API calls, real credentials, or edits to a user's project.
+
+Manual test: no workflow runs this suite (see docs/DEVELOPMENT.md).
 """
 import codecs
 import errno

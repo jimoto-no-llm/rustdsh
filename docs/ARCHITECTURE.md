@@ -96,6 +96,29 @@ retains its 4096-item limit.
 | `file_security.rs` | No-follow, directory-relative file reads within the selected root |
 | `tool_security.rs` | Opt-in audited tool boundary and delegated runtime checks |
 | `cost_ledger.rs` | Pure reported-cost declarations, reports, validation, public projection and schemas |
+| `native_harness/` | Opt-in Rust-owned conversation loop (`native-tui` / `native-web`): proposal validation, approvals, tools, usage |
+| `native_harness/tui/` | Rust TUI front end; `--backend dsh` attaches to its own DSH child over the host's internal Web-Remote protocol |
+
+## Native harness: the documented exception
+
+The design rule above ("port only the hot paths, delegate everything else") and
+[PHILOSOPHY.md](PHILOSOPHY.md)'s non-goal (do not reimplement the agent loop in
+Rust) have one explicit, opt-in exception: `src/native_harness/`. `native-web` and
+`native-tui --backend native` run a Rust-side `model_call` loop. SDK and HTTP
+providers only return proposals; Rust alone owns conversation state, validation of
+the whole proposed batch, the approval gate, tool execution, redaction and usage
+accounting. The delegated `rdsh`/`rdsh --profile`/`rdsh tui` paths are unchanged
+and still hand the conversation to DSH.
+
+`--backend dsh` keeps DSH as the reasoning runtime: the TUI starts one DSH child
+with the Web profile (assembled through `assemble_boot`, so the ZDR guard, model
+overlay, asset overlays, slim env, auth pre-boot and search bridge all apply) and
+talks to it over the loopback Remote protocol. That protocol is **internal** to
+DSH, not a published API: this repository verifies the coupling against DSH
+`0.2.2-alpha.3` (`tests/dsh-tui-pty.py` replays the wire against a fixture; the
+PTY suites are manual, see [DEVELOPMENT.md](DEVELOPMENT.md)). A DSH update can
+change endpoints or frame shapes, so treat a host mismatch as a compatibility bug
+rather than extending the Rust side with guessed commands.
 
 ## Optional Node dashboard (`dashboard/`)
 

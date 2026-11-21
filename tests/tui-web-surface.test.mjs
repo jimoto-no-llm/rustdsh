@@ -1,3 +1,4 @@
+// Manual test: no workflow runs this file (see docs/DEVELOPMENT.md).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
