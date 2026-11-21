@@ -8,7 +8,7 @@
 Unix のインストーラと Windows のインストーラは、不足する Node.js・pnpm・DSH を
 利用者専用の `~/.local/share/rdsh/runtime/` に準備します。既存の利用可能な環境は再利用します。
 Node.js は 24.22.1 の公式アーカイブを固定 SHA-256 で検証し、pnpm は 10.34.9、DSH は
-0.2.2-alpha.3 を npm の公開レジストリから導入します。npm の install scripts は無効です。
+0.2.2-rc.5 を npm の公開レジストリから導入します。npm の install scripts は無効です。
 管理者権限や、事前の pnpm・Corepack の導入は不要です。
 
 本体だけを導入する場合は `install.sh --no-runtime` / `install.ps1 -NoRuntime`、

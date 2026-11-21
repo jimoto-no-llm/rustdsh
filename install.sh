@@ -725,7 +725,7 @@ install_agent_runtime() {
   local runtime="$HOME/.local/share/rdsh/runtime" node_program="" major="" npm_program=""
   mkdir -p "$runtime"
   chmod 700 "$runtime"
-  local node_version="24.22.1" pnpm_version="10.34.9" dsh_version="0.2.2-alpha.3"
+  local node_version="24.22.1" pnpm_version="10.34.9" dsh_version="0.2.2-rc.5"
   local platform="" expected="" archive="" actual="" node_dir="" spec="" package="" need_dsh=1
   if command -v dsh >/dev/null 2>&1; then
     case "$(dsh --version 2>/dev/null || true)" in [0-9]*.[0-9]*.*) need_dsh=0 ;; esac

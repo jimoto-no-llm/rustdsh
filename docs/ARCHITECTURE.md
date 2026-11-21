@@ -129,8 +129,9 @@ this bundle's activation before any registration or prompt wiring.
 
 ## Protected delegated tool runtime
 
-`tool_security.rs` selects an exact matching DSH/tools pair for rc.2, alpha.1
-or alpha.3 and embeds the selected preload. The preload verifies the original
+`tool_security.rs` selects an exact matching DSH/tools pair from
+`AUDITED_ADAPTERS` (0.2.0-rc.2 through 0.2.2-rc.5) and embeds the selected
+preload. The preload verifies the original
 and patched runtime hashes and refuses a dependency resolving another tools
 module. The launcher overwrites adapter/runtime environment overrides.
 Protected delegation requires Linux x86_64, bubblewrap, prlimit and working user

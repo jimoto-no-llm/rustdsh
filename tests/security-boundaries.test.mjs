@@ -26,6 +26,11 @@ function auditedRuntimeEnvironment() {
     rc4: process.env.RDSH_AUDITED_RUNTIME_RC4,
     alpha22: process.env.RDSH_AUDITED_RUNTIME_ALPHA22,
     alpha23: process.env.RDSH_AUDITED_RUNTIME_ALPHA23,
+    rc1_022: process.env.RDSH_AUDITED_RUNTIME_RC1_022,
+    rc2_022: process.env.RDSH_AUDITED_RUNTIME_RC2_022,
+    rc3_022: process.env.RDSH_AUDITED_RUNTIME_RC3_022,
+    rc4_022: process.env.RDSH_AUDITED_RUNTIME_RC4_022,
+    rc5_022: process.env.RDSH_AUDITED_RUNTIME_RC5_022,
   };
 }
 
@@ -59,6 +64,11 @@ test('audited preload accepts registered versions and the legacy unset rc2 adapt
     [runtimes.rc4, 'dsh-tools-0.2.1-rc.4'],
     [runtimes.alpha22, 'dsh-tools-0.2.2-alpha.2'],
     [runtimes.alpha23, 'dsh-tools-0.2.2-alpha.3'],
+    [runtimes.rc1_022, 'dsh-tools-0.2.2-rc.1'],
+    [runtimes.rc2_022, 'dsh-tools-0.2.2-rc.2'],
+    [runtimes.rc3_022, 'dsh-tools-0.2.2-rc.3'],
+    [runtimes.rc4_022, 'dsh-tools-0.2.2-rc.4'],
+    [runtimes.rc5_022, 'dsh-tools-0.2.2-rc.5'],
   ].filter(([runtime]) => runtime);
   if (pairs.length === 0) {
     t.skip('official audited runtime paths are supplied by the Linux security matrix');
@@ -104,6 +114,16 @@ test('audited preload rejects unknown, modified and cross-version runtimes with 
     const crossRc3 = runPreload(runtimes.rc3, 'dsh-tools-0.2.1-alpha.3', { RDSH_LANG: 'en' });
     assert.notEqual(crossRc3.status, 0);
     assert.match(crossRc3.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
+  }
+  if (runtimes.rc1_022 && runtimes.rc2_022) {
+    // rc.1 kept alpha.3's dsh-tools bytes; rc.2 re-cut them. Swapping the
+    // adapter across that boundary must still fail on the digest.
+    const crossRc1 = runPreload(runtimes.rc1_022, 'dsh-tools-0.2.2-rc.2', { RDSH_LANG: 'en' });
+    assert.notEqual(crossRc1.status, 0);
+    assert.match(crossRc1.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
+    const crossRc2 = runPreload(runtimes.rc2_022, 'dsh-tools-0.2.2-rc.1', { RDSH_LANG: 'en' });
+    assert.notEqual(crossRc2.status, 0);
+    assert.match(crossRc2.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
   }
 });
 

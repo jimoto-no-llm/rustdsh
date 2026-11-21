@@ -13,7 +13,7 @@ cat > "$T/bin/node" <<'NODE'
 case "${1:-}" in
   --version) echo v24.22.1 ;;
   */pnpm.cjs) echo 10.34.9 ;;
-  */dsh/lib/bin.js) echo 0.2.2-alpha.3 ;;
+  */dsh/lib/bin.js) echo 0.2.2-rc.5 ;;
   *) exit 9 ;;
 esac
 NODE
@@ -30,8 +30,8 @@ HOME="$T/home with space'quote" PATH="$T/bin" DSH_ORIG_BIN= RDSH_ORIG_BIN= RDSH_
 [ -x "$T/home with space'quote/bin/pnpm" ]
 [ -x "$T/home with space'quote/bin/dsh" ]
 [ "$(HOME="$T/home with space'quote" PATH="$T/bin" "$T/home with space'quote/bin/pnpm" --version)" = 10.34.9 ]
-[ "$(HOME="$T/home with space'quote" PATH="$T/bin" "$T/home with space'quote/bin/dsh" --version)" = 0.2.2-alpha.3 ]
-grep -q -- '--ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true pnpm@10.34.9 @deepseek-ai/dsh@0.2.2-alpha.3' "$T/home with space'quote/npm-calls"
+[ "$(HOME="$T/home with space'quote" PATH="$T/bin" "$T/home with space'quote/bin/dsh" --version)" = 0.2.2-rc.5 ]
+grep -q -- '--ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true pnpm@10.34.9 @deepseek-ai/dsh@0.2.2-rc.5' "$T/home with space'quote/npm-calls"
 ! grep -q -- 'install -g' "$T/home with space'quote/npm-calls"
 [ "$(cat "$T/home with space'quote/.config/rdsh/origin")" = "$T/home with space'quote/.local/share/rdsh/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js" ]
 # Explicit native-only install must not call npm or require a runtime.
