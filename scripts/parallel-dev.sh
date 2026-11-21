@@ -281,18 +281,115 @@ free_port_for() {
   die "no free port in $(( $(port_base) ))-$(( $(port_base) + PORT_RANGE - 1 )): every slot is held by a managed worktree"
 }
 
-# Port selection and recording must be one operation: two simultaneous new
-# commands otherwise both see the other's unrecorded hash and pick the same
-# next port. mkdir is atomic on the supported shells, without another runtime.
-reserve_port() (
-  local slug="$1" dir="$2" lock tries=0 port
-  lock="$(worktrees_root)/.rdsh-port-allocation.lock"
-  while ! mkdir "$lock" 2>/dev/null; do
+# --- ownership-safe directory locks ----------------------------------------
+#
+# Both locks are directories, and the holder records a token "<pid>:<nonce>"
+# in the directory's `owner` file. mkdir stays the atomic primitive (no extra
+# process, no extra dependency); the token adds the three properties a bare
+# directory did not have:
+#
+#   * release removes the directory only while the token is still ours, so a
+#     process that lost the lock can never delete its new owner's lock;
+#   * releasing a lock that is already gone succeeds. Cleanup runs from an EXIT
+#     trap under `set -e`, and a finished command must not turn into a failure
+#     because someone else cleaned up first;
+#   * a lock whose recorded owner is no longer running is reclaimed, so a
+#     killed `new` cannot block the next one until the directory is removed by
+#     hand.
+#
+# A directory without an `owner` file is being published, never stale. The
+# token is chosen per shell; `$$` names the process that started the script, so
+# `kill -0` answers "is the owner still there" from a nested subshell too.
+
+lock_token() { printf '%s:%s\n' "$$" "${RANDOM:-0}"; }
+
+lock_owner_pid() {
+  local owner
+  owner="$(sed -n '1p' "$1/owner" 2>/dev/null)" || return 1
+  [ -n "$owner" ] || return 1
+  owner="${owner%%:*}"
+  case "$owner" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$owner"
+}
+
+# Acquire $1, retrying for at most $2 * 50 ms, and print $3 to stderr when it
+# never becomes free. Returns non-zero so the caller owns the outcome; sets
+# LOCK_TOKEN, which release_dir_lock checks.
+acquire_dir_lock() {
+  local lock="$1" limit="$2" busy="$3" token tries=0
+  token="$(lock_token)"
+  while :; do
+    if mkdir -- "$lock" 2>/dev/null; then
+      # Publish ownership before doing any work. If the directory vanished
+      # between mkdir and this write, the acquisition did not happen.
+      if printf '%s\n' "$token" >"$lock/owner" 2>/dev/null; then
+        LOCK_TOKEN="$token"
+        return 0
+      fi
+      continue
+    fi
+    reclaim_stale_dir_lock "$lock" "$token" && continue
     tries=$((tries + 1))
-    [ "$tries" -lt 100 ] || die "port allocation is busy at $lock; no port was assigned"
+    if [ "$tries" -ge "$limit" ]; then
+      printf 'error: %s\n' "$busy" >&2
+      return 1
+    fi
     sleep .05
   done
-  trap 'rmdir "$lock"' EXIT
+}
+
+# Reclaim $1 when its recorded owner is gone. Returns 0 when the caller should
+# retry mkdir at once (the lock is gone or was taken away) and 1 while it is
+# still held. The takeover is itself a directory lock, so two waiters cannot
+# both remove the same stale lock and then race each other's fresh one.
+reclaim_stale_dir_lock() (
+  local lock="$1" token="$2" takeover owner pid graveyard
+  takeover="$lock.reclaim"
+  mkdir -- "$takeover" 2>/dev/null || return 1
+  trap 'rmdir -- "$takeover" 2>/dev/null || :' EXIT
+  [ -d "$lock" ] || return 0                    # already free
+  [ -f "$lock/owner" ] || return 1              # still being published
+  owner="$(sed -n '1p' "$lock/owner" 2>/dev/null)" || return 1
+  [ -n "$owner" ] || return 1
+  [ "$owner" != "$token" ] || return 1
+  pid="$(lock_owner_pid "$lock")" || return 1
+  kill -0 "$pid" 2>/dev/null && return 1        # the recorded owner is alive
+  printf 'note: reclaiming the stale lock %s from pid %s\n' "$lock" "$pid" >&2
+  graveyard="$lock.stale.$$"
+  rm -rf -- "$graveyard" 2>/dev/null || :
+  # Rename first: only this process holds the takeover lock, so the rename
+  # cannot take a lock that changed hands between the checks above.
+  mv -- "$lock" "$graveyard" 2>/dev/null || return 0
+  rm -rf -- "$graveyard" 2>/dev/null || :
+  return 0
+)
+
+# Release $1 when, and only when, this shell still owns it. Idempotent, and
+# deliberately unable to fail: it runs from EXIT traps, where a non-zero status
+# would be reported as a failure of an otherwise successful command.
+release_dir_lock() {
+  local lock="$1" owner
+  [ -n "${LOCK_TOKEN:-}" ] || return 0
+  [ -d "$lock" ] || return 0
+  owner="$(sed -n '1p' "$lock/owner" 2>/dev/null)" || owner=""
+  if [ "$owner" = "$LOCK_TOKEN" ]; then
+    rm -f -- "$lock/owner" 2>/dev/null || :
+    rmdir -- "$lock" 2>/dev/null || :
+  fi
+  return 0
+}
+
+# Port selection and recording must be one operation: two simultaneous new
+# commands otherwise both see the other's unrecorded hash and pick the same
+# next port.
+reserve_port() (
+  local slug="$1" dir="$2" lock port status
+  lock="$(worktrees_root)/.rdsh-port-allocation.lock"
+  acquire_dir_lock "$lock" 100 \
+    "port allocation is busy at $lock; no port was assigned" || exit 1
+  # Preserve the status of the work through the cleanup trap: release is
+  # idempotent, but it must not mask a real failure either.
+  trap 'status=$?; release_dir_lock "$lock"; exit "$status"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   port="$(free_port_for "$slug")" || exit 1
@@ -305,19 +402,14 @@ reserve_port() (
 # scans $GIT_DIR/worktrees and reads every entry's commondir, so an admin
 # directory the other process created but has not finished writing makes this
 # one die with "fatal: failed to read worktrees/<name>/commondir". The lock is
-# the same mkdir spin as reserve_port, and it is never held while the port lock
-# is taken, so the two locks cannot deadlock.
+# never held while the port lock is taken, so the two locks cannot deadlock.
 with_mirror_lock() (
-  local lock tries=0
+  local lock status
   lock="$(worktrees_root)/.rdsh-mirror.lock"
-  while ! mkdir "$lock" 2>/dev/null; do
-    tries=$((tries + 1))
-    # A shared-mirror fetch can legitimately take a while; wait it out rather
-    # than failing the second `new`, but still give up on a stale lock.
-    [ "$tries" -lt 1200 ] || die "the shared mirror is busy at $lock"
-    sleep .05
-  done
-  trap 'rmdir "$lock"' EXIT
+  # A shared-mirror fetch can legitimately take a while; wait it out rather
+  # than failing the second `new`.
+  acquire_dir_lock "$lock" 1200 "the shared mirror is busy at $lock" || exit 1
+  trap 'status=$?; release_dir_lock "$lock"; exit "$status"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   "$@"
@@ -350,6 +442,23 @@ point_at_object_store() {
     printf '%s\n' "$store/objects" >"$alternates"
   fi
 }
+
+# Create the linked worktree and prepare its checkout as one critical section.
+# `git worktree add` writes the mirror's worktree administration, read-tree then
+# reads it back through the shared object database, and the alternates file
+# lives in the mirror's common git dir as well. Another `new` interleaving
+# between those steps makes this one die with "error: cannot check out <sha>".
+# Everything here runs under the mirror lock; nothing takes the port lock, so
+# the two locks cannot deadlock.
+create_worktree() (
+  local slug="$1" dir="$2" ref="$3" base_sha="$4" mirror="$5"
+  git -C "$mirror" worktree add --quiet --no-checkout \
+    -b "$(branch_for "$slug")" "$dir" "refs/remotes/$ref" ||
+    die "git worktree add failed for $dir"
+  git -C "$dir" read-tree --reset -u HEAD ||
+    die "cannot check out $base_sha into $dir"
+  point_at_object_store "$dir" "$(object_store)" || true
+)
 
 ensure_mirror() {
   local mirror remote url
@@ -406,13 +515,8 @@ cmd_new() {
     die "base ref '$ref' does not exist (try RDSH_PARALLEL_BASE_REF=main)"
   base_sha="$(git -C "$mirror" rev-parse "refs/remotes/$ref")"
 
-  with_mirror_lock git -C "$mirror" worktree add --quiet --no-checkout \
-    -b "$(branch_for "$slug")" "$dir" "refs/remotes/$ref" ||
-    die "git worktree add failed for $dir"
-  git -C "$dir" read-tree --reset -u HEAD ||
-    die "cannot check out $base_sha into $dir"
-
-  with_mirror_lock point_at_object_store "$dir" "$(object_store)" || true
+  with_mirror_lock create_worktree "$slug" "$dir" "$ref" "$base_sha" "$mirror" ||
+    exit 1
   git -C "$dir" fetch --quiet "$remote" "+refs/heads/*:refs/remotes/$remote/*" ||
     printf 'warning: fetch in %s failed; retry with git fetch %s\n' "$dir" "$remote" >&2
 

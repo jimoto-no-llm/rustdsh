@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
@@ -131,7 +132,14 @@ if [ "${1:-}" = -C ]; then
   if [ "${1:-}" = worktree ] && [ "${2:-}" = remove ] && [ "${RDSH_TEST_REMOVE_FAIL:-}" = 1 ]; then
     exit 42
   fi
-  if [ "${1:-}" = read-tree ] && [ -n "${RDSH_TEST_GATE:-}" ]; then
+  if [ "${1:-}" = worktree ] && [ "${2:-}" = add ] && [ -n "${RDSH_TEST_DROP_MIRROR_LOCK:-}" ]; then
+    rm -rf -- "$RDSH_TEST_DROP_MIRROR_LOCK"
+  fi
+  if [ "${1:-}" = worktree ] && [ "${2:-}" = add ] && [ -n "${RDSH_TEST_FOREIGN_MIRROR_LOCK:-}" ]; then
+    printf 'foreign:owner\\n' > "$RDSH_TEST_FOREIGN_MIRROR_LOCK/owner"
+  fi
+  if [ "${1:-}" = fetch ] && [ -n "${RDSH_TEST_GATE:-}" ] &&
+     [ "${dir##*/}" = "rustdsh-$RDSH_TEST_SLUG" ]; then
     touch "$RDSH_TEST_GATE/$RDSH_TEST_SLUG"
     tries=0
     while [ ! -e "$RDSH_TEST_GATE/topic-2" ] || [ ! -e "$RDSH_TEST_GATE/topic-42" ]; do
@@ -339,6 +347,68 @@ exec "''' + GIT.as_posix() + '''" "$@"
             self.assertEqual(process.returncode, 0, stdout + stderr)
         ports = [self.command("port", slug).stdout.strip() for slug in ("topic-2", "topic-42")]
         self.assertEqual(len(set(ports)), 2, ports)
+
+    def mirror_lock(self):
+        return self.safe(self.root / ".worktrees" / ".rdsh-mirror.lock")
+
+    def dead_pid(self):
+        # A pid that has exited, used as the recorded owner of a stale lock.
+        for _ in range(5):
+            process = subprocess.Popen([sys.executable, "-c", "pass"])
+            process.wait()
+            try:
+                os.kill(process.pid, 0)
+            except ProcessLookupError:
+                return process.pid
+        self.skipTest("could not obtain a terminated pid")
+
+    def test_missing_mirror_lock_during_new_is_not_a_failure(self):
+        # The CI flake: cleanup ran from an EXIT trap under `set -e`, so a lock
+        # directory that was already gone turned a finished `new` into
+        # "rmdir: failed to remove ...: No such file or directory" and exit 1.
+        self.git_shim()
+        lock = self.mirror_lock()
+        self.command("new", "topic",
+                     env=dict(self.env, RDSH_TEST_DROP_MIRROR_LOCK=lock.as_posix()))
+        self.assertEqual((self.worktree() / "fixture.txt").read_text(encoding="utf-8"), "initial")
+
+    def test_foreign_mirror_lock_is_left_to_its_owner(self):
+        # Cleanup must prove ownership: a lock that changed hands stays with its
+        # new owner instead of being deleted by the previous holder.
+        self.git_shim()
+        lock = self.mirror_lock()
+        self.command("new", "topic",
+                     env=dict(self.env, RDSH_TEST_FOREIGN_MIRROR_LOCK=lock.as_posix()))
+        self.assertTrue(self.worktree().exists())
+        self.assertEqual((lock / "owner").read_text(encoding="utf-8").strip(), "foreign:owner")
+
+    def test_stale_mirror_lock_is_reclaimed(self):
+        self.new("bootstrap")
+        lock = self.mirror_lock()
+        lock.mkdir()
+        (lock / "owner").write_text("%s:0\n" % self.dead_pid(), encoding="utf-8")
+        self.command("new", "topic")
+        self.assertFalse(lock.exists())
+        self.assertTrue(self.worktree().exists())
+
+    def test_live_mirror_lock_is_waited_for_not_taken(self):
+        self.new("bootstrap")
+        lock = self.mirror_lock()
+        lock.mkdir()
+        (lock / "owner").write_text("%s:0\n" % os.getpid(), encoding="utf-8")
+        process = subprocess.Popen(self.shell_command(SCRIPT, ("new", "topic")),
+                                   cwd=self.repo, env=self.env, text=True,
+                                   encoding="utf-8", stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        try:
+            time.sleep(1)
+            self.assertIsNone(process.poll(), "new took a live owner's lock")
+            self.assertTrue(lock.exists())
+        finally:
+            shutil.rmtree(self.safe(lock))
+        stdout, stderr = process.communicate(timeout=45)
+        self.assertEqual(process.returncode, 0, stdout + stderr)
+        self.assertFalse(lock.exists())
 
     def test_alternates_use_common_object_directory(self):
         directory = self.new()
