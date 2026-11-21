@@ -98,7 +98,7 @@ fn missing_or_malformed_keys_fail_locally_in_each_language() {
 }
 
 #[test]
-fn unknown_provider_is_rejected_and_help_lists_both_choices() {
+fn unknown_provider_is_rejected_and_help_lists_all_choices() {
     let fixture = Fixture::new(true);
     for language in ["en", "zh-CN", "ja"] {
         let error = failed(
@@ -109,6 +109,7 @@ fn unknown_provider_is_rejected_and_help_lists_both_choices() {
         );
         assert!(error.contains("searxng"), "{error}");
         assert!(error.contains("ollama"), "{error}");
+        assert!(error.contains("keenable"), "{error}");
         let output = fixture.command(language, &["--help"]).output().unwrap();
         assert!(output.status.success(), "{output:?}");
         let help = String::from_utf8(output.stdout).unwrap();
@@ -116,17 +117,33 @@ fn unknown_provider_is_rejected_and_help_lists_both_choices() {
             "--provider",
             "searxng",
             "ollama",
+            "keenable",
             "OLLAMA_API_KEY",
-            "https://www.tavily.com/",
-            "https://docs.tavily.com/documentation/quickstart",
+            "KEENABLE_API_KEY",
         ] {
             assert!(help.contains(text), "{help}");
+        }
+        let external_terms = match language {
+            "en" => [
+                "organization credits",
+                "IP quota",
+                "Queries are sent to Keenable",
+            ],
+            "zh-CN" => ["组织额度", "IP 配额", "查询会发送到 Keenable"],
+            _ => [
+                "組織クレジット",
+                "IP 単位",
+                "検索語は Keenable に送信されます",
+            ],
+        };
+        for text in external_terms {
+            assert!(help.contains(text), "missing {text:?} in {help}");
         }
     }
 }
 
 #[test]
-fn default_searxng_is_unchanged_by_an_ambient_ollama_key() {
+fn default_searxng_is_unchanged_by_ambient_hosted_provider_keys() {
     let fixture = Fixture::new(true);
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -161,7 +178,9 @@ fn default_searxng_is_unchanged_by_an_ambient_ollama_key() {
             }
             assert!(request.starts_with("GET /search?q=hello+world HTTP/1.0"));
             assert!(!request.to_ascii_lowercase().contains("authorization"));
+            assert!(!request.to_ascii_lowercase().contains("x-api-key"));
             assert!(!request.contains("fixture-key-never-send"));
+            assert!(!request.contains("keenable-key-never-send"));
             let body = "<article class=\"result\"><a href=\"https://example.invalid/a\">Alpha</a><p class=\"content\">A &amp; B</p></article>";
             write!(
                 stream,
@@ -180,6 +199,7 @@ fn default_searxng_is_unchanged_by_an_ambient_ollama_key() {
             .command("en", args)
             .env("SEARXNG_URL", &base)
             .env("OLLAMA_API_KEY", "fixture-key-never-send")
+            .env("KEENABLE_API_KEY", "keenable-key-never-send")
             .output()
             .unwrap();
         assert!(output.status.success(), "{output:?}");

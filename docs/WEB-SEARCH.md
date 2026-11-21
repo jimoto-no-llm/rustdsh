@@ -1,7 +1,7 @@
 # Web検索 / Web search
 
-`rdsh search-web` は SearXNG または Ollama Web Search API から検索結果を取得します。
-検索先は `--provider searxng|ollama` で選択します。既定は `searxng` です。
+`rdsh search-web` は SearXNG、Ollama Web Search API、または Keenable から検索結果を取得します。
+検索先は `--provider searxng|ollama|keenable` で選択し、既定は `searxng` です。ホスト型の検索先は明示選択し、失敗しても自動切り替えしません。
 これはネイティブCLIの検索先の指定です。DSH本体の検索ツールやモデルのルート設定は変更しません。
 
 ## dsh エージェントの `web_search` をローカル検索へ（`web_search_bridge`、既定ON）
@@ -33,8 +33,14 @@ APIキーの取得と利用手順は [公式Quickstart](https://docs.tavily.com/
 検索の入出力は [Search APIリファレンス](https://docs.tavily.com/documentation/api-reference/endpoint/search) を参照してください。
 `rdsh search-web --help` にも同じ案内があります。
 
-rustdshの組み込み検索先はSearXNGとOllamaです。Tavilyはサービスの紹介で、
+rustdshの組み込み検索先はSearXNG・Ollama・Keenableです。Tavilyはサービスの紹介で、
 `--provider tavily` や `TAVILY_API_KEY` による実行にはまだ対応していません。
+
+## 検索プロバイダーと外部送信
+
+`search-web` の既定は SearXNG です。Ollama と Keenable は `--provider` で明示選択し、失敗時も別の提供元へ自動切り替えません。
+Keenable を選ぶと検索語は Keenable の外部 API に送信されます。キーなしの呼び出しは IP 単位の上限を使い、クレジットを消費しませんが、検索語・IP アドレス・アプリ名 `rdsh` が記録されます。`KEENABLE_API_KEY` を設定した呼び出しは組織のクレジットを消費します。
+接続先・リクエスト・レスポンスの仕様は [公式APIリファレンス](https://docs.keenable.ai/api-reference.md) と [Search API](https://docs.keenable.ai/api-reference/search.md) を参照してください。
 
 ## 有効にする
 
@@ -197,9 +203,36 @@ HTTPエラー、リダイレクト、不正なJSONや結果形式、15秒のタ�
 Ollama APIの利用条件と制限は利用者のアカウントに従います。
 キーの存在だけではOllamaを選択せず、失敗時の別プロバイダーへの自動切り替えも行いません。
 
+## Keenable Web Search API
+
+`--provider keenable` を明示して利用します。`KEENABLE_API_KEY` は任意で、コマンド引数には渡しません。
+
+```sh
+rdsh search-web "Rust async" --provider keenable --limit 5
+rdsh search-web "Rust async" --provider keenable --json
+```
+
+この検索先は Keenable の外部 API に検索語を送信します。空でない `KEENABLE_API_KEY` がない場合は `POST https://api.keenable.ai/v1/search/public` を使い、`Content-Type: application/json`、`X-Keenable-Title: rdsh`、`{"query":"Rust async","max_results":5}` を送信します。キーなしの呼び出しは送信元 IP 単位の上限を使い、クレジットは消費しませんが、検索語・IP アドレス・アプリ名 `rdsh` が記録されます。
+
+空でない `KEENABLE_API_KEY` がある場合は `POST https://api.keenable.ai/v1/search` を使い、`X-API-Key` で認証します。この呼び出しは組織のクレジットを消費します（単なる高いレート制限ではありません）。公開エンドポイントへ自動で切り替えることも、別のプロバイダーへフォールバックすることもありません。
+
+APIの `max_results` は1〜50です。rdsh は `--limit` の値をこの範囲に収めます。結果は `results[].title`、`results[].url`、`results[].snippet` から読み取り、`snippet` を `Hit.content` として返します。deprecated の `description` は空文字列のため読み取りません。
+
+HTTPリダイレクトは追跡しません。各HTTP試行の接続・全体タイムアウトは15秒（待機時間を除く）、応答本文の上限は2 MiBです。
+
+429では `Retry-After` の秒数が60秒以内なら指定秒数を待って1回だけ再試行します。2回目の429では停止します。`Retry-After` が欠落・不正なら少なくとも60秒待つよう案内します。60秒超または数値範囲超過なら自動再試行せず、指定された全待機時間を案内します。範囲超過の数値自体はエラーに出しません。
+
+5xx（500/503/529を含む）は初回失敗後に最大3回まで再試行します。有効な秒数の `Retry-After` がある場合は、指数backoffの待機秒数と指定秒数の大きい方以上を待ちます。欠落・不正時は1、2、4秒の指数backoffを使います。`Retry-After` が60秒超または数値範囲超過なら短縮せず、自動再試行を停止して指定された全待機時間を案内します。範囲超過値自体はエラーに出しません。
+
+402 `insufficient_credits` は再試行せず、組織のクレジット補充を案内します。
+
+HTTPエラー本文、検索語、APIキーはエラー表示へ出しません。エラーには、検索語が Keenable に送られることと、キーなし・キーありそれぞれの記録／クレジットの扱いを明記します。
+
+仕様: [API reference](https://docs.keenable.ai/api-reference.md)、[Search](https://docs.keenable.ai/api-reference/search.md)、[Errors](https://docs.keenable.ai/errors.md#5xx)。
+
 ## 出力
 
-両方ともテキストはタイトル、URL、最大240文字の本文スニペットを表示します。
+各検索先ともテキストはタイトル、URL、最大240文字の本文スニペットを表示します。
 `--json` は同じ形式で本文を省略せず返します。
 
 ```json
@@ -216,8 +249,7 @@ Ollama APIの利用条件と制限は利用者のアカウントに従います�
 
 ## 検証
 
-`cargo test websearch --bin rdsh` と `cargo test --test web_search_providers` は
-ローカルの模擬HTTPサーバーとダミーキーを使います。外部APIやモデルは呼び出しません。
-POST本文・認証・件数・結果順序・エラー・応答サイズ・タイムアウトと、CLIの検索先選択、
-機能スイッチ、三言語のキーエラー、キーがあっても既定はSearXNGであることを確認します。
-Ollamaアカウントの認証や実サービスの検索品質の確認は含みません。
+`cargo test websearch::keenable --bin rdsh`、`cargo test --test web_search_keenable`、`cargo test --test web_search_providers` は
+ローカルの模擬HTTPサーバーとダミーキーを使い、Keenable/Ollama を含む外部APIやモデルには接続しません。
+POST本文・認証・件数・結果順序・エラー・応答サイズ・タイムアウト、CLIの明示選択、三言語のエラー、
+キーがあっても既定はSearXNGであることを確認します。実アカウント認証や検索品質の確認は含みません。
