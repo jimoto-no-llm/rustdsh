@@ -159,25 +159,28 @@ mkdir -p "$DP/cfg/profiles/tui"
 DSH_HOME="$DP/cfg" "$BIN" settings set general.default_profile headless >/dev/null 2>&1
 if dp_dry DSH_HOME="$DP/cfg" "$BIN" --dry-run boot 2>/dev/null | grep -q '"--profile" "headless"'; then ok "general.default_profile beats local tui dir"; else echo "FAIL(output): settings default_profile beats tui dir"; exit 1; fi
 if dp_dry DSH_HOME="$DP/cfg" RDSH_DEFAULT_PROFILE=web "$BIN" --dry-run boot 2>/dev/null | grep -q '"--profile" "web"'; then ok "RDSH_DEFAULT_PROFILE beats general.default_profile"; else echo "FAIL(output): env beats settings default_profile"; exit 1; fi
-if dp_dry DSH_HOME="$DP/empty" "$BIN" --dry-run --profile tui 2>/dev/null | grep -q '"--profile" "tui"' && dp_dry DSH_HOME="$DP/empty" "$BIN" --dry-run tui 2>/dev/null | grep -q '"--profile" "tui"'; then ok "explicit tui passes through verbatim"; else echo "FAIL(output): explicit tui passthrough"; exit 1; fi
+if dp_dry DSH_HOME="$DP/empty" "$BIN" --dry-run --profile tui 2>/dev/null | grep -q '"--profile" "tui"'; then ok "explicit --profile tui passes through verbatim"; else echo "FAIL(output): explicit tui passthrough"; exit 1; fi
+if dp_dry DSH_HOME="$DP/withtui" "$BIN" --dry-run tui 2>/dev/null | grep -q '"--profile" "tui"'; then ok "bare tui with an installed tui profile delegates"; else echo "FAIL(output): tui profile passthrough"; exit 1; fi
+# Without an installed tui profile a bare `rdsh tui` plans the built-in Rust TUI.
+if dp_dry DSH_HOME="$DP/empty" "$BIN" --dry-run tui 2>/dev/null | grep -q "native-tui --backend dsh --dsh-profile web"; then ok "bare tui without a profile plans the built-in TUI"; else echo "FAIL(output): builtin tui fallback"; exit 1; fi
 # --- slim: Node compile cache (the part of slim that really speeds up Node boot) ---
 # Default dir is $HOME/.cache/rdsh-node-compile-cache (XDG_CACHE_HOME is not consulted).
 CC="$RG_TMP/cc"
-mkdir -p "$CC/home" "$CC/home-pt"
+mkdir -p "$CC/home" "$CC/home-pt" "$CC/dsh/profiles/tui"
 printf '#!/bin/sh\nprintf "CACHE=%%s SLIM=%%s\\n" "$NODE_COMPILE_CACHE" "$RDSH_SLIM"\n' > "$CC/envdsh"
 chmod 755 "$CC/envdsh"
 CCDEF="$CC/home/.cache/rdsh-node-compile-cache"
-if env -u NODE_COMPILE_CACHE -u RDSH_NODE_COMPILE_CACHE HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\"$CCDEF\""; then ok "slim dry-run shows NODE_COMPILE_CACHE"; else echo "FAIL(output): slim dry-run shows NODE_COMPILE_CACHE"; exit 1; fi
-if env -u NODE_COMPILE_CACHE HOME="$CC/home-pt" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run --passthrough tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE\|RDSH_SLIM"; then echo "FAIL: --passthrough must add no env"; exit 1; else ok "passthrough adds no env"; fi
+if env -u NODE_COMPILE_CACHE -u RDSH_NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\"$CCDEF\""; then ok "slim dry-run shows NODE_COMPILE_CACHE"; else echo "FAIL(output): slim dry-run shows NODE_COMPILE_CACHE"; exit 1; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home-pt" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run --passthrough tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE\|RDSH_SLIM"; then echo "FAIL: --passthrough must add no env"; exit 1; else ok "passthrough adds no env"; fi
 if [ ! -e "$CC/home-pt/.cache" ]; then ok "passthrough does not create the cache dir"; else echo "FAIL: passthrough created the cache dir"; exit 1; fi
-if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_PASSTHROUGH=1 DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE"; then echo "FAIL: RDSH_PASSTHROUGH=1 must add no env"; exit 1; else ok "RDSH_PASSTHROUGH=1 adds no cache env"; fi
-if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE=0 DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE="'; then echo "FAIL: RDSH_NODE_COMPILE_CACHE=0 opt-out ignored"; else ok "RDSH_NODE_COMPILE_CACHE=0 opts out"; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_PASSTHROUGH=1 DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE"; then echo "FAIL: RDSH_PASSTHROUGH=1 must add no env"; exit 1; else ok "RDSH_PASSTHROUGH=1 adds no cache env"; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE=0 DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE="'; then echo "FAIL: RDSH_NODE_COMPILE_CACHE=0 opt-out ignored"; else ok "RDSH_NODE_COMPILE_CACHE=0 opts out"; fi
 # RDSH_NODE_COMPILE_CACHE=<dir> relocates the cache to the named directory.
-if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE="$CC/ncc-hint" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\\\"$CC/ncc-hint\\\""; then ok "RDSH_NODE_COMPILE_CACHE=<dir> relocates in dry-run"; else echo "FAIL(output): RDSH_NODE_COMPILE_CACHE=<dir> relocation"; exit 1; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE="$CC/ncc-hint" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\\\"$CC/ncc-hint\\\""; then ok "RDSH_NODE_COMPILE_CACHE=<dir> relocates in dry-run"; else echo "FAIL(output): RDSH_NODE_COMPILE_CACHE=<dir> relocation"; exit 1; fi
 rm -rf "$CC/ncc-hint"
 if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE="$CC/ncc-hint" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" "$BIN" tui > "$CC/out-hint" 2> "$CC/err" && grep -q "CACHE=$CC/ncc-hint " "$CC/out-hint" && [ -d "$CC/ncc-hint" ]; then ok "RDSH_NODE_COMPILE_CACHE=<dir> exec exports it and creates the dir"; else echo "FAIL(output): RDSH_NODE_COMPILE_CACHE=<dir> exec"; cat "$CC/err"; exit 1; fi
 # A value the user already exports is left alone: rdsh adds nothing to the exec line.
-if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep "would exec" | grep -q 'NODE_COMPILE_CACHE='; then echo "FAIL: user NODE_COMPILE_CACHE must not be overridden (dry-run)"; exit 1; else ok "user NODE_COMPILE_CACHE respected (dry-run)"; fi
+if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$SB/orig/dsh" "$BIN" --dry-run tui 2>/dev/null | grep "would exec" | grep -q 'NODE_COMPILE_CACHE='; then echo "FAIL: user NODE_COMPILE_CACHE must not be overridden (dry-run)"; exit 1; else ok "user NODE_COMPILE_CACHE respected (dry-run)"; fi
 if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" "$SB/bin/dsh" --version 2>/dev/null | grep -q "CACHE=/tmp/rdsh-mine "; then ok "metadata exec passes the user's NODE_COMPILE_CACHE through"; else echo "FAIL(output): metadata exec must keep the user's NODE_COMPILE_CACHE"; exit 1; fi
 # Real exec (not dry-run): the child sees the default value and the directory exists.
 # (The dry-runs above already made it, so start from a clean slate.)
