@@ -6,7 +6,6 @@ rust-version = "1.85"
 description = "Rust micro-orchestrator for local LLM agents: process isolation, session management and native tooling with a swappable harness adapter (bundled: DeepSeek Harness)"
 license = "MIT"
 repository = "https://github.com/jimoto-no-llm/rustdsh"
-homepage = "https://github.com/jimoto-no-llm/rustdsh"
 readme = "README.md"
 keywords = ["llm", "agents", "micro-orchestrator", "process-isolation", "cli"]
 categories = ["command-line-utilities", "development-tools"]
