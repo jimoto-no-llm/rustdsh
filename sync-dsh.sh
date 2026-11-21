@@ -155,6 +155,11 @@ else
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 write_state() {
+  # A no-op is not an update event. A rebuilt binary can have different bytes
+  # while reporting the same version; that must not produce "v1 -> v1" in the
+  # Web UI banner.
+  [ -n "$3" ] || return 0
+  [ "$2" = "$3" ] && return 0
   node - "$LOGDIR/update-state.json" "$1" "$2" "$3" "$(date +%s)000" <<'JSON'
 const fs = require('node:fs');
 const [target, kind, from, to, at] = process.argv.slice(2);
