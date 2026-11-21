@@ -2109,6 +2109,7 @@ fn main() {
             )
         }),
         None => {
+            let explicit_profile = cli.profile.is_some();
             let parsed = dsh_args::split_launcher_args(cli.profile, cli.extra);
             match parsed {
                 dsh_args::Launcher::Help => {
@@ -2124,22 +2125,57 @@ fn main() {
                     patches,
                     app_args,
                 } => {
-                    let mut all = cli.patch;
-                    all.extend(patches);
-                    if !dry {
-                        // Decides from local files only; the check itself runs
-                        // in a detached worker, so the boot never waits.
-                        plugins_release::auto_tick();
+                    // A bare `rdsh tui` is the documented terminal entry point, but
+                    // DSH ships no tui profile. Rather than failing with a
+                    // missing-profile error, fall back to the Rust TUI this binary
+                    // carries, and say so. An installed tui profile still wins, and
+                    // an explicit --profile never falls back.
+                    if profile == "tui"
+                        && from_default.is_none()
+                        && !explicit_profile
+                        && !local_tui_profile()
+                    {
+                        if dry {
+                            // --dry-run reports what would happen instead of
+                            // starting the terminal program, so it must not
+                            // stop at the built-in TUI's tty guard.
+                            println!(
+                                "[rdsh dry-run] native-tui --backend dsh --dsh-profile web (no local 'tui' profile: the built-in Rust TUI would start)"
+                            );
+                            Ok(())
+                        } else {
+                            announce_builtin_tui(locale);
+                            native_harness::cmd_native_tui(
+                                "dsh".to_string(),
+                                std::env::current_dir()
+                                    .unwrap_or_else(|_| std::path::PathBuf::from(".")),
+                                None,
+                                Some("web".to_string()),
+                                None,
+                                None,
+                                None,
+                                None,
+                                locale,
+                            )
+                        }
+                    } else {
+                        let mut all = cli.patch;
+                        all.extend(patches);
+                        if !dry {
+                            // Decides from local files only; the check itself
+                            // runs in a detached worker, so boot never waits.
+                            plugins_release::auto_tick();
+                        }
+                        passthrough::exec_boot(
+                            &profile,
+                            from_default.as_deref(),
+                            &all,
+                            &app_args,
+                            dry,
+                            slim,
+                            locale,
+                        )
                     }
-                    passthrough::exec_boot(
-                        &profile,
-                        from_default.as_deref(),
-                        &all,
-                        &app_args,
-                        dry,
-                        slim,
-                        locale,
-                    )
                 }
                 dsh_args::Launcher::Dump {
                     profile,
@@ -3072,6 +3108,26 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
 // else a guided error (dsh 0.2.0 ships acp, web, headless, sdk and
 // sdk-minimal templates, but no tui template, so a bare default of tui
 // would fail on fresh environments).
+/// Whether this machine has an installed DSH tool profile named `tui`.
+fn local_tui_profile() -> bool {
+    std::path::Path::new(&format!("{}/profiles/tui", inspect::dsh_home())).is_dir()
+}
+
+/// Say once, in the caller's language, that a bare `rdsh tui` opened the Rust TUI.
+fn announce_builtin_tui(locale: crate::locale::Locale) {
+    eprintln!(
+        "[rdsh] {}",
+        match locale {
+            crate::locale::Locale::English =>
+                "no local 'tui' profile; starting the built-in Rust TUI (install a tui profile with 'dsh plugin --profile tui add <package>' to delegate instead)",
+            crate::locale::Locale::Chinese =>
+                "本地没有 'tui' 配置文件；将启动内置的 Rust TUI（如需委托，请用 'dsh plugin --profile tui add <package>' 安装 tui 配置文件）",
+            crate::locale::Locale::Japanese =>
+                "ローカルに 'tui' プロファイルが無いため、組み込みの Rust TUI を起動します（委譲したい場合は 'dsh plugin --profile tui add <package>' で導入してください）",
+        }
+    );
+}
+
 fn pick_default_profile(env: Option<&str>, local_tui: bool) -> Result<String, String> {
     if let Some(name) = env.map(str::trim).filter(|s| !s.is_empty()) {
         return Ok(name.to_string());

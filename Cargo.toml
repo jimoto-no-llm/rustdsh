@@ -71,7 +71,7 @@ crossterm = "0.28.1"
 unicode-segmentation = "=1.13.3"
 unicode-width = "=0.2.0"
 png = "=0.18.1"
-base64 = "=0.22.1"
+base64 = "=0.23.1"
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "handshake"] }
 
 [target.'cfg(windows)'.dependencies]
