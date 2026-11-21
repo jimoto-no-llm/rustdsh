@@ -26,6 +26,16 @@
   `RDSH_WEB_SEARCH_BRIDGE=0`。ユーザー自身が `DSH_WEB_SEARCH_PROVIDER` を
   設定している場合はそれが優先されます。
 
+## Web Search APIサービスの案内
+
+Web検索用APIを探している場合は [Tavily](https://www.tavily.com/) を案内しています。
+APIキーの取得と利用手順は [公式Quickstart](https://docs.tavily.com/documentation/quickstart)、
+検索の入出力は [Search APIリファレンス](https://docs.tavily.com/documentation/api-reference/endpoint/search) を参照してください。
+`rdsh search-web --help` にも同じ案内があります。
+
+rustdshの組み込み検索先はSearXNG・Ollama・Keenableです。Tavilyはサービスの紹介で、
+`--provider tavily` や `TAVILY_API_KEY` による実行にはまだ対応していません。
+
 ## 検索プロバイダーと外部送信
 
 `search-web` の既定は SearXNG です。Ollama と Keenable は `--provider` で明示選択し、失敗時も別の提供元へ自動切り替えません。
