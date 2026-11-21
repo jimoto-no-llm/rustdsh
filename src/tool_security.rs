@@ -24,7 +24,7 @@ struct AuditedAdapter {
     bin_sha256: &'static str,
 }
 
-const AUDITED_ADAPTERS: [AuditedAdapter; 10] = [
+const AUDITED_ADAPTERS: [AuditedAdapter; 12] = [
     AuditedAdapter {
         id: "dsh-tools-0.2.0-rc.2",
         dsh_version: "0.2.0-rc.2",
@@ -95,6 +95,21 @@ const AUDITED_ADAPTERS: [AuditedAdapter; 10] = [
         dsh_version: "0.2.2-rc.3",
         tools_version: "0.2.2-rc.3",
         // Byte-identical to rc.2; only the manifest pair differs.
+        bin_sha256: "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9",
+    },
+    AuditedAdapter {
+        id: "dsh-tools-0.2.2-rc.4",
+        dsh_version: "0.2.2-rc.4",
+        tools_version: "0.2.2-rc.4",
+        // rc.4 re-cut no entry files: lib/bin.js and dsh-tools' lib/index.js
+        // are byte-identical to rc.2/rc.3, but this manifest pair is audited.
+        bin_sha256: "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9",
+    },
+    AuditedAdapter {
+        id: "dsh-tools-0.2.2-rc.5",
+        dsh_version: "0.2.2-rc.5",
+        tools_version: "0.2.2-rc.5",
+        // Byte-identical to rc.2-rc.4; only the manifest pair differs.
         bin_sha256: "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9",
     },
 ];
@@ -490,6 +505,99 @@ mod tests {
             );
         }
     }
+    /// 0.2.0 and 0.2.1 select the one legacy constructor anchor; 0.2.2 moved
+    /// the service onto Cordis and needs an explicit per-adapter marker. The
+    /// adapter table has no other line, so the 0.2.2 prefix is the boundary.
+    fn needs_explicit_constructor(version: &str) -> bool {
+        version.starts_with("0.2.2-")
+    }
+
+    /// Keys in one \`Object.freeze({ ... })\` block of the embedded preload.
+    /// Only quoted names followed by \`:\` count, so the digest values do not.
+    fn preload_object_keys(section: &str) -> Vec<&str> {
+        let mut keys = Vec::new();
+        let mut rest = section;
+        while let Some(start) = rest.find('\'') {
+            rest = &rest[start + 1..];
+            let Some(end) = rest.find('\'') else { break };
+            let key = &rest[..end];
+            rest = &rest[end + 1..];
+            if rest.trim_start().starts_with(':') {
+                keys.push(key);
+            }
+        }
+        keys
+    }
+
+    fn preload_block(header: &str) -> &'static str {
+        let (_, after) = PRELOAD
+            .split_once(header)
+            .unwrap_or_else(|| panic!("preload.mjs is missing {header:?}"));
+        after
+            .split_once("\n});")
+            .unwrap_or_else(|| panic!("preload.mjs has no end for {header:?}"))
+            .0
+    }
+
+    /// Preload entries the launcher never selects. `plugins/rdsh-mcp-exposure`
+    /// pins the upstream runtime in its devDependencies and runs this preload
+    /// under that exact release, so the preload has to recognise it even though
+    /// the audit table does not. `dsh-tools-0.2.1-rc.5` ships the same entry
+    /// file as the audited 0.2.1-rc.3/rc.4 (`1e53932e…`); dropping the entry
+    /// failed that bundle's guarded test with `RDSH_SECURITY[UNKNOWN_ADAPTER]`.
+    const PRELOAD_ONLY_ADAPTERS: [&str; 1] = ["dsh-tools-0.2.1-rc.5"];
+
+    #[test]
+    fn preload_covers_every_audited_adapter() {
+        let ids = AUDITED_ADAPTERS.map(|adapter| adapter.id);
+        let adapters = preload_object_keys(preload_block("const adapters = Object.freeze({"));
+        for id in ids {
+            assert!(
+                adapters.contains(&id),
+                "security/preload.mjs adapters is missing {id}"
+            );
+        }
+        for adapter in &adapters {
+            assert!(
+                ids.contains(adapter) || PRELOAD_ONLY_ADAPTERS.contains(adapter),
+                "security/preload.mjs adapters has an unaudited entry {adapter}"
+            );
+        }
+        for adapter in PRELOAD_ONLY_ADAPTERS {
+            assert!(
+                adapters.contains(&adapter),
+                "security/preload.mjs adapters is missing the preload-only {adapter}"
+            );
+        }
+
+        let constructors =
+            preload_object_keys(preload_block("const constructors = Object.freeze({"));
+        for adapter in AUDITED_ADAPTERS {
+            let listed = constructors.contains(&adapter.id);
+            if needs_explicit_constructor(adapter.dsh_version) {
+                assert!(
+                    listed,
+                    "security/preload.mjs constructors is missing {}",
+                    adapter.id
+                );
+            } else {
+                // The legacy line shares one anchor; a per-adapter key for an
+                // audited legacy adapter would silently override it.
+                assert!(
+                    !listed,
+                    "security/preload.mjs constructors pins the legacy adapter {}",
+                    adapter.id
+                );
+            }
+        }
+        for constructor in &constructors {
+            assert!(
+                ids.contains(constructor) || PRELOAD_ONLY_ADAPTERS.contains(constructor),
+                "security/preload.mjs constructors has an unaudited entry {constructor}"
+            );
+        }
+    }
+
     #[test]
     fn boundary_is_opt_in() {
         configure(false);
@@ -636,6 +744,31 @@ mod tests {
                 "RDSH_AUDITED_DSH_ALPHA23",
                 "dsh-tools-0.2.2-alpha.3",
                 "RDSH_AUDITED_RUNTIME_ALPHA23",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC1_022",
+                "dsh-tools-0.2.2-rc.1",
+                "RDSH_AUDITED_RUNTIME_RC1_022",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC2_022",
+                "dsh-tools-0.2.2-rc.2",
+                "RDSH_AUDITED_RUNTIME_RC2_022",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC3_022",
+                "dsh-tools-0.2.2-rc.3",
+                "RDSH_AUDITED_RUNTIME_RC3_022",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC4_022",
+                "dsh-tools-0.2.2-rc.4",
+                "RDSH_AUDITED_RUNTIME_RC4_022",
+            ),
+            (
+                "RDSH_AUDITED_DSH_RC5_022",
+                "dsh-tools-0.2.2-rc.5",
+                "RDSH_AUDITED_RUNTIME_RC5_022",
             ),
         ];
         // One release per run is enough: a machine normally carries a single

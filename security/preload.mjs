@@ -12,9 +12,18 @@ const adapters = Object.freeze({
   'dsh-tools-0.2.1-alpha.3': '614e4f50fff440f3f80cbe047148f7ad0ef2807ca27379e57f7e4f57925642cf',
   'dsh-tools-0.2.1-rc.3': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
   'dsh-tools-0.2.1-rc.4': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
+  // Preload-only: the launcher never selects 0.2.1-rc.5 (it is not in
+  // AUDITED_ADAPTERS), but plugins/rdsh-mcp-exposure pins that release in its
+  // devDependencies and its guarded test runs this preload under it. The entry
+  // file is byte-identical to the audited 0.2.1-rc.3 and rc.4.
+  'dsh-tools-0.2.1-rc.5': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
   'dsh-tools-0.2.2-alpha.2': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
   'dsh-tools-0.2.2-alpha.3': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
-  'dsh-tools-0.2.1-rc.5': '1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a',
+  'dsh-tools-0.2.2-rc.1': '1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd',
+  'dsh-tools-0.2.2-rc.2': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.3': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.4': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
+  'dsh-tools-0.2.2-rc.5': 'bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0',
 });
 // The boundary installs itself from the tool runtime's constructor. Each
 // upstream line moves that constructor around, so the anchor is per adapter:
@@ -23,9 +32,16 @@ const adapters = Object.freeze({
 const LEGACY_CONSTRUCTOR =
   '\t\tthis.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls);';
 const constructors = Object.freeze({
+  // The legacy line shares the anchor below; keeping the explicit key that
+  // main shipped preserves the 0.2.1-rc.5 preload-only behaviour.
+  'dsh-tools-0.2.1-rc.5': '\t\tsuper(ctx, "tools");',
   'dsh-tools-0.2.2-alpha.2': '\t\tsuper(ctx, "tools");',
   'dsh-tools-0.2.2-alpha.3': '\t\tsuper(ctx, "tools");',
-  'dsh-tools-0.2.1-rc.5': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.1': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.2': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.3': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.4': '\t\tsuper(ctx, "tools");',
+  'dsh-tools-0.2.2-rc.5': '\t\tsuper(ctx, "tools");',
 });
 
 const language = (() => {

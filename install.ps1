@@ -94,7 +94,7 @@ function Ensure-AgentRuntime {
   Write-Host '[2/3] Preparing private pnpm and DSH runtime...'
   $packages = @('pnpm@10.34.9')
   if ($WithCodex) { $packages += '@openai/codex@0.166.0' }
-  if ($needDsh) { $packages += '@deepseek-ai/dsh@0.2.2-alpha.3' }
+  if ($needDsh) { $packages += '@deepseek-ai/dsh@0.2.2-rc.5' }
   & $npmProgram install --prefix $runtime --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true @packages
   if ($LASTEXITCODE -ne 0) { throw 'Private runtime installation failed' }
   $pnpmScript = Join-Path $runtime 'node_modules/pnpm/bin/pnpm.cjs'
