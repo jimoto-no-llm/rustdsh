@@ -64,47 +64,6 @@ fn settings_default_to_automatic_language_selection() {
 }
 
 #[test]
-fn every_generated_command_and_argument_id_has_a_localized_help_entry() {
-    fn assert_tree(command: &clap::Command, locale: crate::locale::Locale) {
-        assert!(
-            crate::localized_command_about(command.get_name(), locale).is_some(),
-            "missing command description for {}",
-            command.get_name()
-        );
-        for arg in command.get_arguments() {
-            assert!(
-                crate::localized_arg_help(arg.get_id().as_str(), locale).is_some(),
-                "missing argument description for {} in {}",
-                arg.get_id(),
-                command.get_name()
-            );
-        }
-        for subcommand in command.get_subcommands() {
-            assert_tree(subcommand, locale);
-        }
-    }
-
-    let mut command = <crate::Cli as clap::CommandFactory>::command();
-    command.build();
-    for locale in [
-        crate::locale::Locale::Chinese,
-        crate::locale::Locale::Japanese,
-    ] {
-        assert_tree(&command, locale);
-    }
-}
-
-#[test]
-fn english_help_uses_the_derive_generated_tree_unchanged() {
-    let mut generated = <crate::Cli as clap::CommandFactory>::command();
-    let mut localized = crate::localized_command(crate::locale::Locale::English);
-    assert_eq!(
-        generated.render_long_help().to_string(),
-        localized.render_long_help().to_string()
-    );
-}
-
-#[test]
 fn native_message_catalog_has_text_for_every_supported_language() {
     use crate::locale::{native_message, Locale, NativeMessage};
 

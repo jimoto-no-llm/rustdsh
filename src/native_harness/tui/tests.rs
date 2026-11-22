@@ -175,7 +175,7 @@ fn localized_cli_includes_native_terminal_command() {
         crate::locale::Locale::Japanese,
         crate::locale::Locale::Chinese,
     ] {
-        let mut command = crate::localized_command(locale);
+        let mut command = crate::cli_args::localized_command(locale);
         assert!(command
             .find_subcommand_mut("native-tui")
             .unwrap()
