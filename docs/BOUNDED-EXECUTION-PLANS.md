@@ -7,7 +7,7 @@ execution ownership. The ordinary Rust launcher and `--passthrough` are unchange
 
 ## Connect an existing run
 
-Use the existing session-ledger to establish a confirmed DSH 0.2.0-rc.2 native
+Use the existing session-ledger to establish a confirmed DSH 0.2.2-rc.5 native
 session in this project. `session-ledger start` creates the session and stops its
 owned ACP process without sending a prompt. Plan setup sends no model request.
 
@@ -58,7 +58,7 @@ marker blocks attachment. Failed or stale writer locks are preserved.
 
 The scoped Node preload requires Node 22.15+ or 24. It checks the whole published
 source SHA256 for `dsh-workflow-ptc`, `dsh-subagent` and
-`dsh-subagent-spawn-in-process` at 0.2.0-rc.2, and exact adapter markers. An
+`dsh-subagent-spawn-in-process` at 0.2.2-rc.5, and exact adapter markers. An
 unrecognized source refuses to load. It changes only this launch's module source
 in memory; no installed module, profile or global setting is rewritten.
 
@@ -145,8 +145,8 @@ per page, and preserve page/expansion across independent refreshes.
 npm ci --prefix dashboard
 npm test --prefix dashboard
 npm install --prefix /isolated/native-plan --ignore-scripts --no-audit --no-fund \
-  @deepseek-ai/dsh-workflow-ptc@0.2.0-rc.2 @deepseek-ai/dsh-subagent@0.2.0-rc.2 \
-  @deepseek-ai/dsh-subagent-spawn-in-process@0.2.0-rc.2 @deepseek-ai/cordis@4.0.4
+  @deepseek-ai/dsh-workflow-ptc@0.2.2-rc.5 @deepseek-ai/dsh-subagent@0.2.2-rc.5 \
+  @deepseek-ai/dsh-subagent-spawn-in-process@0.2.2-rc.5 @deepseek-ai/cordis@4.1.0
 RDSH_TEST_PLAN_PACKAGE=/isolated/native-plan/package.json node --test tests/plan-runtime-native.test.mjs
 npm test --prefix tests/e2e
 ```

@@ -270,7 +270,7 @@ export function previewRecipe({ project, version, run, state, bindings, planId, 
   const blockers = [];
   const add = (code, detail = null) => blockers.push({ code, detail });
   const ledgerReady = run.project_id === project.id && text(run.run_id);
-  if (!ledgerReady || run.binding !== "confirmed" || run.cli !== "dsh" || run.cli_version !== "0.2.0-rc.2" || !text(run.cli_session_id))
+  if (!ledgerReady || run.binding !== "confirmed" || run.cli !== "dsh" || run.cli_version !== "0.2.2-rc.5" || !text(run.cli_session_id))
     add("run_binding_unconfirmed");
   const cwd = path.resolve(run.cwd || "");
   const relative = path.relative(project.root, cwd);

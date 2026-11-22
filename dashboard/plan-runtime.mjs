@@ -135,7 +135,7 @@ export async function preparePlanAttachment(project, record, env) {
   if (
     record.binding !== "confirmed" ||
     record.cli_session_id !== binding.binding.session_id ||
-    record.cli_version !== "0.2.0-rc.2"
+    record.cli_version !== "0.2.2-rc.5"
   )
     throw new PlanError("plan_native_context_unconfirmed");
   const reason = plans.stopReason(await plans.read(), binding);

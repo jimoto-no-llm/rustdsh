@@ -105,7 +105,7 @@ async function setup(t) {
       command: [process.execPath],
       env,
     }),
-    run = await ledger.confirm(reported.run_id, "native-recipe-fixture", "0.2.0-rc.2");
+    run = await ledger.confirm(reported.run_id, "native-recipe-fixture", "0.2.2-rc.5");
   t.after(async () => {
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith("rdsh-recipe-test-"));

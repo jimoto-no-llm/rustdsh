@@ -58,7 +58,7 @@ registerHooks({
         "utf8",
       ),
     );
-    if (pkg.name !== "@deepseek-ai/" + match[1] || pkg.version !== "0.2.0-rc.2")
+    if (pkg.name !== "@deepseek-ai/" + match[1] || pkg.version !== "0.2.2-rc.5")
       throw new Error("Native plan guard: unsupported runtime");
     const source =
         typeof loaded.source === "string"

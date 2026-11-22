@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 export const planBoundaryKey = "rdsh.native.execution-plan.v1";
 export const planRuntimeHashes = Object.freeze({
   "dsh-workflow-ptc":
-    "4d722dc3cfee83bdc3c131c6d8dd088efb599688f1ee028ca004af9f72ae4693",
+    "b1562c97eae68d58d42b23d5d047e6db557c768d6248ab651f152f5e421aa19f",
   "dsh-subagent":
-    "75b50b1c9452a6aeb10d1c859e3f45b05e062ea1fad6ed3bcd9577f2bc912541",
+    "47837c0cd3cd8259fbdd14b7a477f3df3f928946c5b9e261f35a883411ba3697",
   "dsh-subagent-spawn-in-process":
-    "11c92108dd145957f8251a81fc9bfb8a30e7f6f25d96e34a5cb8581a4be4be06",
+    "249df2c7bdc046c1dd7149acbb40e604eabcba28a7e07ffa4226c2a03f0a3aaa",
 });
 function once(source, from, to) {
   if (source.split(from).length !== 2)
@@ -27,6 +27,8 @@ export function guardedPlanSource(packageName, source) {
       `\n{ const proto = SubagentRuntime.prototype; const start = proto.start;
       proto.start = function(name, request) { return ${boundary}.subagent(request, () => delegationDepthOf(request.parent) + 1, () => start.call(this, name, request), this.getProvider(name)); };
       proto.startContinuable = function() { return ${boundary}.unplanned(); };
+      const startActivation = proto.startActivation;
+      proto.startActivation = function(spec) { return ${boundary}.subagent(spec, () => delegationDepthOf(spec.parent) + 1, () => startActivation.call(this, spec), this.expectProvider(spec.provider)); };
     }\n`
     );
   }
@@ -74,8 +76,8 @@ export function guardedPlanSource(packageName, source) {
   );
   source = once(
     source,
-    "\t\tconst run = await this.subagents.start(this.provider, {",
-    `\t\tconst run = await ${boundary}.child(request.rdshTaskId, this.parent, () => this.subagents.start(this.provider, {`,
+    "\t\tconst run = await this.subagents.startActivation({",
+    `\t\tconst run = await ${boundary}.child(request.rdshTaskId, this.parent, async () => this.subagents.startActivation({`,
   );
   source = once(
     source,
