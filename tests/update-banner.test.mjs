@@ -87,7 +87,9 @@ function host({ storage = new Map(), storageFails = false, locale = null, langua
     window: { addEventListener: (n, f) => windowEvents.on(n, f), removeEventListener: (n, f) => windowEvents.off(n, f),
       __ModuleLoader__: { load(module) {
         moduleExports = module.factory(() => React);
-        moduleExports.apply({ slots: { inject: (_name, fn) => fn(), register: (_options, c) => { component = c; } },
+        const declared = new Set(Array.isArray(moduleExports.inject) ? moduleExports.inject : []);
+        const rawCtx = {
+          slots: { inject: (_name, fn) => fn(), register: (_options, c) => { component = c; } },
           locale: locale ? {
             getLocale: () => ({ active: locale }),
             bind: () => (key, params) => {
@@ -97,7 +99,16 @@ function host({ storage = new Map(), storageFails = false, locale = null, langua
             },
             register: () => {},
           } : undefined,
+        };
+        const strictCtx = new Proxy(rawCtx, {
+          get(target, prop, receiver) {
+            if (typeof prop === 'string' && prop in target && !declared.has(prop)) {
+              throw new Error(`cannot get property "${prop}" without inject`);
+            }
+            return Reflect.get(target, prop, receiver);
+          },
         });
+        moduleExports.apply(strictCtx);
       } } },
     navigator: { language, languages: [language] },
   });
@@ -665,4 +676,11 @@ test('a dsh install refuses to fall back to npm -g when the running prefix is un
   assert.equal(result.data.ok, false);
   assert.match(result.data.message, /could not locate the running dsh installation/);
   await assert.rejects(readFile(marker), /ENOENT/);
+});
+
+test('declares both slots and locale in Cordis inject so apply() boots under strict service gating', async (t) => {
+  const fixture = await shown(t, { locale: 'ja' });
+  assert.ok(Array.isArray(fixture.module.inject));
+  assert.ok(fixture.module.inject.includes('slots'));
+  assert.ok(fixture.module.inject.includes('locale'));
 });

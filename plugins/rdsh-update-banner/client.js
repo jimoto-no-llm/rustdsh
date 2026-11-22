@@ -879,7 +879,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ["slots"],
+      inject: ["slots", "locale"],
       apply: apply,
       __internals: {
         dictionaries: DICTIONARIES,
