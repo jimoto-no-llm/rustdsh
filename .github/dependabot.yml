@@ -4,6 +4,30 @@ updates:
     directories:
       - /plugins/rdsh-model-call
       - /plugins/rdsh-tui-admin
+      - /plugins/dsh-intelligent-ui
+      - /plugins/dsh-mobile-maxxing
+      - /plugins/dsh-mobile-maxxing/packages/dsh-locale-ja
+      - /plugins/dsh-mobile-maxxing/packages/dsh-md-rendering
+      - /plugins/dsh-mobile-maxxing/packages/dsh-mobile-maxxing
+      - /plugins/rdsh-agent-ui
+      - /plugins/rdsh-answer-guard
+      - /plugins/rdsh-budget-guard
+      - /plugins/rdsh-easy-work
+      - /plugins/rdsh-mobile-ui
+      - /plugins/rdsh-no-feedback
+      - /plugins/rdsh-no-feedback-client
+      - /plugins/rdsh-release-probe
+      - /plugins/rdsh-session-cleanup
+      - /plugins/rdsh-settings
+      - /plugins/rdsh-subagent-optimizer
+      - /plugins/rdsh-subagent-route
+      - /plugins/rdsh-ui-comfort
+      - /plugins/rdsh-update-banner
+      - /plugins/rdsh-web-cache
+      - /plugins/rdsh-web-search-searxng
+      - /plugins/workflow-board
+      - /scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup
+      - /tools/blue-purple
     schedule:
       interval: weekly
       day: monday
@@ -160,6 +184,24 @@ updates:
     open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /plugins/rdsh-devin-cli
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-ptc-catalog
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /desktop/sdk
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+  - package-ecosystem: pip
+    directory: /plugins/rdsh-direct-models
     schedule:
       interval: weekly
       day: monday

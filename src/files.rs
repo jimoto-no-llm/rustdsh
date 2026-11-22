@@ -541,7 +541,6 @@ pub(crate) fn download_name(path: &Path) -> String {
 }
 
 /// A content type good enough for a browser to open the saved copy.
-#[allow(dead_code)] // the Web route uses it once the form is wired
 pub(crate) fn content_type(path: &Path) -> &'static str {
     match path
         .extension()
