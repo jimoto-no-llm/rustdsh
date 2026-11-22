@@ -557,3 +557,12 @@ pub fn diagnostic(locale: Locale, text: &str) -> &str {
         Locale::Japanese => pair.1,
     }
 }
+
+/// Pick the message for the active locale out of English/Chinese/Japanese text.
+pub fn pick<T>(locale: Locale, english: T, chinese: T, japanese: T) -> T {
+    match locale {
+        Locale::English => english,
+        Locale::Chinese => chinese,
+        Locale::Japanese => japanese,
+    }
+}

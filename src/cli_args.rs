@@ -1076,56 +1076,65 @@ pub(crate) fn exit_clap_error(locale: locale::Locale, error: clap::Error) -> ! {
         error.exit();
     }
     let description = match error.kind() {
-        ErrorKind::InvalidValue | ErrorKind::ValueValidation => match locale {
-            locale::Locale::English => "an argument value is invalid",
-            locale::Locale::Chinese => "参数值无效",
-            locale::Locale::Japanese => "引数の値が無効です",
-        },
-        ErrorKind::UnknownArgument | ErrorKind::InvalidSubcommand => match locale {
-            locale::Locale::English => "an argument or command is not recognized",
-            locale::Locale::Chinese => "无法识别参数或命令",
-            locale::Locale::Japanese => "引数またはコマンドを認識できません",
-        },
+        ErrorKind::InvalidValue | ErrorKind::ValueValidation => crate::locale::pick(
+            locale,
+            "an argument value is invalid",
+            "参数值无效",
+            "引数の値が無効です",
+        ),
+        ErrorKind::UnknownArgument | ErrorKind::InvalidSubcommand => crate::locale::pick(
+            locale,
+            "an argument or command is not recognized",
+            "无法识别参数或命令",
+            "引数またはコマンドを認識できません",
+        ),
         ErrorKind::NoEquals
         | ErrorKind::TooManyValues
         | ErrorKind::TooFewValues
-        | ErrorKind::WrongNumberOfValues => match locale {
-            locale::Locale::English => "the number or form of argument values is invalid",
-            locale::Locale::Chinese => "参数值的数量或形式无效",
-            locale::Locale::Japanese => "引数の値の数または形式が無効です",
-        },
-        ErrorKind::ArgumentConflict => match locale {
-            locale::Locale::English => "conflicting arguments were provided",
-            locale::Locale::Chinese => "提供的参数相互冲突",
-            locale::Locale::Japanese => "競合する引数が指定されました",
-        },
-        ErrorKind::MissingRequiredArgument | ErrorKind::MissingSubcommand => match locale {
-            locale::Locale::English => "a required argument or command is missing",
-            locale::Locale::Chinese => "缺少必需的参数或命令",
-            locale::Locale::Japanese => "必須の引数またはコマンドがありません",
-        },
-        ErrorKind::InvalidUtf8 => match locale {
-            locale::Locale::English => "an argument is not valid UTF-8",
-            locale::Locale::Chinese => "参数不是有效的 UTF-8",
-            locale::Locale::Japanese => "引数が有効な UTF-8 ではありません",
-        },
-        ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => match locale {
-            locale::Locale::English => "a command or argument is required",
-            locale::Locale::Chinese => "需要命令或参数",
-            locale::Locale::Japanese => "コマンドまたは引数が必要です",
-        },
+        | ErrorKind::WrongNumberOfValues => crate::locale::pick(
+            locale,
+            "the number or form of argument values is invalid",
+            "参数值的数量或形式无效",
+            "引数の値の数または形式が無効です",
+        ),
+        ErrorKind::ArgumentConflict => crate::locale::pick(
+            locale,
+            "conflicting arguments were provided",
+            "提供的参数相互冲突",
+            "競合する引数が指定されました",
+        ),
+        ErrorKind::MissingRequiredArgument | ErrorKind::MissingSubcommand => crate::locale::pick(
+            locale,
+            "a required argument or command is missing",
+            "缺少必需的参数或命令",
+            "必須の引数またはコマンドがありません",
+        ),
+        ErrorKind::InvalidUtf8 => crate::locale::pick(
+            locale,
+            "an argument is not valid UTF-8",
+            "参数不是有效的 UTF-8",
+            "引数が有効な UTF-8 ではありません",
+        ),
+        ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => crate::locale::pick(
+            locale,
+            "a command or argument is required",
+            "需要命令或参数",
+            "コマンドまたは引数が必要です",
+        ),
         ErrorKind::Io | ErrorKind::Format | ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
-            match locale {
-                locale::Locale::English => "the command-line parser could not format its output",
-                locale::Locale::Chinese => "命令行解析器无法格式化输出",
-                locale::Locale::Japanese => "コマンドライン解析器が出力を整形できません",
-            }
+            crate::locale::pick(
+                locale,
+                "the command-line parser could not format its output",
+                "命令行解析器无法格式化输出",
+                "コマンドライン解析器が出力を整形できません",
+            )
         }
-        _ => match locale {
-            locale::Locale::English => "the command-line parser rejected the arguments",
-            locale::Locale::Chinese => "命令行解析器拒绝了参数",
-            locale::Locale::Japanese => "コマンドライン解析器が引数を拒否しました",
-        },
+        _ => crate::locale::pick(
+            locale,
+            "the command-line parser rejected the arguments",
+            "命令行解析器拒绝了参数",
+            "コマンドライン解析器が引数を拒否しました",
+        ),
     };
     eprintln!(
         "[rdsh] {}: {description}",
@@ -1489,10 +1498,10 @@ fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static s
         return Some(websearch::help(locale));
     }
     (name == "rdsh").then(|| match locale {
-        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
-        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
-        locale::Locale::English => unreachable!(),
-    })
+                locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh plugins status             查看配置文件仍缺少哪些必需插件（只读）\n  rdsh plugins install --profile web   升级后补装必需插件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
+                locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (swarm|cloud|adapter-catalog|tokens|prune|search|search-web|rustxng|compact|compaction|doctor|bench|serve|native-web|native-tui|sessions|profiles|skills|logs|guard|compute|desktop|plugins|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh plugins status             不足している必須プラグインを表示（読み取り専用）\n  rdsh plugins install --profile web   アップグレード後に必須プラグインを補完\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
+                locale::Locale::English => unreachable!(),
+            })
 }
 
 fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> {

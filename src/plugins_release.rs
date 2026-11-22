@@ -671,14 +671,6 @@ pub(crate) fn info_json(info: &Info) -> Value {
     })
 }
 
-fn t(locale: Locale, en: String, zh: String, ja: String) -> String {
-    match locale {
-        Locale::English => en,
-        Locale::Chinese => zh,
-        Locale::Japanese => ja,
-    }
-}
-
 /// One status line about the origin, in the user's language.
 pub(crate) fn info_line(info: &Info, locale: Locale) -> Option<String> {
     let auto = |on: bool| match (locale, on) {
@@ -692,7 +684,7 @@ pub(crate) fn info_line(info: &Info, locale: Locale) -> Option<String> {
     match (info.source, &info.tag) {
         ("release", Some(tag)) => {
             let latest = info.latest.clone().unwrap_or_else(|| "?".into());
-            Some(t(
+            Some(crate::locale::pick(
                 locale,
                 format!(
                     "bundled plugins: release {tag} (latest {latest}; {})",
@@ -708,17 +700,18 @@ pub(crate) fn info_line(info: &Info, locale: Locale) -> Option<String> {
                 ),
             ))
         }
-        ("checkout", _) => Some(t(
+        ("checkout", _) => Some(crate::locale::pick(
             locale,
-            "bundled plugins: checkout (managed by you; never fetched)".into(),
-            "内置插件：检出目录（由你管理，不会下载）".into(),
-            "同梱プラグイン: チェックアウト（利用者の管理。取得しません）".into(),
+            "bundled plugins: checkout (managed by you; never fetched)".to_string(),
+            "内置插件：检出目录（由你管理，不会下载）".to_string(),
+            "同梱プラグイン: チェックアウト（利用者の管理。取得しません）".to_string(),
         )),
-        _ => Some(t(
+        _ => Some(crate::locale::pick(
             locale,
-            "bundled plugins: none (rdsh plugins install fetches them from the release)".into(),
-            "内置插件：无（rdsh plugins install 会从 release 获取）".into(),
-            "同梱プラグイン: なし（rdsh plugins install で release から取得します）".into(),
+            "bundled plugins: none (rdsh plugins install fetches them from the release)"
+                .to_string(),
+            "内置插件：无（rdsh plugins install 会从 release 获取）".to_string(),
+            "同梱プラグイン: なし（rdsh plugins install で release から取得します）".to_string(),
         )),
     }
 }
@@ -731,7 +724,7 @@ pub(crate) fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
     };
     let state = upd::load_state(&state_path(&root));
     match state.latest_tag {
-        Some(latest) if valid_tag(&latest) && !same_or_newer(&tag, &latest) => vec![t(
+        Some(latest) if valid_tag(&latest) && !same_or_newer(&tag, &latest) => vec![crate::locale::pick(
             locale,
             format!("[rdsh] plugins: bundled plugins {tag} are older than {latest}; run: rdsh plugins update"),
             format!("[rdsh] plugins: 内置插件 {tag} 低于 {latest}；请运行：rdsh plugins update"),
@@ -758,11 +751,11 @@ pub(crate) fn cmd_update(
     if env.plugins_dir.is_some() {
         bail!(
             "{}",
-            t(
+            crate::locale::pick(
                 locale,
-                "RDSH_PLUGINS_DIR is set: you manage that checkout, so nothing is fetched".into(),
-                "已设置 RDSH_PLUGINS_DIR：该检出目录由你管理，不会下载".into(),
-                "RDSH_PLUGINS_DIR が設定されています。そのチェックアウトは利用者の管理なので取得しません".into(),
+                "RDSH_PLUGINS_DIR is set: you manage that checkout, so nothing is fetched".to_string(),
+                "已设置 RDSH_PLUGINS_DIR：该检出目录由你管理，不会下载".to_string(),
+                "RDSH_PLUGINS_DIR が設定されています。そのチェックアウトは利用者の管理なので取得しません".to_string(),
             )
         );
     }
@@ -807,36 +800,16 @@ pub(crate) fn cmd_update(
         return Ok(());
     }
     let line = match report.action {
-        Action::NotManaged => t(
-            locale,
-            "no release copy of the bundled plugins is installed; fetch it with: rdsh plugins install".into(),
-            "尚未安装 release 版内置插件；请运行：rdsh plugins install".into(),
-            "release 版の同梱プラグインは未導入です。rdsh plugins install で取得してください".into(),
-        ),
-        Action::UpToDate => t(
-            locale,
-            format!("bundled plugins are up to date ({installed}, latest {latest})"),
-            format!("内置插件已是最新（{installed}，最新 {latest}）"),
-            format!("同梱プラグインは最新です（{installed}、最新 {latest}）"),
-        ),
-        Action::Available => t(
-            locale,
-            format!("update available: {installed} -> {latest}; run: rdsh plugins update"),
-            format!("有可用更新：{installed} -> {latest}；请运行：rdsh plugins update"),
-            format!("更新があります: {installed} -> {latest}。rdsh plugins update を実行してください"),
-        ),
-        Action::Updated => t(
-            locale,
-            format!("bundled plugins updated: {installed} -> {latest}; restart DSH sessions to load them"),
-            format!("内置插件已更新：{installed} -> {latest}；请重启 DSH 会话以加载"),
-            format!("同梱プラグインを更新しました: {installed} -> {latest}。DSH セッションを再起動すると反映されます"),
-        ),
+        Action::NotManaged => crate::locale::pick(locale, "no release copy of the bundled plugins is installed; fetch it with: rdsh plugins install".to_string(), "尚未安装 release 版内置插件；请运行：rdsh plugins install".to_string(), "release 版の同梱プラグインは未導入です。rdsh plugins install で取得してください".to_string()),
+        Action::UpToDate => crate::locale::pick(locale, format!("bundled plugins are up to date ({installed}, latest {latest})"), format!("内置插件已是最新（{installed}，最新 {latest}）"), format!("同梱プラグインは最新です（{installed}、最新 {latest}）")),
+        Action::Available => crate::locale::pick(locale, format!("update available: {installed} -> {latest}; run: rdsh plugins update"), format!("有可用更新：{installed} -> {latest}；请运行：rdsh plugins update"), format!("更新があります: {installed} -> {latest}。rdsh plugins update を実行してください")),
+        Action::Updated => crate::locale::pick(locale, format!("bundled plugins updated: {installed} -> {latest}; restart DSH sessions to load them"), format!("内置插件已更新：{installed} -> {latest}；请重启 DSH 会话以加载"), format!("同梱プラグインを更新しました: {installed} -> {latest}。DSH セッションを再起動すると反映されます")),
     };
     println!("[rdsh] plugins: {line}");
     for package in &report.dangling {
         println!(
             "[rdsh] plugins: {}",
-            t(
+            crate::locale::pick(
                 locale,
                 format!("{package} is linked but the new release no longer ships it"),
                 format!("{package} 仍被链接，但新版本已不再提供"),

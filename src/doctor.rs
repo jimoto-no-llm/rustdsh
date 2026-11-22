@@ -86,19 +86,13 @@ pub(crate) fn doctor(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result
     let mut say = |s: String| {
         let _ = writeln!(out, "{s}");
     };
-    let text = |english: &'static str, chinese: &'static str, japanese: &'static str| match locale {
-        locale::Locale::English => english,
-        locale::Locale::Chinese => chinese,
-        locale::Locale::Japanese => japanese,
+    let text = |english: &'static str, chinese: &'static str, japanese: &'static str| {
+        crate::locale::pick(locale, english, chinese, japanese)
     };
     let orig = passthrough::find_original_dsh();
     say(format!(
         "[rdsh] {}: {}",
-        match locale {
-            locale::Locale::English => "original dsh",
-            locale::Locale::Chinese => "原始 dsh",
-            locale::Locale::Japanese => "元の dsh",
-        },
+        crate::locale::pick(locale, "original dsh", "原始 dsh", "元の dsh"),
         orig.as_deref().unwrap_or("<not found in PATH>")
     ));
     let home = crate::inspect::dsh_home();
@@ -344,10 +338,8 @@ fn mode_choice(answer: Option<&str>, desktop_session: bool) -> bool {
 
 fn doctor_mode_choice(mode: DoctorMode, locale: locale::Locale) -> anyhow::Result<()> {
     use std::io::Write as _;
-    let text = |english: &'static str, chinese: &'static str, japanese: &'static str| match locale {
-        locale::Locale::English => english,
-        locale::Locale::Chinese => chinese,
-        locale::Locale::Japanese => japanese,
+    let text = |english: &'static str, chinese: &'static str, japanese: &'static str| {
+        crate::locale::pick(locale, english, chinese, japanese)
     };
     let connected = !crate::auth::setup_needed();
     let plugins = crate::plugins::doctor_lines(&desktop::OsEnv::from_process(), locale);
@@ -495,29 +487,32 @@ fn smart_dsh_status(home: &str, locale: locale::Locale) -> String {
     let pkg = format!("{home}/profiles/web/package.json");
     let text = std::fs::read_to_string(&pkg).unwrap_or_default();
     if text.is_empty() {
-        return match locale {
-            locale::Locale::English => "(not installed: no web profile package.json)",
-            locale::Locale::Chinese => "（未安装：没有 Web 配置文件 package.json）",
-            locale::Locale::Japanese => "（未導入: Web プロファイルの package.json がありません）",
-        }
+        return crate::locale::pick(
+            locale,
+            "(not installed: no web profile package.json)",
+            "（未安装：没有 Web 配置文件 package.json）",
+            "（未導入: Web プロファイルの package.json がありません）",
+        )
         .to_string();
     }
     let found: Vec<&str> = KNOWN.iter().copied().filter(|b| text.contains(b)).collect();
     if found.is_empty() {
-        match locale {
-            locale::Locale::English => "(not installed in web profile)",
-            locale::Locale::Chinese => "（未安装在 Web 配置文件中）",
-            locale::Locale::Japanese => "（Web プロファイルに導入されていません）",
-        }
+        crate::locale::pick(
+            locale,
+            "(not installed in web profile)",
+            "（未安装在 Web 配置文件中）",
+            "（Web プロファイルに導入されていません）",
+        )
         .to_string()
     } else {
         format!(
             "{}: {}",
-            match locale {
-                locale::Locale::English => "bundles in web profile",
-                locale::Locale::Chinese => "Web 配置文件中的捆绑包",
-                locale::Locale::Japanese => "Web プロファイルのバンドル",
-            },
+            crate::locale::pick(
+                locale,
+                "bundles in web profile",
+                "Web 配置文件中的捆绑包",
+                "Web プロファイルのバンドル"
+            ),
             found.join(", ")
         )
     }

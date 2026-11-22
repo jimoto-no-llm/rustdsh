@@ -1060,21 +1060,8 @@ pub(crate) fn doctor_line(locale: Locale) -> Option<String> {
     let latest = parse_version(&latest_tag)?;
     let installed = probe_binary(&managed).version?;
     (installed < latest).then(|| {
-        t(
-            locale,
-            format!("rustxng {installed} is older than {latest_tag}; run: rdsh rustxng update"),
-            format!("rustxng {installed} 低于 {latest_tag}；请运行：rdsh rustxng update"),
-            format!("rustxng {installed} は {latest_tag} より古い版です。rdsh rustxng update を実行してください"),
-        )
+        crate::locale::pick(locale, format!("rustxng {installed} is older than {latest_tag}; run: rdsh rustxng update"), format!("rustxng {installed} 低于 {latest_tag}；请运行：rdsh rustxng update"), format!("rustxng {installed} は {latest_tag} より古い版です。rdsh rustxng update を実行してください"))
     })
-}
-
-fn t(locale: Locale, en: String, zh: String, ja: String) -> String {
-    match locale {
-        Locale::English => en,
-        Locale::Chinese => zh,
-        Locale::Japanese => ja,
-    }
 }
 
 /// `rdsh rustxng update [--check] [--json]` (and the hidden `--background`).
@@ -1086,11 +1073,11 @@ pub fn cmd_update(check: bool, json_out: bool, background: bool, locale: Locale)
     let Some(home) = home_dir() else {
         bail!(
             "{}",
-            t(
+            crate::locale::pick(
                 locale,
-                "no home directory".into(),
-                "没有主目录".into(),
-                "ホームディレクトリがありません".into()
+                "no home directory".to_string(),
+                "没有主目录".to_string(),
+                "ホームディレクトリがありません".to_string()
             )
         );
     };
@@ -1114,12 +1101,7 @@ pub fn cmd_update(check: bool, json_out: bool, background: bool, locale: Locale)
             "not-installed",
             None,
             None,
-            t(
-                locale,
-                format!("no rdsh-managed rustxng at {}; install it with: rdsh rustxng install", dest.display()),
-                format!("{} 没有 rdsh 管理的 rustxng；请运行：rdsh rustxng install", dest.display()),
-                format!("{} に rdsh が管理する rustxng がありません。rdsh rustxng install で導入してください", dest.display()),
-            ),
+            crate::locale::pick(locale, format!("no rdsh-managed rustxng at {}; install it with: rdsh rustxng install", dest.display()), format!("{} 没有 rdsh 管理的 rustxng；请运行：rdsh rustxng install", dest.display()), format!("{} に rdsh が管理する rustxng がありません。rdsh rustxng install で導入してください", dest.display())),
         );
     }
     let state_path = update_state_path();
@@ -1131,11 +1113,11 @@ pub fn cmd_update(check: bool, json_out: bool, background: bool, locale: Locale)
             Some(lock) => Some(lock),
             None => bail!(
                 "{}",
-                t(
+                crate::locale::pick(
                     locale,
-                    "another rustxng update is already running".into(),
-                    "另一个 rustxng 更新正在运行".into(),
-                    "別の rustxng 更新が実行中です".into()
+                    "another rustxng update is already running".to_string(),
+                    "另一个 rustxng 更新正在运行".to_string(),
+                    "別の rustxng 更新が実行中です".to_string()
                 )
             ),
         }
@@ -1161,54 +1143,40 @@ pub fn cmd_update(check: bool, json_out: bool, background: bool, locale: Locale)
             "up-to-date",
             report.installed.as_ref(),
             Some(&latest),
-            t(
-                locale,
-                format!("rustxng is up to date ({installed}, latest {latest})"),
-                format!("rustxng 已是最新（{installed}，最新 {latest}）"),
-                format!("rustxng は最新です（{installed}、最新 {latest}）"),
-            ),
+            crate::locale::pick(locale, format!("rustxng is up to date ({installed}, latest {latest})"), format!("rustxng 已是最新（{installed}，最新 {latest}）"), format!("rustxng は最新です（{installed}、最新 {latest}）")),
         ),
         Action::Available => emit(
             "update-available",
             report.installed.as_ref(),
             Some(&latest),
-            t(
-                locale,
-                format!("update available: {installed} -> {latest}; run: rdsh rustxng update"),
-                format!("有可用更新：{installed} -> {latest}；请运行：rdsh rustxng update"),
-                format!("更新があります: {installed} -> {latest}。rdsh rustxng update を実行してください"),
-            ),
+            crate::locale::pick(locale, format!("update available: {installed} -> {latest}; run: rdsh rustxng update"), format!("有可用更新：{installed} -> {latest}；请运行：rdsh rustxng update"), format!("更新があります: {installed} -> {latest}。rdsh rustxng update を実行してください")),
         ),
         Action::Updated => emit(
             "updated",
             report.installed.as_ref(),
             Some(&latest),
-            t(
-                locale,
-                format!(
-                    "rustxng updated: {installed} -> {latest} (previous kept as {}); a running engine restarts on next use",
-                    prev_path(&dest).display()
-                ),
-                format!(
-                    "rustxng 已更新：{installed} -> {latest}（旧版保留为 {}）；运行中的引擎将在下次使用时重启",
-                    prev_path(&dest).display()
-                ),
-                format!(
-                    "rustxng を更新しました: {installed} -> {latest}（旧版は {} に保存）。稼働中のエンジンは次回の利用時に再起動します",
-                    prev_path(&dest).display()
-                ),
-            ),
+            crate::locale::pick(locale, format!(
+                "rustxng updated: {installed} -> {latest} (previous kept as {}); a running engine restarts on next use",
+                prev_path(&dest).display()
+            ), format!(
+                "rustxng 已更新：{installed} -> {latest}（旧版保留为 {}）；运行中的引擎将在下次使用时重启",
+                prev_path(&dest).display()
+            ), format!(
+                "rustxng を更新しました: {installed} -> {latest}（旧版は {} に保存）。稼働中のエンジンは次回の利用時に再起動します",
+                prev_path(&dest).display()
+            )),
         ),
     }
 }
 
 /// Short note appended to `rdsh rustxng install`'s messages.
 pub(super) fn update_hint(locale: Locale) -> &'static str {
-    match locale {
-        Locale::English => "keep it current with: rdsh rustxng update",
-        Locale::Chinese => "更新请运行：rdsh rustxng update",
-        Locale::Japanese => "最新版への更新: rdsh rustxng update",
-    }
+    crate::locale::pick(
+        locale,
+        "keep it current with: rdsh rustxng update",
+        "更新请运行：rdsh rustxng update",
+        "最新版への更新: rdsh rustxng update",
+    )
 }
 
 #[cfg(test)]

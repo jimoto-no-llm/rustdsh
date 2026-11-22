@@ -390,11 +390,7 @@ pub(crate) fn run() {
                     // the editable-key list.
                     println!(
                         "{}: {}",
-                        match locale {
-                            locale::Locale::English => "config",
-                            locale::Locale::Chinese => "配置",
-                            locale::Locale::Japanese => "設定",
-                        },
+                        crate::locale::pick(locale, "config", "配置", "設定"),
                         rdsh_config::settings_path()
                     );
                     let raw: serde_json::Value =
@@ -410,17 +406,9 @@ pub(crate) fn run() {
                             v => serde_json::to_string(&v).unwrap_or_else(|_| "-".to_string()),
                         };
                         let source = if settings_key_in_file(&raw, key) {
-                            match locale {
-                                locale::Locale::English => "config",
-                                locale::Locale::Chinese => "配置",
-                                locale::Locale::Japanese => "設定",
-                            }
+                            crate::locale::pick(locale, "config", "配置", "設定")
                         } else {
-                            match locale {
-                                locale::Locale::English => "default",
-                                locale::Locale::Chinese => "默认",
-                                locale::Locale::Japanese => "既定値",
-                            }
+                            crate::locale::pick(locale, "default", "默认", "既定値")
                         };
                         println!("{key}  {rendered}  {source}");
                     }
@@ -434,17 +422,9 @@ pub(crate) fn run() {
                             "false"
                         };
                         let source = if rdsh_config::feature_is_explicit(&cfg, id) {
-                            match locale {
-                                locale::Locale::English => "config",
-                                locale::Locale::Chinese => "配置",
-                                locale::Locale::Japanese => "設定",
-                            }
+                            crate::locale::pick(locale, "config", "配置", "設定")
                         } else {
-                            match locale {
-                                locale::Locale::English => "default",
-                                locale::Locale::Chinese => "默认",
-                                locale::Locale::Japanese => "既定値",
-                            }
+                            crate::locale::pick(locale, "default", "默认", "既定値")
                         };
                         println!("{key}  {state}  {source}");
                     }
@@ -462,11 +442,12 @@ pub(crate) fn run() {
                         eprintln!(
                             "[rdsh] {} {path} ({})",
                             locale::message(locale, locale::Message::SettingsExists),
-                            match locale {
-                                locale::Locale::English => "use --force to overwrite",
-                                locale::Locale::Chinese => "使用 --force 覆盖",
-                                locale::Locale::Japanese => "上書きするには --force を使います",
-                            }
+                            crate::locale::pick(
+                                locale,
+                                "use --force to overwrite",
+                                "使用 --force 覆盖",
+                                "上書きするには --force を使います"
+                            )
                         );
                         std::process::exit(2);
                     }
@@ -495,11 +476,12 @@ pub(crate) fn run() {
                     eprintln!(
                         "[rdsh] {}: {key} ({})",
                         locale::message(locale, locale::Message::UnknownSetting),
-                        match locale {
-                            locale::Locale::English => "try: rdsh settings keys",
-                            locale::Locale::Chinese => "请尝试: rdsh settings keys",
-                            locale::Locale::Japanese => "rdsh settings keys を実行してください",
-                        }
+                        crate::locale::pick(
+                            locale,
+                            "try: rdsh settings keys",
+                            "请尝试: rdsh settings keys",
+                            "rdsh settings keys を実行してください"
+                        )
                     );
                     std::process::exit(2);
                 }
@@ -524,11 +506,12 @@ pub(crate) fn run() {
                                 }
                             }
                         }
-                        None => Err(anyhow::anyhow!(match locale {
-                            locale::Locale::English => format!("set failed: {key}"),
-                            locale::Locale::Chinese => format!("设置失败: {key}"),
-                            locale::Locale::Japanese => format!("設定に失敗しました: {key}"),
-                        })),
+                        None => Err(anyhow::anyhow!(crate::locale::pick(
+                            locale,
+                            format!("set failed: {key}"),
+                            format!("设置失败: {key}"),
+                            format!("設定に失敗しました: {key}")
+                        ))),
                     },
                 }
             }
@@ -541,14 +524,12 @@ pub(crate) fn run() {
                             "{} {} ({})",
                             locale::message(locale, locale::Message::Reset),
                             key.trim(),
-                            match locale {
-                                locale::Locale::English =>
-                                    format!("saved to {}", rdsh_config::settings_path()),
-                                locale::Locale::Chinese =>
-                                    format!("已保存到 {}", rdsh_config::settings_path()),
-                                locale::Locale::Japanese =>
-                                    format!("{} に保存しました", rdsh_config::settings_path()),
-                            },
+                            crate::locale::pick(
+                                locale,
+                                format!("saved to {}", rdsh_config::settings_path()),
+                                format!("已保存到 {}", rdsh_config::settings_path()),
+                                format!("{} に保存しました", rdsh_config::settings_path())
+                            ),
                         );
                         Ok(())
                     }
@@ -1143,56 +1124,16 @@ fn localized_launcher_error(locale: locale::Locale, message: &str) -> String {
         return message.to_string();
     }
     let translated = match message {
-        "error: plugin needs pnpm arguments to forward (e.g. add <package>)" => match locale {
-            locale::Locale::Chinese => "错误：plugin 需要转发 pnpm 参数（例如 add <package>）",
-            locale::Locale::Japanese => "エラー: plugin には転送する pnpm 引数が必要です（例: add <package>）",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --profile <name> is required" => match locale {
-            locale::Locale::Chinese => "错误：需要 --profile <name>",
-            locale::Locale::Japanese => "エラー: --profile <name> が必要です",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: select a profile only once" => match locale {
-            locale::Locale::Chinese => "错误：只能选择一次配置文件",
-            locale::Locale::Japanese => "エラー: プロファイルは一度だけ選択してください",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --profile needs a name" => match locale {
-            locale::Locale::Chinese => "错误：--profile 需要名称",
-            locale::Locale::Japanese => "エラー: --profile には名前が必要です",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --from-default-profile needs a name" => match locale {
-            locale::Locale::Chinese => "错误：--from-default-profile 需要名称",
-            locale::Locale::Japanese => "エラー: --from-default-profile には名前が必要です",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --patch needs a path" => match locale {
-            locale::Locale::Chinese => "错误：--patch 需要路径",
-            locale::Locale::Japanese => "エラー: --patch にはパスが必要です",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: profile desktop is managed exclusively by the Electron application" => match locale {
-            locale::Locale::Chinese => "错误：desktop 配置文件仅由 Electron 应用管理",
-            locale::Locale::Japanese => "エラー: desktop プロファイルは Electron アプリケーションのみが管理します",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive" => match locale {
-            locale::Locale::Chinese => "错误：--dump-config、--dump-default-config 和 --dump-config-schema 不能同时使用",
-            locale::Locale::Japanese => "エラー: --dump-config、--dump-default-config、--dump-config-schema は同時に使用できません",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: config dumps take no app arguments" => match locale {
-            locale::Locale::Chinese => "错误：配置转储不接受应用参数",
-            locale::Locale::Japanese => "エラー: 設定ダンプはアプリ引数を受け取りません",
-            locale::Locale::English => unreachable!(),
-        },
-        "error: --dump-default-config prints the bundle layers and takes no --patch" => match locale {
-            locale::Locale::Chinese => "错误：--dump-default-config 打印捆绑层且不接受 --patch",
-            locale::Locale::Japanese => "エラー: --dump-default-config はバンドルレイヤーを出力し、--patch を受け取りません",
-            locale::Locale::English => unreachable!(),
-        },
+        "error: plugin needs pnpm arguments to forward (e.g. add <package>)" => crate::locale::pick(locale, message, "错误：plugin 需要转发 pnpm 参数（例如 add <package>）", "エラー: plugin には転送する pnpm 引数が必要です（例: add <package>）"),
+        "error: --profile <name> is required" => crate::locale::pick(locale, message, "错误：需要 --profile <name>", "エラー: --profile <name> が必要です"),
+        "error: select a profile only once" => crate::locale::pick(locale, message, "错误：只能选择一次配置文件", "エラー: プロファイルは一度だけ選択してください"),
+        "error: --profile needs a name" => crate::locale::pick(locale, message, "错误：--profile 需要名称", "エラー: --profile には名前が必要です"),
+        "error: --from-default-profile needs a name" => crate::locale::pick(locale, message, "错误：--from-default-profile 需要名称", "エラー: --from-default-profile には名前が必要です"),
+        "error: --patch needs a path" => crate::locale::pick(locale, message, "错误：--patch 需要路径", "エラー: --patch にはパスが必要です"),
+        "error: profile desktop is managed exclusively by the Electron application" => crate::locale::pick(locale, message, "错误：desktop 配置文件仅由 Electron 应用管理", "エラー: desktop プロファイルは Electron アプリケーションのみが管理します"),
+        "error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive" => crate::locale::pick(locale, message, "错误：--dump-config、--dump-default-config 和 --dump-config-schema 不能同时使用", "エラー: --dump-config、--dump-default-config、--dump-config-schema は同時に使用できません"),
+        "error: config dumps take no app arguments" => crate::locale::pick(locale, message, "错误：配置转储不接受应用参数", "エラー: 設定ダンプはアプリ引数を受け取りません"),
+        "error: --dump-default-config prints the bundle layers and takes no --patch" => crate::locale::pick(locale, message, "错误：--dump-default-config 打印捆绑层且不接受 --patch", "エラー: --dump-default-config はバンドルレイヤーを出力し、--patch を受け取りません"),
         _ => message,
     };
     translated.to_string()
@@ -1319,14 +1260,7 @@ fn local_tui_profile() -> bool {
 fn announce_builtin_tui(locale: crate::locale::Locale) {
     eprintln!(
         "[rdsh] {}",
-        match locale {
-            crate::locale::Locale::English =>
-                "no local 'tui' profile; starting the built-in Rust TUI (install a tui profile with 'dsh plugin --profile tui add <package>' to delegate instead)",
-            crate::locale::Locale::Chinese =>
-                "本地没有 'tui' 配置文件；将启动内置的 Rust TUI（如需委托，请用 'dsh plugin --profile tui add <package>' 安装 tui 配置文件）",
-            crate::locale::Locale::Japanese =>
-                "ローカルに 'tui' プロファイルが無いため、組み込みの Rust TUI を起動します（委譲したい場合は 'dsh plugin --profile tui add <package>' で導入してください）",
-        }
+        crate::locale::pick(locale, "no local 'tui' profile; starting the built-in Rust TUI (install a tui profile with 'dsh plugin --profile tui add <package>' to delegate instead)", "本地没有 'tui' 配置文件；将启动内置的 Rust TUI（如需委托，请用 'dsh plugin --profile tui add <package>' 安装 tui 配置文件）", "ローカルに 'tui' プロファイルが無いため、組み込みの Rust TUI を起動します（委譲したい場合は 'dsh plugin --profile tui add <package>' で導入してください）")
     );
 }
 
@@ -1362,11 +1296,7 @@ fn resolve_default_profile(
     let home = crate::inspect::dsh_home();
     let local_tui = std::path::Path::new(&format!("{home}/profiles/tui")).is_dir();
     pick_default_profile(env.as_deref(), local_tui).map_err(|m| {
-        anyhow::anyhow!(match locale {
-            locale::Locale::English => m,
-            locale::Locale::Chinese => "未指定配置文件且未找到本地 ‘tui’ 配置文件（dsh 0.2.0 提供 acp、web、headless、sdk 和 sdk-minimal 模板，但不提供 tui 模板）。请使用 --profile <name> 启动（例如 --profile web），或设置 RDSH_DEFAULT_PROFILE=<name>".to_string(),
-            locale::Locale::Japanese => "プロファイルが指定されず、ローカルの ‘tui’ プロファイルも見つかりません（dsh 0.2.0 には acp、web、headless、sdk、sdk-minimal テンプレートがありますが tui テンプレートはありません）。--profile <name>（例: --profile web）で起動するか、RDSH_DEFAULT_PROFILE=<name> を設定してください".to_string(),
-        })
+        anyhow::anyhow!(crate::locale::pick(locale, m, "未指定配置文件且未找到本地 ‘tui’ 配置文件（dsh 0.2.0 提供 acp、web、headless、sdk 和 sdk-minimal 模板，但不提供 tui 模板）。请使用 --profile <name> 启动（例如 --profile web），或设置 RDSH_DEFAULT_PROFILE=<name>".to_string(), "プロファイルが指定されず、ローカルの ‘tui’ プロファイルも見つかりません（dsh 0.2.0 には acp、web、headless、sdk、sdk-minimal テンプレートがありますが tui テンプレートはありません）。--profile <name>（例: --profile web）で起動するか、RDSH_DEFAULT_PROFILE=<name> を設定してください".to_string()))
     })
 }
 
@@ -1396,11 +1326,7 @@ fn dump_config_native(
         Ok(entries) => {
             println!(
                 "# {} {root}:",
-                match locale {
-                    locale::Locale::English => "layers under",
-                    locale::Locale::Chinese => "以下层级",
-                    locale::Locale::Japanese => "次の配下のレイヤー",
-                }
+                crate::locale::pick(locale, "layers under", "以下层级", "次の配下のレイヤー")
             );
             let mut names: Vec<String> = entries
                 .filter_map(Result::ok)
@@ -1414,16 +1340,18 @@ fn dump_config_native(
         Err(_) => {
             println!(
                 "# {} {root} ({})",
-                match locale {
-                    locale::Locale::English => "no local profile dir at",
-                    locale::Locale::Chinese => "没有本地配置文件目录：",
-                    locale::Locale::Japanese => "ローカルプロファイルディレクトリがありません:",
-                },
-                match locale {
-                    locale::Locale::English => "shipped template will be used by dsh",
-                    locale::Locale::Chinese => "dsh 将使用随附模板",
-                    locale::Locale::Japanese => "dsh は同梱テンプレートを使用します",
-                }
+                crate::locale::pick(
+                    locale,
+                    "no local profile dir at",
+                    "没有本地配置文件目录：",
+                    "ローカルプロファイルディレクトリがありません:"
+                ),
+                crate::locale::pick(
+                    locale,
+                    "shipped template will be used by dsh",
+                    "dsh 将使用随附模板",
+                    "dsh は同梱テンプレートを使用します"
+                )
             )
         }
     }
@@ -1471,36 +1399,16 @@ fn features_list(
     let _ = writeln!(
         out,
         "{}: {}",
-        match locale {
-            locale::Locale::English => "config",
-            locale::Locale::Chinese => "配置",
-            locale::Locale::Japanese => "設定",
-        },
+        crate::locale::pick(locale, "config", "配置", "設定"),
         rdsh_config::settings_path()
     );
     let _ = writeln!(
         out,
         "{:<24} {:<5} {:<7} {}",
-        match locale {
-            locale::Locale::English => "feature",
-            locale::Locale::Chinese => "功能",
-            locale::Locale::Japanese => "機能",
-        },
-        match locale {
-            locale::Locale::English => "state",
-            locale::Locale::Chinese => "状态",
-            locale::Locale::Japanese => "状態",
-        },
-        match locale {
-            locale::Locale::English => "default",
-            locale::Locale::Chinese => "默认",
-            locale::Locale::Japanese => "既定",
-        },
-        match locale {
-            locale::Locale::English => "what it does",
-            locale::Locale::Chinese => "说明",
-            locale::Locale::Japanese => "説明",
-        }
+        crate::locale::pick(locale, "feature", "功能", "機能"),
+        crate::locale::pick(locale, "state", "状态", "状態"),
+        crate::locale::pick(locale, "default", "默认", "既定"),
+        crate::locale::pick(locale, "what it does", "说明", "説明")
     );
     for def in rdsh_config::FEATURES {
         let _ = writeln!(
@@ -1508,30 +1416,14 @@ fn features_list(
             "{:<24} {:<5} {:<7} {}",
             def.id,
             if rdsh_config::feature_enabled(cfg, def.id) {
-                match locale {
-                    locale::Locale::English => "on",
-                    locale::Locale::Chinese => "开启",
-                    locale::Locale::Japanese => "オン",
-                }
+                crate::locale::pick(locale, "on", "开启", "オン")
             } else {
-                match locale {
-                    locale::Locale::English => "off",
-                    locale::Locale::Chinese => "关闭",
-                    locale::Locale::Japanese => "オフ",
-                }
+                crate::locale::pick(locale, "off", "关闭", "オフ")
             },
             if def.default {
-                match locale {
-                    locale::Locale::English => "on",
-                    locale::Locale::Chinese => "开启",
-                    locale::Locale::Japanese => "オン",
-                }
+                crate::locale::pick(locale, "on", "开启", "オン")
             } else {
-                match locale {
-                    locale::Locale::English => "off",
-                    locale::Locale::Chinese => "关闭",
-                    locale::Locale::Japanese => "オフ",
-                }
+                crate::locale::pick(locale, "off", "关闭", "オフ")
             },
             feature_summary(locale, def)
         );
@@ -1539,11 +1431,7 @@ fn features_list(
     let _ = writeln!(
         out,
         "{}",
-        match locale {
-            locale::Locale::English => "change one: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false",
-            locale::Locale::Chinese => "修改一项：rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false",
-            locale::Locale::Japanese => "変更: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false",
-        }
+        crate::locale::pick(locale, "change one: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false", "修改一项：rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false", "変更: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false")
     );
     Ok(())
 }
@@ -1571,11 +1459,7 @@ fn feature_summary(locale: locale::Locale, def: &rdsh_config::FeatureDef) -> &'s
         "node_compile_cache" => ("委派运行的 Node 编译缓存（Node >= 22.1）", "委譲実行用の Node コンパイルキャッシュ（Node >= 22.1）"),
         _ => return def.summary,
     };
-    match locale {
-        locale::Locale::Chinese => chinese,
-        locale::Locale::Japanese => japanese,
-        locale::Locale::English => unreachable!(),
-    }
+    crate::locale::pick(locale, def.summary, chinese, japanese)
 }
 
 /// `rdsh features on|off <id>`: writes features.<id> through the shared lock.
@@ -1584,16 +1468,13 @@ fn features_toggle(id: &str, on: bool, locale: locale::Locale) -> anyhow::Result
     let def = rdsh_config::feature_def(id).ok_or_else(|| {
         anyhow::anyhow!(
             "{}: {id} ({})",
-            match locale {
-                locale::Locale::English => "unknown feature id",
-                locale::Locale::Chinese => "未知功能 ID",
-                locale::Locale::Japanese => "不明な機能 ID",
-            },
-            match locale {
-                locale::Locale::English => "try: rdsh features",
-                locale::Locale::Chinese => "请尝试: rdsh features",
-                locale::Locale::Japanese => "rdsh features を実行してください",
-            }
+            crate::locale::pick(locale, "unknown feature id", "未知功能 ID", "不明な機能 ID"),
+            crate::locale::pick(
+                locale,
+                "try: rdsh features",
+                "请尝试: rdsh features",
+                "rdsh features を実行してください"
+            )
         )
     })?;
     rdsh_config::update(locale, |cfg| {
@@ -1618,11 +1499,12 @@ fn features_toggle(id: &str, on: bool, locale: locale::Locale) -> anyhow::Result
                     println!(
                         "features.feedback: {} {profile}",
                         if ok {
-                            match locale {
-                                locale::Locale::English => "removed the feedback patch from",
-                                locale::Locale::Chinese => "已从以下配置移除反馈补丁：",
-                                locale::Locale::Japanese => "フィードバック無効化を外しました:",
-                            }
+                            crate::locale::pick(
+                                locale,
+                                "removed the feedback patch from",
+                                "已从以下配置移除反馈补丁：",
+                                "フィードバック無効化を外しました:",
+                            )
                         } else {
                             match locale {
                                 locale::Locale::English => {
@@ -1646,22 +1528,19 @@ fn features_toggle(id: &str, on: bool, locale: locale::Locale) -> anyhow::Result
 /// Server-type extras are off by default: refuse with enable guidance.
 /// Setup is not an extra: `features.setup_web` (default on) gates it instead.
 fn extra_disabled(id: &str, locale: locale::Locale) -> anyhow::Result<()> {
-    let text = match locale {
-        locale::Locale::English => format!("extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"),
-        locale::Locale::Chinese => format!("附加功能 '{id}' 默认关闭；请使用以下命令启用：rdsh features on {id}（或 rdsh settings set extras.enable {id}）"),
-        locale::Locale::Japanese => format!("追加機能 '{id}' は既定で無効です。有効化: rdsh features on {id}（または rdsh settings set extras.enable {id}）"),
-    };
+    let text = crate::locale::pick(locale, format!("extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"), format!("附加功能 '{id}' 默认关闭；请使用以下命令启用：rdsh features on {id}（或 rdsh settings set extras.enable {id}）"), format!("追加機能 '{id}' は既定で無効です。有効化: rdsh features on {id}（または rdsh settings set extras.enable {id}）"));
     Err(anyhow::Error::msg(text))
 }
 
 fn bench(n: u32, locale: locale::Locale) -> anyhow::Result<()> {
     use std::time::Instant;
     if n == 0 {
-        anyhow::bail!(match locale {
-            locale::Locale::English => "--n must be >= 1",
-            locale::Locale::Chinese => "--n 必须 >= 1",
-            locale::Locale::Japanese => "--n は 1 以上である必要があります",
-        });
+        anyhow::bail!(crate::locale::pick(
+            locale,
+            "--n must be >= 1",
+            "--n 必须 >= 1",
+            "--n は 1 以上である必要があります"
+        ));
     }
     let me = std::env::current_exe()?;
     let mut mine = vec![];
@@ -1669,11 +1548,12 @@ fn bench(n: u32, locale: locale::Locale) -> anyhow::Result<()> {
         let t = Instant::now();
         let st = std::process::Command::new(&me).arg("--version").status()?;
         if !st.success() {
-            anyhow::bail!(match locale {
-                locale::Locale::English => "self --version failed",
-                locale::Locale::Chinese => "自身的 --version 失败",
-                locale::Locale::Japanese => "自身の --version が失敗しました",
-            });
+            anyhow::bail!(crate::locale::pick(
+                locale,
+                "self --version failed",
+                "自身的 --version 失败",
+                "自身の --version が失敗しました"
+            ));
         }
         mine.push(t.elapsed());
     }
@@ -1691,11 +1571,12 @@ fn bench(n: u32, locale: locale::Locale) -> anyhow::Result<()> {
     } else {
         println!(
             "[dsh ] {}",
-            match locale {
-                locale::Locale::English => "skipped (original not found)",
-                locale::Locale::Chinese => "已跳过（未找到原始版本）",
-                locale::Locale::Japanese => "スキップ（元のバージョンが見つかりません）",
-            }
+            crate::locale::pick(
+                locale,
+                "skipped (original not found)",
+                "已跳过（未找到原始版本）",
+                "スキップ（元のバージョンが見つかりません）"
+            )
         );
     }
     Ok(())

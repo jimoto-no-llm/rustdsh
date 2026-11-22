@@ -88,25 +88,20 @@ impl Outcome {
     /// caller on its normal path (already up, opted out, or a remote base
     /// that reports its own connection error).
     pub fn start_failure(&self, base: &str, locale: crate::locale::Locale) -> Option<String> {
-        let runtime_hint = match locale {
-            crate::locale::Locale::English => "start Docker/Podman, or run SearXNG yourself",
-            crate::locale::Locale::Chinese => "请启动 Docker/Podman，或自行运行 SearXNG",
-            crate::locale::Locale::Japanese => {
-                "Docker/Podman を起動するか、SearXNG を手動で起動してください"
-            }
-        };
+        let runtime_hint = crate::locale::pick(
+            locale,
+            "start Docker/Podman, or run SearXNG yourself",
+            "请启动 Docker/Podman，或自行运行 SearXNG",
+            "Docker/Podman を起動するか、SearXNG を手動で起動してください",
+        );
         Some(match self {
-            Self::NoRuntime => match locale {
-                crate::locale::Locale::English => format!(
-                    "no container runtime found (docker compose, docker-compose, podman compose, podman-compose); {runtime_hint}"
-                ),
-                crate::locale::Locale::Chinese => format!(
-                    "未找到容器运行时（docker compose、docker-compose、podman compose、podman-compose）；{runtime_hint}"
-                ),
-                crate::locale::Locale::Japanese => format!(
-                    "コンテナランタイムが見つかりません（docker compose、docker-compose、podman compose、podman-compose）。{runtime_hint}"
-                ),
-            },
+            Self::NoRuntime => crate::locale::pick(locale, format!(
+                "no container runtime found (docker compose, docker-compose, podman compose, podman-compose); {runtime_hint}"
+            ), format!(
+                "未找到容器运行时（docker compose、docker-compose、podman compose、podman-compose）；{runtime_hint}"
+            ), format!(
+                "コンテナランタイムが見つかりません（docker compose、docker-compose、podman compose、podman-compose）。{runtime_hint}"
+            )),
             Self::NoComposeFile => match locale {
                 crate::locale::Locale::English => format!(
                     "{COMPOSE_FILE_ENV} does not name a readable file; {runtime_hint}"
@@ -118,31 +113,23 @@ impl Outcome {
                     "{COMPOSE_FILE_ENV} が読み取り可能なファイルを指していません。{runtime_hint}"
                 ),
             },
-            Self::ComposeUnavailable => match locale {
-                crate::locale::Locale::English => format!(
-                    "the built-in {COMPOSE_FILE} could not be written to the cache directory; set a writable HOME or name your own file with {COMPOSE_FILE_ENV}"
-                ),
-                crate::locale::Locale::Chinese => format!(
-                    "无法将内置 {COMPOSE_FILE} 写入缓存目录；请设置可写的 HOME，或用 {COMPOSE_FILE_ENV} 指定文件"
-                ),
-                crate::locale::Locale::Japanese => format!(
-                    "同梱の {COMPOSE_FILE} をキャッシュディレクトリへ書き出せません。書き込み可能な HOME を設定するか、{COMPOSE_FILE_ENV} でファイルを指定してください"
-                ),
-            },
-            Self::Timeout => match locale {
-                crate::locale::Locale::English => format!(
-                    "SearXNG at {base} did not answer within {}s; the container may still be starting",
-                    START_TIMEOUT.as_secs()
-                ),
-                crate::locale::Locale::Chinese => format!(
-                    "{base} 的 SearXNG 在 {} 秒内没有响应；容器可能仍在启动",
-                    START_TIMEOUT.as_secs()
-                ),
-                crate::locale::Locale::Japanese => format!(
-                    "{base} の SearXNG が {} 秒以内に応答しません。コンテナはまだ起動中の可能性があります",
-                    START_TIMEOUT.as_secs()
-                ),
-            },
+            Self::ComposeUnavailable => crate::locale::pick(locale, format!(
+                "the built-in {COMPOSE_FILE} could not be written to the cache directory; set a writable HOME or name your own file with {COMPOSE_FILE_ENV}"
+            ), format!(
+                "无法将内置 {COMPOSE_FILE} 写入缓存目录；请设置可写的 HOME，或用 {COMPOSE_FILE_ENV} 指定文件"
+            ), format!(
+                "同梱の {COMPOSE_FILE} をキャッシュディレクトリへ書き出せません。書き込み可能な HOME を設定するか、{COMPOSE_FILE_ENV} でファイルを指定してください"
+            )),
+            Self::Timeout => crate::locale::pick(locale, format!(
+                "SearXNG at {base} did not answer within {}s; the container may still be starting",
+                START_TIMEOUT.as_secs()
+            ), format!(
+                "{base} 的 SearXNG 在 {} 秒内没有响应；容器可能仍在启动",
+                START_TIMEOUT.as_secs()
+            ), format!(
+                "{base} の SearXNG が {} 秒以内に応答しません。コンテナはまだ起動中の可能性があります",
+                START_TIMEOUT.as_secs()
+            )),
             _ => return None,
         })
     }
@@ -162,11 +149,7 @@ pub enum ComposeSource {
 impl ComposeSource {
     /// 'rdsh doctor' label: the user's file, or the built-in project.
     pub fn label(&self, locale: crate::locale::Locale) -> String {
-        let missing = match locale {
-            crate::locale::Locale::English => "not found",
-            crate::locale::Locale::Chinese => "未找到",
-            crate::locale::Locale::Japanese => "見つかりません",
-        };
+        let missing = crate::locale::pick(locale, "not found", "未找到", "見つかりません");
         match self {
             Self::Override(path) if path.is_file() => path.display().to_string(),
             Self::Override(path) => format!("{} ({missing})", path.display()),

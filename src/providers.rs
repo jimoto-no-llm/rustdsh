@@ -213,15 +213,6 @@ fn preset(id: &str) -> Option<&'static Preset> {
     PRESETS.iter().find(|p| p.id == id)
 }
 
-pub(crate) fn t(locale: crate::locale::Locale, ja: &str, en: &str, zh: &str) -> String {
-    match locale {
-        crate::locale::Locale::Japanese => ja,
-        crate::locale::Locale::English => en,
-        crate::locale::Locale::Chinese => zh,
-    }
-    .to_string()
-}
-
 // --- model and route -----------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -3263,15 +3254,13 @@ pub(crate) fn cmd_add(
     if args.discover && !preset.supports_discovery {
         bail!(
             "{}",
-            t(locale,
-                &format!(
-                    "{} には GET /models がない（404）ため --discover は使えません。--model <id> を指定するか、省略して既定のモデルを使ってください",
-                    preset.id
-                ),
-                &format!(
+            crate::locale::pick(locale, &format!(
                     "--discover is not supported for {}: its API has no GET /models (it answers 404). Pass --model <id>, or omit it to use the built-in models",
                     preset.id
-                ), &format!("{} 的 API 没有 GET /models（返回 404），不能使用 --discover。请传入 --model <id>，或省略以使用内置模型", preset.id))
+                ), &format!("{} 的 API 没有 GET /models（返回 404），不能使用 --discover。请传入 --model <id>，或省略以使用内置模型", preset.id), &format!(
+                    "{} には GET /models がない（404）ため --discover は使えません。--model <id> を指定するか、省略して既定のモデルを使ってください",
+                    preset.id
+                ))
         );
     }
     if args.key_stdin && args.no_key {
@@ -3668,30 +3657,30 @@ pub(crate) fn cmd_add(
     }
     let file = patch_path.display();
     let verb = match change {
-        Change::Added => t(locale, "追加しました", "added", "已添加"),
-        Change::Replaced => t(locale, "置き換えました", "replaced", "已替换"),
-        Change::Exists => t(
+        Change::Added => crate::locale::pick(locale, "added", "已添加", "追加しました"),
+        Change::Replaced => crate::locale::pick(locale, "replaced", "已替换", "置き換えました"),
+        Change::Exists => crate::locale::pick(
             locale,
-            "既に設定済みです（変更なし。置き換えるには --replace）",
             "already configured, nothing changed (use --replace to rewrite it)",
             "已配置，未作更改（使用 --replace 重写）",
+            "既に設定済みです（変更なし。置き換えるには --replace）",
         ),
-        Change::Identical => t(
+        Change::Identical => crate::locale::pick(
             locale,
-            "既に同じ内容です（変更なし）",
             "already identical, nothing changed",
             "内容已相同，未作更改",
+            "既に同じ内容です（変更なし）",
         ),
     };
     let dry = if args.dry_run {
-        t(
+        crate::locale::pick(
             locale,
-            "[dry-run・書き込みなし] ",
             "[dry-run, nothing written] ",
             "[试运行，未写入] ",
+            "[dry-run・書き込みなし] ",
         )
     } else {
-        String::new()
+        ""
     };
     println!("[rdsh provider] {dry}{} {}: {verb}", profile, route.id);
     println!(
@@ -3742,29 +3731,23 @@ pub(crate) fn cmd_add(
     match key_state {
         "stored" => println!(
             "[rdsh provider] {}",
-            t(locale,
-                &format!("鍵を {key_env} として保存しました"),
-                &format!("key saved as {key_env}"), &format!("密钥已保存为 {key_env}"))
+            crate::locale::pick(locale, &format!("key saved as {key_env}"), &format!("密钥已保存为 {key_env}"), &format!("鍵を {key_env} として保存しました"))
         ),
         "would-store" => println!(
             "[rdsh provider] {}",
-            t(locale, &format!("{key_env} を保存します"), &format!("would save {key_env}"), &format!("将保存 {key_env}"))
+            crate::locale::pick(locale, &format!("would save {key_env}"), &format!("将保存 {key_env}"), &format!("{key_env} を保存します"))
         ),
         "placeholder" | "would-store-placeholder" => println!(
             "[rdsh provider] {}",
-            t(locale,
-                &format!("鍵なしのため {key_env} にダミー値を保存します"),
-                &format!("no key: stores a placeholder for {key_env}"), &format!("无需密钥：将为 {key_env} 保存占位值"))
+            crate::locale::pick(locale, &format!("no key: stores a placeholder for {key_env}"), &format!("无需密钥：将为 {key_env} 保存占位值"), &format!("鍵なしのため {key_env} にダミー値を保存します"))
         ),
         "present" => println!(
             "[rdsh provider] {}",
-            t(locale, &format!("{key_env}: 設定済み"), &format!("{key_env}: present"), &format!("{key_env}：已存在"))
+            crate::locale::pick(locale, &format!("{key_env}: present"), &format!("{key_env}：已存在"), &format!("{key_env}: 設定済み"))
         ),
         _ => println!(
             "[rdsh provider] {}",
-            t(locale,
-                &format!("{key_env} が未設定です。{key_env}=... を付けて再実行するか、--key-stdin で渡してください"),
-                &format!("{key_env} is missing: re-run with {key_env}=... set, or pipe it with --key-stdin"), &format!("缺少 {key_env}：请设置 {key_env}=... 后重试，或通过 --key-stdin 传入"))
+            crate::locale::pick(locale, &format!("{key_env} is missing: re-run with {key_env}=... set, or pipe it with --key-stdin"), &format!("缺少 {key_env}：请设置 {key_env}=... 后重试，或通过 --key-stdin 传入"), &format!("{key_env} が未設定です。{key_env}=... を付けて再実行するか、--key-stdin で渡してください"))
         ),
     }
     Ok(())
@@ -3868,11 +3851,12 @@ pub(crate) fn cmd_list(json: bool, locale: crate::locale::Locale) -> Result<()> 
                 "  {:<13} {} ({}, 密钥 {})",
                 "  {:<13} {} ({}, キー {})",
                 p.id,
-                p.base_url.unwrap_or(match locale {
-                    crate::locale::Locale::English => "--base-url required",
-                    crate::locale::Locale::Chinese => "需要 --base-url",
-                    crate::locale::Locale::Japanese => "--base-url が必要です",
-                }),
+                p.base_url.unwrap_or(crate::locale::pick(
+                    locale,
+                    "--base-url required",
+                    "需要 --base-url",
+                    "--base-url が必要です"
+                )),
                 API,
                 route_key_env(p.id)
             )

@@ -16,27 +16,20 @@ const SERVER_ERROR_BACKOFF_SECONDS: [u64; MAX_SERVER_ERROR_RETRIES] = [1, 2, 4];
 const MAX_RETRY_AFTER_SECONDS: u64 = 60;
 
 fn message(locale: Locale, detail: &str) -> anyhow::Error {
-    let disclosure = match locale {
-        Locale::English => "This provider sends queries to Keenable. Keyless calls use an IP quota, consume no credits, and are logged with the query, IP address, and app title rdsh; keyed calls draw from organization credits.",
-        Locale::Chinese => "此提供方会将查询发送到 Keenable。无密钥请求使用 IP 配额、不消耗额度，并会记录查询、IP 地址和应用标题 rdsh；带密钥请求会消耗组织额度。",
-        Locale::Japanese => "このプロバイダーは検索語を Keenable に送信します。キーなしの呼び出しは IP 単位の上限を使い、クレジットを消費せず、検索語、IP アドレス、アプリ名 rdsh が記録されます。キー付きの呼び出しは組織のクレジットを消費します。",
-    };
-    let prefix = match locale {
-        Locale::English => "Keenable Web Search",
-        Locale::Chinese => "Keenable 网页搜索",
-        Locale::Japanese => "Keenable Web 検索",
-    };
+    let disclosure = crate::locale::pick(locale, "This provider sends queries to Keenable. Keyless calls use an IP quota, consume no credits, and are logged with the query, IP address, and app title rdsh; keyed calls draw from organization credits.", "此提供方会将查询发送到 Keenable。无密钥请求使用 IP 配额、不消耗额度，并会记录查询、IP 地址和应用标题 rdsh；带密钥请求会消耗组织额度。", "このプロバイダーは検索語を Keenable に送信します。キーなしの呼び出しは IP 単位の上限を使い、クレジットを消費せず、検索語、IP アドレス、アプリ名 rdsh が記録されます。キー付きの呼び出しは組織のクレジットを消費します。");
+    let prefix = crate::locale::pick(
+        locale,
+        "Keenable Web Search",
+        "Keenable 网页搜索",
+        "Keenable Web 検索",
+    );
     anyhow::anyhow!("{prefix}: {detail}. {disclosure}")
 }
 
 fn credential_error(locale: Locale) -> anyhow::Error {
     message(
         locale,
-        match locale {
-            Locale::English => "KEENABLE_API_KEY contains invalid HTTP header characters; no request was sent",
-            Locale::Chinese => "KEENABLE_API_KEY 包含无效的 HTTP 请求头字符；请求尚未发送",
-            Locale::Japanese => "KEENABLE_API_KEY に無効な HTTP ヘッダー文字が含まれています。リクエストは送信されていません",
-        },
+        crate::locale::pick(locale, "KEENABLE_API_KEY contains invalid HTTP header characters; no request was sent", "KEENABLE_API_KEY 包含无效的 HTTP 请求头字符；请求尚未发送", "KEENABLE_API_KEY に無効な HTTP ヘッダー文字が含まれています。リクエストは送信されていません"),
     )
 }
 
@@ -88,17 +81,13 @@ fn server_error_wait_seconds(retries: usize, retry_after: Option<u64>) -> u64 {
 }
 
 fn retry_after_overflow_detail(locale: Locale, status: u16) -> String {
-    match locale {
-        Locale::English => format!(
-            "HTTP {status}; Retry-After exceeds the supported numeric range. No further automatic retry will be made; wait for the full Retry-After delay from the response before retrying manually"
-        ),
-        Locale::Chinese => format!(
-            "HTTP {status}；Retry-After 数值超出支持范围。不再执行自动重试；请按响应中的 Retry-After 完整等待后再手动重试"
-        ),
-        Locale::Japanese => format!(
-            "HTTP {status}；Retry-After の数値が対応範囲を超えています。これ以上の自動再試行は行いません。レスポンスの指定時間をすべて待ってから手動で再試行してください"
-        ),
-    }
+    crate::locale::pick(locale, format!(
+        "HTTP {status}; Retry-After exceeds the supported numeric range. No further automatic retry will be made; wait for the full Retry-After delay from the response before retrying manually"
+    ), format!(
+        "HTTP {status}；Retry-After 数值超出支持范围。不再执行自动重试；请按响应中的 Retry-After 完整等待后再手动重试"
+    ), format!(
+        "HTTP {status}；Retry-After の数値が対応範囲を超えています。これ以上の自動再試行は行いません。レスポンスの指定時間をすべて待ってから手動で再試行してください"
+    ))
 }
 
 fn rate_limit_error(
@@ -106,53 +95,49 @@ fn rate_limit_error(
     retry_after: RetryAfterSeconds,
     retry_limit_reached: bool,
 ) -> anyhow::Error {
-    let detail = match locale {
-        Locale::English => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP 429 rate limit exceeded; Keenable says to wait {seconds} seconds. Automatic waits are limited to {MAX_RETRY_AFTER_SECONDS} seconds, so retry manually after the full wait"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
-                "HTTP 429 rate limit exceeded again; retry after {seconds} seconds (automatic retry limit reached)"
-            ),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP 429 rate limit exceeded; retry after {seconds} seconds")
-            }
-            RetryAfterSeconds::MissingOrInvalid => format!(
-                "HTTP 429 rate limit exceeded; Retry-After is missing or invalid. Wait at least {MAX_RETRY_AFTER_SECONDS} seconds, then retry manually"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
-        },
-        Locale::Chinese => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP 429 速率受限；Keenable 指定等待 {seconds} 秒。自动等待上限为 {MAX_RETRY_AFTER_SECONDS} 秒，请完整等待后手动重试"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
-                "再次遇到 HTTP 429；请等待 {seconds} 秒后手动重试（自动重试次数已用尽）"
-            ),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP 429 速率受限；请等待 {seconds} 秒后重试")
-            }
-            RetryAfterSeconds::MissingOrInvalid => format!(
-                "HTTP 429 速率受限；Retry-After 缺失或无效。请至少等待 {MAX_RETRY_AFTER_SECONDS} 秒后手动重试"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
-        },
-        Locale::Japanese => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP 429 のレート制限です。Keenable の指定は {seconds} 秒です。自動待機は最大 {MAX_RETRY_AFTER_SECONDS} 秒のため、指定時間を待ってから手動で再試行してください"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
-                "HTTP 429 が再発しました。{seconds} 秒待ってから手動で再試行してください（自動再試行回数の上限）"
-            ),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP 429 のレート制限です。{seconds} 秒待って再試行してください")
-            }
-            RetryAfterSeconds::MissingOrInvalid => format!(
-                "HTTP 429 のレート制限です。Retry-After がないか不正です。少なくとも {MAX_RETRY_AFTER_SECONDS} 秒待ってから手動で再試行してください"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
-        },
-    };
+    let detail = crate::locale::pick(locale, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP 429 rate limit exceeded; Keenable says to wait {seconds} seconds. Automatic waits are limited to {MAX_RETRY_AFTER_SECONDS} seconds, so retry manually after the full wait"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
+            "HTTP 429 rate limit exceeded again; retry after {seconds} seconds (automatic retry limit reached)"
+        ),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP 429 rate limit exceeded; retry after {seconds} seconds")
+        }
+        RetryAfterSeconds::MissingOrInvalid => format!(
+            "HTTP 429 rate limit exceeded; Retry-After is missing or invalid. Wait at least {MAX_RETRY_AFTER_SECONDS} seconds, then retry manually"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
+    }, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP 429 速率受限；Keenable 指定等待 {seconds} 秒。自动等待上限为 {MAX_RETRY_AFTER_SECONDS} 秒，请完整等待后手动重试"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
+            "再次遇到 HTTP 429；请等待 {seconds} 秒后手动重试（自动重试次数已用尽）"
+        ),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP 429 速率受限；请等待 {seconds} 秒后重试")
+        }
+        RetryAfterSeconds::MissingOrInvalid => format!(
+            "HTTP 429 速率受限；Retry-After 缺失或无效。请至少等待 {MAX_RETRY_AFTER_SECONDS} 秒后手动重试"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
+    }, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP 429 のレート制限です。Keenable の指定は {seconds} 秒です。自動待機は最大 {MAX_RETRY_AFTER_SECONDS} 秒のため、指定時間を待ってから手動で再試行してください"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if retry_limit_reached => format!(
+            "HTTP 429 が再発しました。{seconds} 秒待ってから手動で再試行してください（自動再試行回数の上限）"
+        ),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP 429 のレート制限です。{seconds} 秒待って再試行してください")
+        }
+        RetryAfterSeconds::MissingOrInvalid => format!(
+            "HTTP 429 のレート制限です。Retry-After がないか不正です。少なくとも {MAX_RETRY_AFTER_SECONDS} 秒待ってから手動で再試行してください"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, 429),
+    });
     message(locale, &detail)
 }
 
@@ -164,62 +149,58 @@ fn server_error_error(
 ) -> anyhow::Error {
     let status = status.as_u16();
     let exhausted = retries >= MAX_SERVER_ERROR_RETRIES;
-    let detail = match locale {
-        Locale::English => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP {status} server error; Keenable requests a wait of {seconds} seconds. Automatic waits are limited to {MAX_RETRY_AFTER_SECONDS} seconds, so retry manually after the full wait"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
-                "HTTP {status} persisted after {retries} retries; wait {seconds} seconds before retrying manually (retry limit reached)"
-            ),
-            RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
-                "HTTP {status} persisted after {retries} retries; no valid Retry-After was provided. Retry manually later"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP {status} server error; retry after {seconds} seconds")
-            }
-            RetryAfterSeconds::MissingOrInvalid => {
-                format!("HTTP {status} server error; retry manually later")
-            }
-        },
-        Locale::Chinese => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP {status} 服务器错误；Keenable 指定等待 {seconds} 秒。自动等待上限为 {MAX_RETRY_AFTER_SECONDS} 秒，请等待完整时长后手动重试"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
-                "HTTP {status} 在 {retries} 次重试后仍失败；请等待 {seconds} 秒后手动重试（已达重试上限）"
-            ),
-            RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
-                "HTTP {status} 在 {retries} 次重试后仍失败；Retry-After 缺失或无效，请稍后手动重试"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP {status} 服务器错误；请等待 {seconds} 秒后重试")
-            }
-            RetryAfterSeconds::MissingOrInvalid => {
-                format!("HTTP {status} 服务器错误；请稍后手动重试")
-            }
-        },
-        Locale::Japanese => match retry_after {
-            RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
-                "HTTP {status} のサーバーエラーです。Keenable の指定は {seconds} 秒です。自動待機は最大 {MAX_RETRY_AFTER_SECONDS} 秒のため、指定時間を待ってから手動で再試行してください"
-            ),
-            RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
-                "HTTP {status} は {retries} 回再試行しても解消しませんでした。{seconds} 秒待ってから手動で再試行してください（再試行上限）"
-            ),
-            RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
-                "HTTP {status} は {retries} 回再試行しても解消しませんでした。Retry-After がないか不正です。後ほど手動で再試行してください"
-            ),
-            RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
-            RetryAfterSeconds::Seconds(seconds) => {
-                format!("HTTP {status} のサーバーエラーです。{seconds} 秒待って再試行してください")
-            }
-            RetryAfterSeconds::MissingOrInvalid => {
-                format!("HTTP {status} のサーバーエラーです。後ほど手動で再試行してください")
-            }
-        },
-    };
+    let detail = crate::locale::pick(locale, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP {status} server error; Keenable requests a wait of {seconds} seconds. Automatic waits are limited to {MAX_RETRY_AFTER_SECONDS} seconds, so retry manually after the full wait"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
+            "HTTP {status} persisted after {retries} retries; wait {seconds} seconds before retrying manually (retry limit reached)"
+        ),
+        RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
+            "HTTP {status} persisted after {retries} retries; no valid Retry-After was provided. Retry manually later"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP {status} server error; retry after {seconds} seconds")
+        }
+        RetryAfterSeconds::MissingOrInvalid => {
+            format!("HTTP {status} server error; retry manually later")
+        }
+    }, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP {status} 服务器错误；Keenable 指定等待 {seconds} 秒。自动等待上限为 {MAX_RETRY_AFTER_SECONDS} 秒，请等待完整时长后手动重试"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
+            "HTTP {status} 在 {retries} 次重试后仍失败；请等待 {seconds} 秒后手动重试（已达重试上限）"
+        ),
+        RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
+            "HTTP {status} 在 {retries} 次重试后仍失败；Retry-After 缺失或无效，请稍后手动重试"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP {status} 服务器错误；请等待 {seconds} 秒后重试")
+        }
+        RetryAfterSeconds::MissingOrInvalid => {
+            format!("HTTP {status} 服务器错误；请稍后手动重试")
+        }
+    }, match retry_after {
+        RetryAfterSeconds::Seconds(seconds) if seconds > MAX_RETRY_AFTER_SECONDS => format!(
+            "HTTP {status} のサーバーエラーです。Keenable の指定は {seconds} 秒です。自動待機は最大 {MAX_RETRY_AFTER_SECONDS} 秒のため、指定時間を待ってから手動で再試行してください"
+        ),
+        RetryAfterSeconds::Seconds(seconds) if exhausted => format!(
+            "HTTP {status} は {retries} 回再試行しても解消しませんでした。{seconds} 秒待ってから手動で再試行してください（再試行上限）"
+        ),
+        RetryAfterSeconds::MissingOrInvalid if exhausted => format!(
+            "HTTP {status} は {retries} 回再試行しても解消しませんでした。Retry-After がないか不正です。後ほど手動で再試行してください"
+        ),
+        RetryAfterSeconds::Overflow => retry_after_overflow_detail(locale, status),
+        RetryAfterSeconds::Seconds(seconds) => {
+            format!("HTTP {status} のサーバーエラーです。{seconds} 秒待って再試行してください")
+        }
+        RetryAfterSeconds::MissingOrInvalid => {
+            format!("HTTP {status} のサーバーエラーです。後ほど手動で再試行してください")
+        }
+    });
     message(locale, &detail)
 }
 
@@ -298,11 +279,7 @@ async fn fetch(
     let network_error = || {
         message(
             locale,
-            match locale {
-                Locale::English => "the request failed or timed out; check your network and try again",
-                Locale::Chinese => "请求失败或超时；请检查网络后重试",
-                Locale::Japanese => "リクエストが失敗またはタイムアウトしました。ネットワークを確認して再試行してください",
-            },
+            crate::locale::pick(locale, "the request failed or timed out; check your network and try again", "请求失败或超时；请检查网络后重试", "リクエストが失敗またはタイムアウトしました。ネットワークを確認して再試行してください"),
         )
     };
     let client = reqwest::Client::builder()

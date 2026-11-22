@@ -42,19 +42,6 @@ macro_rules! err {
     }};
 }
 
-fn text(
-    locale: Locale,
-    english: &'static str,
-    chinese: &'static str,
-    japanese: &'static str,
-) -> &'static str {
-    match locale {
-        Locale::English => english,
-        Locale::Chinese => chinese,
-        Locale::Japanese => japanese,
-    }
-}
-
 /// One package the catalog knows about.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
@@ -343,9 +330,9 @@ impl Row {
 
     fn localized_state(&self, locale: Locale) -> &'static str {
         match self.state_label() {
-            "enabled" => text(locale, "enabled", "已启用", "有効"),
-            "installed" => text(locale, "installed", "已安装", "インストール済み"),
-            _ => text(locale, "missing", "未安装", "未導入"),
+            "enabled" => crate::locale::pick(locale, "enabled", "已启用", "有効"),
+            "installed" => crate::locale::pick(locale, "installed", "已安装", "インストール済み"),
+            _ => crate::locale::pick(locale, "missing", "未安装", "未導入"),
         }
     }
 }
@@ -471,19 +458,19 @@ pub fn cmd_status(
     }
     out!(
         "[rdsh] plugins: {} {} ({})",
-        text(locale, "profile", "配置文件", "プロファイル"),
+        crate::locale::pick(locale, "profile", "配置文件", "プロファイル"),
         report.profile,
         report.dir.display()
     );
     if let Some(error) = &report.error {
         out!(
             "[rdsh] plugins: {}: {error}",
-            text(locale, "unreadable", "无法读取", "読み取れません")
+            crate::locale::pick(locale, "unreadable", "无法读取", "読み取れません")
         );
     } else if !report.initialized {
         out!(
             "[rdsh] plugins: {}",
-            text(
+            crate::locale::pick(
                 locale,
                 "the profile has no package.json yet; boot it once, then provision",
                 "该配置文件尚无 package.json；请先启动一次再安装",
@@ -494,12 +481,12 @@ pub fn cmd_status(
     match (&report.plugins_dir, &report.plugins_dir_error) {
         (Some(dir), _) => out!(
             "[rdsh] plugins: {} {}",
-            text(locale, "sources", "来源", "取得元"),
+            crate::locale::pick(locale, "sources", "来源", "取得元"),
             dir.display()
         ),
         (None, Some(error)) if report.bundled_missing() => out!(
             "[rdsh] plugins: {}: {error}",
-            text(locale, "sources", "来源", "取得元")
+            crate::locale::pick(locale, "sources", "来源", "取得元")
         ),
         _ => {}
     }
@@ -508,11 +495,11 @@ pub fn cmd_status(
     }
     for (tier, rows) in [
         (
-            text(locale, "essential", "必需", "必須"),
+            crate::locale::pick(locale, "essential", "必需", "必須"),
             &report.essentials,
         ),
         (
-            text(locale, "recommended", "推荐", "推奨"),
+            crate::locale::pick(locale, "recommended", "推荐", "推奨"),
             &report.recommended,
         ),
     ] {
@@ -520,10 +507,20 @@ pub fn cmd_status(
         for row in rows {
             let mut note = String::new();
             if row.entry.bundled {
-                note.push_str(text(locale, " (bundled)", "（内置）", "（同梱）"));
+                note.push_str(crate::locale::pick(
+                    locale,
+                    " (bundled)",
+                    "（内置）",
+                    "（同梱）",
+                ));
             }
             if row.entry.starter {
-                note.push_str(text(locale, " (starter)", "（入门）", "（スターター）"));
+                note.push_str(crate::locale::pick(
+                    locale,
+                    " (starter)",
+                    "（入门）",
+                    "（スターター）",
+                ));
             }
             out!(
                 "[rdsh] plugins:   {:<9} {}{note}",
@@ -535,7 +532,7 @@ pub fn cmd_status(
     if report.ok() {
         out!(
             "[rdsh] plugins: {}",
-            text(
+            crate::locale::pick(
                 locale,
                 "essential plugins are complete",
                 "必需插件已齐全",
@@ -557,7 +554,7 @@ pub fn cmd_status(
         out!("{line}");
         out!(
             "[rdsh] plugins: {}: rdsh plugins install --profile {}",
-            text(locale, "fix", "修复", "修正"),
+            crate::locale::pick(locale, "fix", "修复", "修正"),
             report.profile
         );
     }
@@ -597,7 +594,7 @@ fn fetch_release_copy(env: &OsEnv, latest: bool, locale: Locale) -> Result<()> {
         use crate::plugins_release::{provision, Want};
         err!(
             "[rdsh] plugins: {}",
-            text(
+            crate::locale::pick(
                 locale,
                 "fetching the bundled plugins from the release",
                 "正在从 release 获取内置插件",
@@ -639,7 +636,7 @@ fn resolve_bundled_dir(env: &OsEnv, request: &InstallRequest, locale: Locale) ->
         Ok(()) => desktop::resolve_plugins_dir(None, env, locale),
         // A refresh that failed still leaves the copy that was already there.
         Err(_) if resolved.is_ok() => resolved,
-        Err(error) => Err(error.context(text(
+        Err(error) => Err(error.context(crate::locale::pick(
             locale,
             "could not fetch the bundled plugins from the release",
             "无法从 release 获取内置插件",
@@ -766,21 +763,21 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
     if !request.json {
         out!(
             "[rdsh] plugins: {} {} ({})",
-            text(locale, "profile", "配置文件", "プロファイル"),
+            crate::locale::pick(locale, "profile", "配置文件", "プロファイル"),
             request.profile,
             state.path.display()
         );
         if let Some(dir) = &sources {
             out!(
                 "[rdsh] plugins: {} {}",
-                text(locale, "sources", "来源", "取得元"),
+                crate::locale::pick(locale, "sources", "来源", "取得元"),
                 dir
             );
         }
         if targets.is_empty() {
             out!(
                 "[rdsh] plugins: {}",
-                text(
+                crate::locale::pick(
                     locale,
                     "nothing to add; the selected plugins are already attached",
                     "无需添加；所选插件均已安装",
@@ -803,7 +800,7 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
             if !request.json {
                 out!(
                     "[rdsh] {}: {} {}",
-                    text(locale, "dry-run", "试运行", "ドライラン"),
+                    crate::locale::pick(locale, "dry-run", "试运行", "ドライラン"),
                     dsh,
                     args.join(" ")
                 );
@@ -820,7 +817,7 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
         if !request.json {
             out!(
                 "[rdsh] plugins: {} {}",
-                text(locale, "installing", "正在安装", "インストール中"),
+                crate::locale::pick(locale, "installing", "正在安装", "インストール中"),
                 target.entry.package
             );
         }
@@ -856,9 +853,9 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
             out!(
                 "[rdsh] plugins: {} {}",
                 if ok {
-                    text(locale, "installed", "已安装", "インストールしました")
+                    crate::locale::pick(locale, "installed", "已安装", "インストールしました")
                 } else {
-                    text(locale, "failed", "失败", "失敗しました")
+                    crate::locale::pick(locale, "failed", "失败", "失敗しました")
                 },
                 target.entry.package
             );
@@ -894,26 +891,27 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
             }))?
         );
     } else {
-        let line = match locale {
-            Locale::English => format!(
+        let line = crate::locale::pick(
+            locale,
+            format!(
                 "[rdsh] plugins: done: {installed_count} installed, {} not installed",
                 not_installed.len()
             ),
-            Locale::Chinese => format!(
+            format!(
                 "[rdsh] plugins: 完成：已安装 {installed_count} 个，未安装 {} 个",
                 not_installed.len()
             ),
-            Locale::Japanese => format!(
+            format!(
                 "[rdsh] plugins: 完了: {installed_count} 件をインストール、{} 件は未導入",
                 not_installed.len()
             ),
-        };
+        );
         out!("{line}");
         if installed_count > 0 {
             out!(
                 "[rdsh] plugins: {}: {}",
-                text(locale, "next", "下一步", "次の手順"),
-                text(
+                crate::locale::pick(locale, "next", "下一步", "次の手順"),
+                crate::locale::pick(
                     locale,
                     "restart the DSH session so the new plugins load",
                     "请重启 DSH 会话以加载新插件",
@@ -926,7 +924,7 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
         for (package, why) in &declined {
             out!(
                 "[rdsh] plugins: {}: {package} ({why})",
-                text(locale, "skipped", "已跳过", "スキップ")
+                crate::locale::pick(locale, "skipped", "已跳过", "スキップ")
             );
         }
     }
@@ -934,7 +932,7 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
         for item in &not_installed {
             err!(
                 "[rdsh] plugins: {}: {item}",
-                text(locale, "not installed", "未安装", "未導入")
+                crate::locale::pick(locale, "not installed", "未安装", "未導入")
             );
         }
         bail!(
@@ -971,7 +969,7 @@ fn install_desktop(
     if targets.is_empty() {
         out!(
             "[rdsh] plugins: {}",
-            text(
+            crate::locale::pick(
                 locale,
                 "nothing to add; the selected plugins are already attached",
                 "无需添加；所选插件均已安装",
@@ -1114,29 +1112,20 @@ pub fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
     let mut lines: Vec<String> = crate::plugins_release::doctor_lines(env, locale);
     if no_source {
         lines.push(
-            text(
-                locale,
-                "[rdsh] plugins: the bundled plugins are not installed and there is no checkout; run: rdsh plugins install (fetches them from the release)",
-                "[rdsh] plugins: 未安装内置插件且没有检出目录；请运行：rdsh plugins install（从 release 获取）",
-                "[rdsh] plugins: 同梱プラグインが未導入で、チェックアウトもありません。rdsh plugins install で release から取得してください",
-            )
+            crate::locale::pick(locale, "[rdsh] plugins: the bundled plugins are not installed and there is no checkout; run: rdsh plugins install (fetches them from the release)", "[rdsh] plugins: 未安装内置插件且没有检出目录；请运行：rdsh plugins install（从 release 获取）", "[rdsh] plugins: 同梱プラグインが未導入で、チェックアウトもありません。rdsh plugins install で release から取得してください")
             .to_string(),
         );
     }
-    lines.extend(gaps.into_iter().map(|(profile, missing)| match locale {
-            Locale::English => format!(
-                "[rdsh] plugins: {profile} is missing {} essential plugin(s) (fix: rdsh plugins install --profile {profile})",
-                missing.len()
-            ),
-            Locale::Chinese => format!(
-                "[rdsh] plugins: {profile} 缺少 {} 个必需插件（修复：rdsh plugins install --profile {profile}）",
-                missing.len()
-            ),
-            Locale::Japanese => format!(
-                "[rdsh] plugins: {profile} は必須プラグインが {} 件不足（修正: rdsh plugins install --profile {profile}）",
-                missing.len()
-            ),
-        }));
+    lines.extend(gaps.into_iter().map(|(profile, missing)| crate::locale::pick(locale, format!(
+        "[rdsh] plugins: {profile} is missing {} essential plugin(s) (fix: rdsh plugins install --profile {profile})",
+        missing.len()
+    ), format!(
+        "[rdsh] plugins: {profile} 缺少 {} 个必需插件（修复：rdsh plugins install --profile {profile}）",
+        missing.len()
+    ), format!(
+        "[rdsh] plugins: {profile} は必須プラグインが {} 件不足（修正: rdsh plugins install --profile {profile}）",
+        missing.len()
+    ))));
     lines
 }
 
