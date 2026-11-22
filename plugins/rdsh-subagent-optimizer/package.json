@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": { "test": "node --test test/*.test.mjs" },
-  "peerDependencies": { "@deepseek-ai/dsh-subagent": "0.2.0-rc.2 || 0.2.1-alpha.2 || 0.2.2-rc.5", "@deepseek-ai/dsh-tool-subagent": "0.2.0-rc.2 || 0.2.1-alpha.2 || 0.2.2-rc.5" },
+  "peerDependencies": { "@deepseek-ai/dsh-subagent": "0.2.0-rc.2 || 0.2.1-alpha.2 || 0.2.1-rc.5 || 0.2.2-rc.5", "@deepseek-ai/dsh-tool-subagent": "0.2.0-rc.2 || 0.2.1-alpha.2 || 0.2.1-rc.5 || 0.2.2-rc.5" },
   "license": "MIT",
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 }

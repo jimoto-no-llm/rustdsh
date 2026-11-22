@@ -10,7 +10,7 @@ const runtime = process.env.RDSH_PUBLIC_DSH_MODULES;
 test('pinned DSH public helpers, native tool and SlotCore accept the plugins without live sessions', { skip: !runtime }, async t => {
   const modules = resolve(runtime);
   const pkg = JSON.parse(await readFile(join(modules, '@deepseek-ai/dsh-subagent/package.json'), 'utf8'));
-  assert.ok(['0.2.0-rc.2', '0.2.1-alpha.2', '0.2.2-rc.5'].includes(pkg.version), 'only explicitly qualified DSH cohorts are supported');
+  assert.ok(['0.2.0-rc.2', '0.2.1-alpha.2', '0.2.1-rc.5', '0.2.2-rc.5'].includes(pkg.version), 'only explicitly qualified DSH cohorts are supported');
   const temporary = await mkdtemp(join(tmpdir(), 'rdsh-native-contract-'));
   t.after(() => rm(temporary, { recursive: true, force: true }));
   for (const file of ['index.js', 'optimizer.js', 'package.json']) await copyFile(new URL('../' + file, import.meta.url), join(temporary, file));
