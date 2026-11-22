@@ -2356,15 +2356,20 @@ mod rdsh_config_tests {
         assert!(c.set_dotted("unknown.key", "1").is_err());
         // unset: 単項目と節全体
         c.set_dotted("search.max", "7").unwrap();
-        c.reset_dotted_with_locale("search.max", crate::locale::Locale::English).unwrap();
+        c.reset_dotted_with_locale("search.max", crate::locale::Locale::English)
+            .unwrap();
         assert_eq!(c.search.max, 100);
         c.set_dotted("context.goal", "tmp").unwrap();
-        c.reset_dotted_with_locale("context", crate::locale::Locale::English).unwrap();
+        c.reset_dotted_with_locale("context", crate::locale::Locale::English)
+            .unwrap();
         assert!(c.context.goal.is_empty());
         c.set_dotted("search.max", "7").unwrap();
-        c.reset_dotted_with_locale("all", crate::locale::Locale::English).unwrap();
+        c.reset_dotted_with_locale("all", crate::locale::Locale::English)
+            .unwrap();
         assert_eq!(c, RdshSettings::default());
-        assert!(c.reset_dotted_with_locale("unknown.key", crate::locale::Locale::English).is_err());
+        assert!(c
+            .reset_dotted_with_locale("unknown.key", crate::locale::Locale::English)
+            .is_err());
     }
 
     #[test]
@@ -2380,7 +2385,8 @@ mod rdsh_config_tests {
             assert!(cfg.set_dotted("search.rustxng_profile", invalid).is_err());
             assert_eq!(cfg, previous);
         }
-        cfg.reset_dotted_with_locale("search.rustxng_profile", crate::locale::Locale::English).unwrap();
+        cfg.reset_dotted_with_locale("search.rustxng_profile", crate::locale::Locale::English)
+            .unwrap();
         assert_eq!(cfg.search.rustxng_profile, "standard");
         for raw in [
             serde_json::json!({}),
