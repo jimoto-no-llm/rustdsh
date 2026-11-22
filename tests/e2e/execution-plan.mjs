@@ -112,7 +112,7 @@ try {
     binding: "confirmed",
     run_id: "browser-run",
     cli: "dsh",
-    cli_version: "0.2.0-rc.2",
+    cli_version: "0.2.2-rc.5",
     cli_session_id: "browser-native-fixture",
     cwd,
   });
