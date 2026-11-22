@@ -13,7 +13,7 @@ session control, which is a separate interface from calling dashboard tools.
 
 | CLI | Verified version | Transport | Operations |
 | ----------- | ---------------- | ----------------- | ------------------------------------------- |
-| DSH | 0.2.0-rc.2 | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
+| DSH | 0.2.0-rc.2, 0.2.2-rc.5 | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
 | Codex | None | Not implemented | All unsupported |
 | Claude Code | None | Not implemented | All unsupported |
 | Kimi | None | Not implemented | All unsupported |
