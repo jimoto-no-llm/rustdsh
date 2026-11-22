@@ -3350,8 +3350,11 @@ pub(crate) fn cmd_add(
     }
 
     // Everything above is checked before the profile or the network is touched.
-    let profile =
-        crate::profile_or_default(args.profile.clone(), configured_default_profile, locale)?;
+    let profile = crate::cli_dispatch::profile_or_default(
+        args.profile.clone(),
+        configured_default_profile,
+        locale,
+    )?;
     if !valid_profile_name(&profile) {
         bail!(
             "{}",
