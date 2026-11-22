@@ -426,11 +426,11 @@ pub(crate) fn print(detected: &Detected, locale: Locale) {
     if !detected.known.is_empty() {
         println!(
             "{}",
-            providers::t(
+            crate::locale::pick(
                 locale,
-                "[rdsh provider] dsh がそのまま使えます（登録不要）:",
                 "[rdsh provider] dsh can use these as-is (no route needed):",
-                "[rdsh provider] dsh 可直接使用（无需注册）："
+                "[rdsh provider] dsh 可直接使用（无需注册）：",
+                "[rdsh provider] dsh がそのまま使えます（登録不要）:"
             )
         );
         for known in &detected.known {
@@ -440,27 +440,29 @@ pub(crate) fn print(detected: &Detected, locale: Locale) {
     if !detected.candidates.is_empty() {
         println!(
             "{}",
-            providers::t(
+            crate::locale::pick(
                 locale,
-                "[rdsh provider] rdsh で経路を登録できます:",
                 "[rdsh provider] rdsh can register these routes:",
-                "[rdsh provider] rdsh 可注册以下路由："
+                "[rdsh provider] rdsh 可注册以下路由：",
+                "[rdsh provider] rdsh で経路を登録できます:"
             )
         );
         for candidate in &detected.candidates {
             let key = match candidate.key_state {
                 KeyState::Env => {
-                    providers::t(locale, "キー: 環境変数", "key: env", "密钥：环境变量")
+                    crate::locale::pick(locale, "key: env", "密钥：环境变量", "キー: 環境変数")
                 }
-                KeyState::Elsewhere => providers::t(
+                KeyState::Elsewhere => crate::locale::pick(
                     locale,
-                    "キー: 他ツール",
                     "key: other tool",
                     "密钥：其他工具",
+                    "キー: 他ツール",
                 ),
-                KeyState::NotNeeded => providers::t(locale, "キー不要", "no key", "无需密钥"),
+                KeyState::NotNeeded => {
+                    crate::locale::pick(locale, "no key", "无需密钥", "キー不要")
+                }
                 KeyState::Missing => {
-                    providers::t(locale, "キー未検出", "key not found", "未检测到密钥")
+                    crate::locale::pick(locale, "key not found", "未检测到密钥", "キー未検出")
                 }
             };
             println!(
@@ -619,9 +621,9 @@ pub(crate) fn cmd_import(
     }
     for outcome in &outcomes {
         let mark = if outcome.ok {
-            providers::t(locale, "登録", "added", "已注册")
+            crate::locale::pick(locale, "added", "已注册", "登録")
         } else {
-            providers::t(locale, "未登録", "skipped", "未注册")
+            crate::locale::pick(locale, "skipped", "未注册", "未登録")
         };
         match &outcome.error {
             Some(error) => println!("  {:<16} {}: {error}", outcome.route, mark),
@@ -725,11 +727,11 @@ pub(crate) fn print_setup_block(locale: Locale, registered: &[String]) {
         let joined = names.join(", ");
         println!(
             "{}",
-            providers::t(
+            crate::locale::pick(
                 locale,
-                &format!("[rdsh setup] dsh がそのまま使えます（登録不要）: {joined}"),
                 &format!("[rdsh setup] dsh can use these as-is (no route needed): {joined}"),
                 &format!("[rdsh setup] dsh 可直接使用（无需注册）：{joined}"),
+                &format!("[rdsh setup] dsh がそのまま使えます（登録不要）: {joined}")
             )
         );
     }
@@ -743,7 +745,7 @@ pub(crate) fn print_setup_block(locale: Locale, registered: &[String]) {
         match is_added(&candidate.route_name()) {
             true => format!(
                 "{base} {}",
-                providers::t(locale, "登録済み", "registered", "已注册")
+                crate::locale::pick(locale, "registered", "已注册", "登録済み")
             ),
             false => base,
         }
@@ -768,22 +770,22 @@ pub(crate) fn print_setup_block(locale: Locale, registered: &[String]) {
         let joined = writable.join(", ");
         println!(
             "{}",
-            providers::t(
+            crate::locale::pick(
                 locale,
-                &format!("[rdsh setup] 登録できる経路: {joined}"),
                 &format!("[rdsh setup] routes detected: {joined}"),
                 &format!("[rdsh setup] 检测到的路由：{joined}"),
+                &format!("[rdsh setup] 登録できる経路: {joined}")
             )
         );
     }
     if pending {
         println!(
             "{}",
-            providers::t(
+            crate::locale::pick(
                 locale,
-                "[rdsh setup] 残りは rdsh provider import で登録できます",
                 "[rdsh setup] run rdsh provider import for the rest",
                 "[rdsh setup] 其余可用 rdsh provider import 注册",
+                "[rdsh setup] 残りは rdsh provider import で登録できます"
             )
         );
     }
@@ -791,18 +793,13 @@ pub(crate) fn print_setup_block(locale: Locale, registered: &[String]) {
         let joined = blocked.join(", ");
         println!(
             "{}",
-            providers::t(
-                locale,
-                &format!(
-                    "[rdsh setup] 鍵が見つからないため保留: {joined}（rdsh provider add <preset> --key-stdin）"
-                ),
-                &format!(
+            crate::locale::pick(locale, &format!(
                     "[rdsh setup] waiting for a key: {joined} (rdsh provider add <preset> --key-stdin)"
-                ),
-                &format!(
+                ), &format!(
                     "[rdsh setup] 因缺少密钥而暂缓：{joined}（rdsh provider add <preset> --key-stdin）"
-                ),
-            )
+                ), &format!(
+                    "[rdsh setup] 鍵が見つからないため保留: {joined}（rdsh provider add <preset> --key-stdin）"
+                ))
         );
     }
 }

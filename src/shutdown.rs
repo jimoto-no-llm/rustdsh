@@ -19,13 +19,12 @@ pub fn install(locale: crate::locale::Locale) -> anyhow::Result<()> {
             if libc::signal(signal, request_shutdown as *const () as libc::sighandler_t)
                 == libc::SIG_ERR
             {
-                anyhow::bail!(match locale {
-                    crate::locale::Locale::English =>
-                        "could not install server shutdown signal handler",
-                    crate::locale::Locale::Chinese => "无法安装服务器关闭信号处理程序",
-                    crate::locale::Locale::Japanese =>
-                        "サーバー終了シグナルハンドラーを設定できませんでした",
-                });
+                anyhow::bail!(crate::locale::pick(
+                    locale,
+                    "could not install server shutdown signal handler",
+                    "无法安装服务器关闭信号处理程序",
+                    "サーバー終了シグナルハンドラーを設定できませんでした"
+                ));
             }
         }
     }
@@ -54,12 +53,12 @@ pub fn install(locale: crate::locale::Locale) -> anyhow::Result<()> {
     }
 
     if unsafe { SetConsoleCtrlHandler(Some(request_shutdown), 1) } == 0 {
-        anyhow::bail!(match locale {
-            crate::locale::Locale::English => "could not install server shutdown signal handler",
-            crate::locale::Locale::Chinese => "无法安装服务器关闭信号处理程序",
-            crate::locale::Locale::Japanese =>
-                "サーバー終了シグナルハンドラーを設定できませんでした",
-        });
+        anyhow::bail!(crate::locale::pick(
+            locale,
+            "could not install server shutdown signal handler",
+            "无法安装服务器关闭信号处理程序",
+            "サーバー終了シグナルハンドラーを設定できませんでした"
+        ));
     }
     Ok(())
 }

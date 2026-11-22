@@ -735,11 +735,7 @@ fn locale_text(
     chinese: &'static str,
     japanese: &'static str,
 ) -> &'static str {
-    match locale {
-        Locale::English => english,
-        Locale::Chinese => chinese,
-        Locale::Japanese => japanese,
-    }
+    crate::locale::pick(locale, english, chinese, japanese)
 }
 
 /// Localized doctor lines for the environment block. Warnings only: doctor's

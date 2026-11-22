@@ -461,7 +461,7 @@ fn safe_scalar(s: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
     if s.chars()
         .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
     {
-        anyhow::bail!(localized(
+        anyhow::bail!(crate::locale::pick(
             locale,
             "credential value contains a line or control character",
             "凭据值包含换行或控制字符",
@@ -477,7 +477,7 @@ fn ensure_writable_doc(doc: &CredsDoc, locale: crate::locale::Locale) -> anyhow:
     }
     anyhow::ensure!(
         doc.version_ok,
-        localized(
+        crate::locale::pick(
             locale,
             "unsupported credential store layout; no credentials were copied",
             "凭据存储格式不受支持；未复制凭据",
@@ -500,7 +500,7 @@ fn ensure_writable_doc(doc: &CredsDoc, locale: crate::locale::Locale) -> anyhow:
                 if line.starts_with(&format!("{name}:")) {
                     anyhow::ensure!(
                         line == format!("{name}:") && sections.insert(name),
-                        localized(
+                        crate::locale::pick(
                             locale,
                             "ambiguous credential store layout; no credentials were copied",
                             "凭据存储格式不明确；未复制凭据",
@@ -512,7 +512,7 @@ fn ensure_writable_doc(doc: &CredsDoc, locale: crate::locale::Locale) -> anyhow:
             }
         } else if !section.is_empty() && indent_of(line) == 2 {
             let (key, value) = line.trim().split_once(':').ok_or_else(|| {
-                anyhow::anyhow!(localized(
+                anyhow::anyhow!(crate::locale::pick(
                     locale,
                     "unsupported credential entry; no credentials were copied",
                     "凭据条目不受支持；未复制凭据",
@@ -521,7 +521,7 @@ fn ensure_writable_doc(doc: &CredsDoc, locale: crate::locale::Locale) -> anyhow:
             })?;
             anyhow::ensure!(
                 entries.insert((section, key)) && (section != "records" || value.is_empty()),
-                localized(
+                crate::locale::pick(
                     locale,
                     "ambiguous credential entry; no credentials were copied",
                     "凭据条目不明确；未复制凭据",
@@ -1306,7 +1306,7 @@ pub fn cmd_auth(args: AuthArgs, dry: bool, locale: crate::locale::Locale) -> any
     let path = creds_path();
     if mutating {
         eprintln!("{}", localized_format!(locale, "[rdsh auth] {}selection: {}; persistent destination: {path}; scope: all DSH profiles in this DSH_HOME", "[rdsh auth] {}选择：{}；持久保存位置：{path}；范围：此 DSH_HOME 的所有 DSH 配置文件", "[rdsh auth] {}選択: {}; 永続保存先: {path}; 対象: このDSH_HOMEの全DSHプロファイル",
-            if dry { localized(locale, "preview ", "预览 ", "プレビュー ") } else { "" },
+            if dry { crate::locale::pick(locale, "preview ", "预览 ", "プレビュー ") } else { "" },
             policy.selected.iter().cloned().collect::<Vec<_>>().join(", ")
         ));
         if one_time_import {
@@ -1620,19 +1620,6 @@ const PROVIDER_ROUTE_KEYS: &[&str] = &[
     "COMMANDCODE_API_KEY",
 ];
 
-fn localized(
-    locale: crate::locale::Locale,
-    english: &'static str,
-    chinese: &'static str,
-    japanese: &'static str,
-) -> &'static str {
-    match locale {
-        crate::locale::Locale::English => english,
-        crate::locale::Locale::Chinese => chinese,
-        crate::locale::Locale::Japanese => japanese,
-    }
-}
-
 fn env_key_set(name: &str) -> bool {
     std::env::var(name)
         .map(|v| !v.trim().is_empty())
@@ -1778,7 +1765,7 @@ fn prompt_secret(locale: crate::locale::Locale) -> Option<String> {
     }
     eprint!(
         "{}",
-        localized(
+        crate::locale::pick(
             locale,
             "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input hidden): ",
             "[rdsh setup] 在此粘贴 DEEPSEEK_API_KEY（Enter 跳过，输入不会显示）：",
@@ -1804,12 +1791,7 @@ fn prompt_secret(locale: crate::locale::Locale) -> Option<String> {
 
 #[cfg(not(unix))]
 fn prompt_secret(locale: crate::locale::Locale) -> Option<String> {
-    prompt_line(localized(
-        locale,
-        "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input echoed): ",
-        "[rdsh setup] 在此粘贴 DEEPSEEK_API_KEY（Enter 跳过，输入会显示）：",
-        "[rdsh setup] DEEPSEEK_API_KEY を貼り付けてください（Enter でスキップ、入力内容は表示されます）：",
-    ))
+    prompt_line(crate::locale::pick(locale, "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input echoed): ", "[rdsh setup] 在此粘贴 DEEPSEEK_API_KEY（Enter 跳过，输入会显示）：", "[rdsh setup] DEEPSEEK_API_KEY を貼り付けてください（Enter でスキップ、入力内容は表示されます）："))
 }
 
 fn prompt_yes(prompt: &str) -> bool {
@@ -2001,7 +1983,7 @@ fn launch_login(locale: crate::locale::Locale) -> bool {
         None => {
             eprintln!(
                 "[rdsh setup] {}",
-                localized(
+                crate::locale::pick(
                     locale,
                     "neither codex nor opencode found on PATH; install one first",
                     "在 PATH 中找不到 codex 或 opencode；请先安装其中一个",
@@ -2013,9 +1995,9 @@ fn launch_login(locale: crate::locale::Locale) -> bool {
     };
     eprintln!(
         "[rdsh setup] {} `{bin} {}` … {}",
-        localized(locale, "launching", "正在启动", "起動します"),
+        crate::locale::pick(locale, "launching", "正在启动", "起動します"),
         args.join(" "),
-        localized(
+        crate::locale::pick(
             locale,
             "finish the login there",
             "请在该处完成登录",
@@ -2027,7 +2009,7 @@ fn launch_login(locale: crate::locale::Locale) -> bool {
         Err(e) => {
             eprintln!(
                 "[rdsh setup] {} {bin}: {e:#}",
-                localized(
+                crate::locale::pick(
                     locale,
                     "could not launch",
                     "无法启动",
@@ -2064,7 +2046,7 @@ fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<bool> 
     let st = cmd.status().map_err(|e| {
         anyhow::anyhow!(
             "{}: {e}",
-            localized(
+            crate::locale::pick(
                 locale,
                 "spawning opener",
                 "启动打开程序",
@@ -2075,7 +2057,7 @@ fn open_path(path: &str, locale: crate::locale::Locale) -> anyhow::Result<bool> 
     if !st.success() {
         eprintln!(
             "{} {st}",
-            localized(
+            crate::locale::pick(
                 locale,
                 "opener exited",
                 "打开程序已退出",
@@ -2097,12 +2079,12 @@ fn open_settings_dirs(json: bool, locale: crate::locale::Locale) {
         match open_path(&t, locale) {
             Ok(_) if !json => println!(
                 "[rdsh setup] {} {t}",
-                localized(locale, "opened", "已打开", "開きました")
+                crate::locale::pick(locale, "opened", "已打开", "開きました")
             ),
             Ok(_) => {}
             Err(e) => eprintln!(
                 "[rdsh setup] {} {t}: {e:#}",
-                localized(locale, "could not open", "无法打开", "開けませんでした")
+                crate::locale::pick(locale, "could not open", "无法打开", "開けませんでした")
             ),
         }
     }

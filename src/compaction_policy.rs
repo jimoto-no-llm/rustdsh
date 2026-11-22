@@ -275,17 +275,13 @@ fn route_text(policy: &AbsolutePolicy, locale: Locale) -> String {
         policy.retain_tokens,
         policy.max_tokens,
     );
-    match locale {
-        Locale::English => format!(
-            "  {provider} / {model}: compacts at {trigger} tokens, keeps the last {retain}, summary cap {cap}"
-        ),
-        Locale::Chinese => format!(
-            "  {provider} / {model}：达到 {trigger} token 时压缩，保留最近 {retain} token，摘要上限 {cap} token"
-        ),
-        Locale::Japanese => format!(
-            "  {provider} / {model}: {trigger} トークンで圧縮、直近の {retain} トークンを残す、要約の上限 {cap} トークン"
-        ),
-    }
+    crate::locale::pick(locale, format!(
+        "  {provider} / {model}: compacts at {trigger} tokens, keeps the last {retain}, summary cap {cap}"
+    ), format!(
+        "  {provider} / {model}：达到 {trigger} token 时压缩，保留最近 {retain} token，摘要上限 {cap} token"
+    ), format!(
+        "  {provider} / {model}: {trigger} トークンで圧縮、直近の {retain} トークンを残す、要約の上限 {cap} トークン"
+    ))
 }
 
 /// Localized doctor lines.
@@ -295,38 +291,26 @@ fn route_text(policy: &AbsolutePolicy, locale: Locale) -> String {
 /// in English in every locale, like the boot notice that carries the same
 /// text.
 pub fn doctor_lines(report: &Report, locale: Locale) -> Vec<String> {
-    let label = match locale {
-        Locale::English => "compaction policy",
-        Locale::Chinese => "压缩阈值",
-        Locale::Japanese => "圧縮のしきい値",
-    };
+    let label = crate::locale::pick(locale, "compaction policy", "压缩阈值", "圧縮のしきい値");
     let line = |text: String| format!("[rdsh] {label}: {text}");
     let summary = match (report.enabled, &report.file) {
         (false, FileState::Absent) => return Vec::new(),
         (false, FileState::Policies(policies)) => {
             let count = policies.len();
-            match locale {
-                Locale::English => format!(
-                    "OFF; {FILE_NAME} lists {count} route(s) that are not passed to DSH — enable with: rdsh features on {id}",
-                    id = crate::compaction_overlay::FEATURE_ID
-                ),
-                Locale::Chinese => format!(
-                    "已关闭；{FILE_NAME} 中的 {count} 条路由不会传给 DSH — 使用以下命令启用：rdsh features on {id}",
-                    id = crate::compaction_overlay::FEATURE_ID
-                ),
-                Locale::Japanese => format!(
-                    "OFFです。{FILE_NAME} の {count} 件は DSH に渡しません。有効化: rdsh features on {id}",
-                    id = crate::compaction_overlay::FEATURE_ID
-                ),
-            }
+            crate::locale::pick(locale, format!(
+                "OFF; {FILE_NAME} lists {count} route(s) that are not passed to DSH — enable with: rdsh features on {id}",
+                id = crate::compaction_overlay::FEATURE_ID
+            ), format!(
+                "已关闭；{FILE_NAME} 中的 {count} 条路由不会传给 DSH — 使用以下命令启用：rdsh features on {id}",
+                id = crate::compaction_overlay::FEATURE_ID
+            ), format!(
+                "OFFです。{FILE_NAME} の {count} 件は DSH に渡しません。有効化: rdsh features on {id}",
+                id = crate::compaction_overlay::FEATURE_ID
+            ))
         }
-        (false, FileState::Invalid(reason)) => match locale {
-            Locale::English => format!("OFF; {FILE_NAME} {reason}"),
-            Locale::Chinese => format!("已关闭；{FILE_NAME} 无法使用（{FILE_NAME} {reason}）"),
-            Locale::Japanese => {
-                format!("OFFです。{FILE_NAME} は使えません（{FILE_NAME} {reason}）")
-            }
-        },
+        (false, FileState::Invalid(reason)) => crate::locale::pick(locale, format!("OFF; {FILE_NAME} {reason}"), format!("已关闭；{FILE_NAME} 无法使用（{FILE_NAME} {reason}）"), {
+            format!("OFFです。{FILE_NAME} は使えません（{FILE_NAME} {reason}）")
+        }),
         (true, FileState::Absent) => match locale {
             Locale::English => format!(
                 "ON, but DSH_HOME has no {FILE_NAME}; routes stay on the DSH defaults"
@@ -351,17 +335,13 @@ pub fn doctor_lines(report: &Report, locale: Locale) -> Vec<String> {
         },
         (true, FileState::Policies(policies)) => {
             let count = policies.len();
-            match locale {
-                Locale::English => format!(
-                    "ON, {count} route(s) from {FILE_NAME}; a boot passes them to the compaction rows it finds in the profile"
-                ),
-                Locale::Chinese => format!(
-                    "已开启，{FILE_NAME} 中有 {count} 条路由；启动时会传给配置文件中找到的压缩行"
-                ),
-                Locale::Japanese => format!(
-                    "ONです。{FILE_NAME} の {count} 件を、起動時にプロファイルの圧縮の行へ渡します"
-                ),
-            }
+            crate::locale::pick(locale, format!(
+                "ON, {count} route(s) from {FILE_NAME}; a boot passes them to the compaction rows it finds in the profile"
+            ), format!(
+                "已开启，{FILE_NAME} 中有 {count} 条路由；启动时会传给配置文件中找到的压缩行"
+            ), format!(
+                "ONです。{FILE_NAME} の {count} 件を、起動時にプロファイルの圧縮の行へ渡します"
+            ))
         }
         (true, FileState::Invalid(reason)) => match locale {
             Locale::English => {
@@ -384,11 +364,12 @@ pub fn doctor_lines(report: &Report, locale: Locale) -> Vec<String> {
                 .map(|policy| line(route_text(policy, locale))),
         );
         if let Some(more) = policies.len().checked_sub(DOCTOR_ROUTES).filter(|n| *n > 0) {
-            lines.push(line(match locale {
-                Locale::English => format!("  ... and {more} more route(s)"),
-                Locale::Chinese => format!("  另有 {more} 条路由"),
-                Locale::Japanese => format!("  ほか {more} 件"),
-            }));
+            lines.push(line(crate::locale::pick(
+                locale,
+                format!("  ... and {more} more route(s)"),
+                format!("  另有 {more} 条路由"),
+                format!("  ほか {more} 件"),
+            )));
         }
     }
     lines

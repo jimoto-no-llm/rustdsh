@@ -843,12 +843,12 @@ fn base_cmd_inner(
         return Ok(command);
     }
     let bin = selected_node(orig).ok_or_else(|| {
-        anyhow::anyhow!(match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: compatible Node runtime is required",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：需要兼容的 Node 运行时",
-            crate::locale::Locale::Japanese =>
-                "RDSH_SECURITY: 互換性のある Node ランタイムが必要です",
-        })
+        anyhow::anyhow!(crate::locale::pick(
+            locale,
+            "RDSH_SECURITY: compatible Node runtime is required",
+            "RDSH_SECURITY：需要兼容的 Node 运行时",
+            "RDSH_SECURITY: 互換性のある Node ランタイムが必要です"
+        ))
     })?;
     if !crate::tool_security::sandbox_enabled() {
         // Default: hand the run to DSH with its normal tools and normal file
@@ -1022,11 +1022,7 @@ fn exec_or_spawn(
     if dry {
         println!(
             "[rdsh dry-run] {}: {cmd:?}",
-            match locale {
-                crate::locale::Locale::English => "would exec",
-                crate::locale::Locale::Chinese => "将执行",
-                crate::locale::Locale::Japanese => "実行予定",
-            }
+            crate::locale::pick(locale, "would exec", "将执行", "実行予定")
         );
         return Ok(());
     }
@@ -1039,11 +1035,7 @@ fn exec_or_spawn(
         let err = cmd.exec();
         Err(anyhow::anyhow!(
             "{}: {err}",
-            match locale {
-                crate::locale::Locale::English => "exec failed",
-                crate::locale::Locale::Chinese => "执行失败",
-                crate::locale::Locale::Japanese => "実行に失敗しました",
-            }
+            crate::locale::pick(locale, "exec failed", "执行失败", "実行に失敗しました")
         ))
     }
     #[cfg(not(unix))]
@@ -1057,11 +1049,7 @@ fn exec_or_spawn(
             Ok(st) => std::process::exit(st.code().unwrap_or(1)),
             Err(e) => Err(anyhow::anyhow!(
                 "{}: {e}",
-                match locale {
-                    crate::locale::Locale::English => "spawn failed",
-                    crate::locale::Locale::Chinese => "启动失败",
-                    crate::locale::Locale::Japanese => "起動に失敗しました",
-                }
+                crate::locale::pick(locale, "spawn failed", "启动失败", "起動に失敗しました")
             )),
         }
     }
@@ -1136,11 +1124,12 @@ pub(crate) fn assemble_boot(
     apply_web_assets(&mut cmd, origin, profile);
     apply_search_bridge(&mut cmd, profile, dry);
     if slim {
-        let (boot_term, via_term, slim_term) = match locale {
-            crate::locale::Locale::English => ("boot", "via", "slim ON"),
-            crate::locale::Locale::Chinese => ("启动", "通过", "精简环境开启"),
-            crate::locale::Locale::Japanese => ("起動", "経由", "slim 環境オン"),
-        };
+        let (boot_term, via_term, slim_term) = crate::locale::pick(
+            locale,
+            ("boot", "via", "slim ON"),
+            ("启动", "通过", "精简环境开启"),
+            ("起動", "経由", "slim 環境オン"),
+        );
         notices.push(format!(
             "[rdsh] {} '{}' {} {} ({}: {})",
             boot_term,
@@ -1271,13 +1260,14 @@ pub fn exec_plugin(
 }
 
 pub(crate) fn original_dsh_not_found_message(locale: crate::locale::Locale) -> &'static str {
-    match locale {
-        crate::locale::Locale::English => "original dsh not found in PATH (set DSH_ORIG_BIN)",
-        crate::locale::Locale::Chinese => "未在 PATH 中找到原始 dsh（请设置 DSH_ORIG_BIN）",
-        crate::locale::Locale::Japanese => {
+    crate::locale::pick(
+        locale,
+        "original dsh not found in PATH (set DSH_ORIG_BIN)",
+        "未在 PATH 中找到原始 dsh（请设置 DSH_ORIG_BIN）",
+        {
             "PATH に元の dsh が見つかりません（DSH_ORIG_BIN を設定してください）"
-        }
-    }
+        },
+    )
 }
 #[cfg(test)]
 mod tests {

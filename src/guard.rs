@@ -1073,13 +1073,12 @@ pub fn cmd_guard(
                 if json_out {
                     "blocked by rdsh guard".to_owned()
                 } else {
-                    match locale {
-                        crate::locale::Locale::English => "blocked by rdsh guard".to_owned(),
-                        crate::locale::Locale::Chinese => "被 rdsh guard 阻止".to_owned(),
-                        crate::locale::Locale::Japanese => {
-                            "rdsh guard によりブロックされました".to_owned()
-                        }
-                    }
+                    crate::locale::pick(
+                        locale,
+                        "blocked by rdsh guard".to_owned(),
+                        "被 rdsh guard 阻止".to_owned(),
+                        "rdsh guard によりブロックされました".to_owned(),
+                    )
                 }
             });
             eprintln!(

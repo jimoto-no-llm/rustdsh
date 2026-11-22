@@ -201,17 +201,13 @@ pub fn compile_cache_advice(dir: &str, locale: crate::locale::Locale) -> Option<
         return None;
     }
     let mib = bytes / (1024 * 1024);
-    Some(match locale {
-        crate::locale::Locale::English => format!(
-            "the Node compile cache at {dir} holds {mib} MiB in {files} files; a fresh cache is often faster (rm -rf {dir})"
-        ),
-        crate::locale::Locale::Chinese => format!(
-            "位于 {dir} 的 Node 编译缓存已占用 {mib} MiB、{files} 个文件；清空后通常更快（rm -rf {dir}）"
-        ),
-        crate::locale::Locale::Japanese => format!(
-            "Node のコンパイルキャッシュ {dir} が {mib} MiB・{files} ファイルまで育っています。作り直すと速くなることがあります（rm -rf {dir}）"
-        ),
-    })
+    Some(crate::locale::pick(locale, format!(
+        "the Node compile cache at {dir} holds {mib} MiB in {files} files; a fresh cache is often faster (rm -rf {dir})"
+    ), format!(
+        "位于 {dir} 的 Node 编译缓存已占用 {mib} MiB、{files} 个文件；清空后通常更快（rm -rf {dir}）"
+    ), format!(
+        "Node のコンパイルキャッシュ {dir} が {mib} MiB・{files} ファイルまで育っています。作り直すと速くなることがあります（rm -rf {dir}）"
+    )))
 }
 
 #[cfg(test)]

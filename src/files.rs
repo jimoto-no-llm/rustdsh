@@ -338,33 +338,34 @@ pub(crate) fn cmd_list(
         let _ = writeln!(
             out,
             "[rdsh] {}",
-            match locale {
-                crate::locale::Locale::English => format!("session {label} declared no files"),
-                crate::locale::Locale::Chinese => format!("会话 {label} 没有声明文件"),
-                crate::locale::Locale::Japanese => {
-                    format!("セッション {label} はファイルを宣言していません")
-                }
-            }
+            crate::locale::pick(
+                locale,
+                format!("session {label} declared no files"),
+                format!("会话 {label} 没有声明文件"),
+                format!("セッション {label} はファイルを宣言していません")
+            )
         );
         return Ok(());
     }
     let _ = writeln!(
         out,
         "[rdsh] {}: {label}",
-        match locale {
-            crate::locale::Locale::English => "files declared by session",
-            crate::locale::Locale::Chinese => "会话声明的文件",
-            crate::locale::Locale::Japanese => "セッションが宣言したファイル",
-        }
+        crate::locale::pick(
+            locale,
+            "files declared by session",
+            "会话声明的文件",
+            "セッションが宣言したファイル"
+        )
     );
     for item in &files {
         let size = match item.bytes {
             Some(bytes) => human_size(bytes),
-            None => match locale {
-                crate::locale::Locale::English => "missing".to_string(),
-                crate::locale::Locale::Chinese => "缺失".to_string(),
-                crate::locale::Locale::Japanese => "見つかりません".to_string(),
-            },
+            None => crate::locale::pick(
+                locale,
+                "missing".to_string(),
+                "缺失".to_string(),
+                "見つかりません".to_string(),
+            ),
         };
         let _ = writeln!(out, "  {}  ({size})", item.path.display());
         if let Some(description) = &item.description {
@@ -373,11 +374,7 @@ pub(crate) fn cmd_list(
         let _ = writeln!(
             out,
             "    {}: rdsh files get \"{}\"",
-            match locale {
-                crate::locale::Locale::English => "save a copy",
-                crate::locale::Locale::Chinese => "保存副本",
-                crate::locale::Locale::Japanese => "コピーを保存",
-            },
+            crate::locale::pick(locale, "save a copy", "保存副本", "コピーを保存"),
             item.path.display()
         );
     }
@@ -508,11 +505,7 @@ pub(crate) fn cmd_get(
     let _ = writeln!(
         stdout,
         "[rdsh] {}: {}",
-        match locale {
-            crate::locale::Locale::English => "saved",
-            crate::locale::Locale::Chinese => "已保存",
-            crate::locale::Locale::Japanese => "保存しました",
-        },
+        crate::locale::pick(locale, "saved", "已保存", "保存しました"),
         destination.display()
     );
     if out.is_none() {

@@ -218,22 +218,19 @@ fn canonical_package_file(package: &Path, relative: &Path) -> std::io::Result<Op
 }
 
 fn language_code(locale: crate::locale::Locale) -> &'static str {
-    match locale {
-        crate::locale::Locale::English => "en",
-        crate::locale::Locale::Chinese => "zh",
-        crate::locale::Locale::Japanese => "ja",
-    }
+    crate::locale::pick(locale, "en", "zh", "ja")
 }
 
 fn read_dsh_manifest(
     path: &Path,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<serde_json::Value> {
-    let message = match locale {
-        crate::locale::Locale::English => "RDSH_SECURITY[INVALID_DSH_MANIFEST]: cannot read the audited DSH package manifest",
-        crate::locale::Locale::Chinese => "RDSH_SECURITY[INVALID_DSH_MANIFEST]：无法读取经过审计的 DSH 包清单",
-        crate::locale::Locale::Japanese => "RDSH_SECURITY[INVALID_DSH_MANIFEST]: 監査対象のDSHパッケージマニフェストを読み込めません",
-    };
+    let message = crate::locale::pick(
+        locale,
+        "RDSH_SECURITY[INVALID_DSH_MANIFEST]: cannot read the audited DSH package manifest",
+        "RDSH_SECURITY[INVALID_DSH_MANIFEST]：无法读取经过审计的 DSH 包清单",
+        "RDSH_SECURITY[INVALID_DSH_MANIFEST]: 監査対象のDSHパッケージマニフェストを読み込めません",
+    );
     let bytes = std::fs::read(path).with_context(|| message)?;
     serde_json::from_slice(&bytes).with_context(|| message)
 }
@@ -242,11 +239,7 @@ fn read_tools_manifest(
     path: &Path,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<serde_json::Value> {
-    let message = match locale {
-        crate::locale::Locale::English => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: cannot read the audited tool runtime manifest",
-        crate::locale::Locale::Chinese => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]：无法读取经过审计的工具运行时清单",
-        crate::locale::Locale::Japanese => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: 監査対象のツールランタイムマニフェストを読み込めません",
-    };
+    let message = crate::locale::pick(locale, "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: cannot read the audited tool runtime manifest", "RDSH_SECURITY[INVALID_TOOL_MANIFEST]：无法读取经过审计的工具运行时清单", "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: 監査対象のツールランタイムマニフェストを読み込めません");
     let bytes = std::fs::read(path).with_context(|| message)?;
     serde_json::from_slice(&bytes).with_context(|| message)
 }
@@ -261,28 +254,18 @@ fn verify_entry_digest(
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     let bytes = std::fs::read(executable).map_err(|error| {
-        anyhow::anyhow!(match locale {
-            crate::locale::Locale::English =>
-                format!("RDSH_SECURITY[AUDIT_DIGEST]: cannot read the DSH entry file: {error}"),
-            crate::locale::Locale::Chinese =>
-                format!("RDSH_SECURITY[AUDIT_DIGEST]：无法读取 DSH 入口文件：{error}"),
-            crate::locale::Locale::Japanese => format!(
-                "RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルを読み込めません: {error}"
-            ),
-        })
+        anyhow::anyhow!(crate::locale::pick(
+            locale,
+            format!("RDSH_SECURITY[AUDIT_DIGEST]: cannot read the DSH entry file: {error}"),
+            format!("RDSH_SECURITY[AUDIT_DIGEST]：无法读取 DSH 入口文件：{error}"),
+            format!("RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルを読み込めません: {error}")
+        ))
     })?;
     let actual = sha256_hex(&bytes);
     anyhow::ensure!(
         actual == expected_sha256,
         "{}",
-        match locale {
-            crate::locale::Locale::English =>
-                "RDSH_SECURITY[AUDIT_DIGEST]: the DSH entry file does not match the audited digest; refusing to delegate",
-            crate::locale::Locale::Chinese =>
-                "RDSH_SECURITY[AUDIT_DIGEST]：DSH 入口文件与审计摘要不符；拒绝委派",
-            crate::locale::Locale::Japanese =>
-                "RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルが監査済みダイジェストと一致しません。委譲を拒否します",
-        }
+        crate::locale::pick(locale, "RDSH_SECURITY[AUDIT_DIGEST]: the DSH entry file does not match the audited digest; refusing to delegate", "RDSH_SECURITY[AUDIT_DIGEST]：DSH 入口文件与审计摘要不符；拒绝委派", "RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルが監査済みダイジェストと一致しません。委譲を拒否します")
     );
     Ok(())
 }
@@ -293,11 +276,7 @@ pub fn command(
 ) -> anyhow::Result<std::process::Command> {
     anyhow::ensure!(cfg!(all(target_os = "linux", target_arch = "x86_64")),
         "{}",
-        match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: protected agent tools currently require Linux x86_64; refusing unprotected delegation",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：受保护的代理工具目前需要 Linux x86_64；拒绝未受保护的委派",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY: 保護されたエージェントツールには現在 Linux x86_64 が必要です。保護されない委譲を拒否します",
-        });
+        crate::locale::pick(locale, "RDSH_SECURITY: protected agent tools currently require Linux x86_64; refusing unprotected delegation", "RDSH_SECURITY：受保护的代理工具目前需要 Linux x86_64；拒绝未受保护的委派", "RDSH_SECURITY: 保護されたエージェントツールには現在 Linux x86_64 が必要です。保護されない委譲を拒否します"));
     let executable = std::fs::canonicalize(orig)?;
     anyhow::ensure!(
         executable.file_name().is_some_and(|n| n == "bin.js")
@@ -306,79 +285,54 @@ pub fn command(
                 .and_then(Path::file_name)
                 .is_some_and(|n| n == "lib"),
         "{}",
-        match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: unsupported DSH executable; expected the audited DSH lib/bin.js",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：不支持的 DSH 可执行文件；需要经过审计的 DSH lib/bin.js",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY: 対応していない DSH 実行ファイルです。監査済みの DSH lib/bin.js が必要です",
-        }
+        crate::locale::pick(locale, "RDSH_SECURITY: unsupported DSH executable; expected the audited DSH lib/bin.js", "RDSH_SECURITY：不支持的 DSH 可执行文件；需要经过审计的 DSH lib/bin.js", "RDSH_SECURITY: 対応していない DSH 実行ファイルです。監査済みの DSH lib/bin.js が必要です")
     );
     let package = executable.parent().and_then(Path::parent).ok_or_else(|| {
-        anyhow::anyhow!(match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: invalid DSH package path",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：DSH 包路径无效",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY: DSH パッケージのパスが無効です",
-        })
+        anyhow::anyhow!(crate::locale::pick(
+            locale,
+            "RDSH_SECURITY: invalid DSH package path",
+            "RDSH_SECURITY：DSH 包路径无效",
+            "RDSH_SECURITY: DSH パッケージのパスが無効です"
+        ))
     })?;
     let dsh_manifest_path = canonical_package_file(package, Path::new("package.json"))?
         .ok_or_else(|| {
-            anyhow::anyhow!(match locale {
-                crate::locale::Locale::English => "RDSH_SECURITY[INVALID_DSH_MANIFEST]: DSH package manifest escapes its package",
-                crate::locale::Locale::Chinese => "RDSH_SECURITY[INVALID_DSH_MANIFEST]：DSH 包清单超出其包目录",
-                crate::locale::Locale::Japanese => "RDSH_SECURITY[INVALID_DSH_MANIFEST]: DSHパッケージマニフェストがパッケージ外を参照しています",
-            })
+            anyhow::anyhow!(crate::locale::pick(locale, "RDSH_SECURITY[INVALID_DSH_MANIFEST]: DSH package manifest escapes its package", "RDSH_SECURITY[INVALID_DSH_MANIFEST]：DSH 包清单超出其包目录", "RDSH_SECURITY[INVALID_DSH_MANIFEST]: DSHパッケージマニフェストがパッケージ外を参照しています"))
         })?;
     let dsh_manifest = read_dsh_manifest(&dsh_manifest_path, locale)?;
     let tools_package = first_tools_package(&executable)
-        .with_context(|| match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY[INVALID_TOOL_PATH]: cannot resolve the audited tool runtime package",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY[INVALID_TOOL_PATH]：无法解析经过审计的工具运行时包",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY[INVALID_TOOL_PATH]: 監査対象のツールランタイムパッケージを解決できません",
-        })?
+        .with_context(|| crate::locale::pick(locale, "RDSH_SECURITY[INVALID_TOOL_PATH]: cannot resolve the audited tool runtime package", "RDSH_SECURITY[INVALID_TOOL_PATH]：无法解析经过审计的工具运行时包", "RDSH_SECURITY[INVALID_TOOL_PATH]: 監査対象のツールランタイムパッケージを解決できません"))?
         .ok_or_else(|| {
-        anyhow::anyhow!(match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: audited tool runtime is missing",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：缺少经过审计的工具运行时",
-            crate::locale::Locale::Japanese =>
-                "RDSH_SECURITY: 監査済みツールランタイムがありません",
-        })
+        anyhow::anyhow!(crate::locale::pick(locale, "RDSH_SECURITY: audited tool runtime is missing", "RDSH_SECURITY：缺少经过审计的工具运行时", "RDSH_SECURITY: 監査済みツールランタイムがありません"))
     })?;
     let tools_manifest_path = canonical_package_file(&tools_package, Path::new("package.json"))?
         .ok_or_else(|| {
-            anyhow::anyhow!(match locale {
-                crate::locale::Locale::English => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: tool runtime manifest escapes its package",
-                crate::locale::Locale::Chinese => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]：工具运行时清单超出其包目录",
-                crate::locale::Locale::Japanese => "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: ツールランタイムマニフェストがパッケージ外を参照しています",
-            })
+            anyhow::anyhow!(crate::locale::pick(locale, "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: tool runtime manifest escapes its package", "RDSH_SECURITY[INVALID_TOOL_MANIFEST]：工具运行时清单超出其包目录", "RDSH_SECURITY[INVALID_TOOL_MANIFEST]: ツールランタイムマニフェストがパッケージ外を参照しています"))
         })?;
     let tools_manifest = read_tools_manifest(&tools_manifest_path, locale)?;
     let adapter = audited_adapter(&dsh_manifest, &tools_manifest).ok_or_else(|| {
-        anyhow::anyhow!(match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: unsupported DSH and tool runtime version pair; an audited execution adapter is required",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：不支持的 DSH 与工具运行时版本组合；需要经过审计的执行适配器",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY: DSHとツールランタイムのバージョン組み合わせに対応していません。監査済みの実行アダプターが必要です",
-        })
+        anyhow::anyhow!(crate::locale::pick(locale, "RDSH_SECURITY: unsupported DSH and tool runtime version pair; an audited execution adapter is required", "RDSH_SECURITY：不支持的 DSH 与工具运行时版本组合；需要经过审计的执行适配器", "RDSH_SECURITY: DSHとツールランタイムのバージョン組み合わせに対応していません。監査済みの実行アダプターが必要です"))
     })?;
     verify_entry_digest(&executable, adapter.bin_sha256, locale)?;
     let runtime = canonical_package_file(&tools_package, Path::new("lib/index.js"))?
         .filter(|path| path.is_file())
         .ok_or_else(|| {
-            anyhow::anyhow!(match locale {
-                crate::locale::Locale::English =>
-                    "RDSH_SECURITY: audited tool runtime is missing or escapes its package",
-                crate::locale::Locale::Chinese =>
-                    "RDSH_SECURITY：经过审计的工具运行时缺失或超出其包目录",
-                crate::locale::Locale::Japanese =>
-                    "RDSH_SECURITY: 監査済みツールランタイムがないか、パッケージ外を参照しています",
-            })
+            anyhow::anyhow!(crate::locale::pick(
+                locale,
+                "RDSH_SECURITY: audited tool runtime is missing or escapes its package",
+                "RDSH_SECURITY：经过审计的工具运行时缺失或超出其包目录",
+                "RDSH_SECURITY: 監査済みツールランタイムがないか、パッケージ外を参照しています"
+            ))
         })?;
     anyhow::ensure!(
         Path::new("/usr/bin/bwrap").is_file() && Path::new("/usr/bin/prlimit").is_file(),
         "{}",
-        match locale {
-            crate::locale::Locale::English => "RDSH_SECURITY: bubblewrap and prlimit are required; refusing unprotected delegation",
-            crate::locale::Locale::Chinese => "RDSH_SECURITY：需要 bubblewrap 和 prlimit；拒绝未受保护的委派",
-            crate::locale::Locale::Japanese => "RDSH_SECURITY: bubblewrap と prlimit が必要です。保護されない委譲を拒否します",
-        }
+        crate::locale::pick(
+            locale,
+            "RDSH_SECURITY: bubblewrap and prlimit are required; refusing unprotected delegation",
+            "RDSH_SECURITY：需要 bubblewrap 和 prlimit；拒绝未受保护的委派",
+            "RDSH_SECURITY: bubblewrap と prlimit が必要です。保護されない委譲を拒否します"
+        )
     );
     let directory = private_directory()?;
     // Files are embedded in rdsh: no working-tree plugin can replace the gate.
@@ -409,13 +363,12 @@ pub fn command(
     command.env("RDSH_SECURE_WORKSPACE", std::fs::canonicalize(".")?);
     eprintln!(
         "[rdsh security] {}",
-        match locale {
-            crate::locale::Locale::English =>
-                "rdsh_inspect is isolated; other DSH tools use upstream permissions",
-            crate::locale::Locale::Chinese => "rdsh_inspect 已隔离；其他 DSH 工具使用上游权限",
-            crate::locale::Locale::Japanese =>
-                "rdsh_inspect は分離されています。その他の DSH ツールは上流の権限を使用します",
-        }
+        crate::locale::pick(
+            locale,
+            "rdsh_inspect is isolated; other DSH tools use upstream permissions",
+            "rdsh_inspect 已隔离；其他 DSH 工具使用上游权限",
+            "rdsh_inspect は分離されています。その他の DSH ツールは上流の権限を使用します"
+        )
     );
     Ok(command)
 }

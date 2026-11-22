@@ -13,13 +13,7 @@ const ICON: &str = include_str!("../assets/icon.svg");
 fn paste_hint(locale: crate::locale::Locale) {
     eprintln!(
         "[rdsh setup] {}",
-        match locale {
-            crate::locale::Locale::English =>
-                "enter the token handoff file contents in the setup page; the token is never printed",
-            crate::locale::Locale::Chinese => "请在设置页面中输入令牌交接文件的内容；令牌绝不会打印",
-            crate::locale::Locale::Japanese =>
-                "セットアップページでトークン引き渡しファイルの内容を入力してください。トークンは表示されません",
-        }
+        crate::locale::pick(locale, "enter the token handoff file contents in the setup page; the token is never printed", "请在设置页面中输入令牌交接文件的内容；令牌绝不会打印", "セットアップページでトークン引き渡しファイルの内容を入力してください。トークンは表示されません")
     );
 }
 
@@ -68,11 +62,7 @@ pub fn cmd_setup_web(
     let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}")).map_err(|e| {
         anyhow::anyhow!(
             "{} 127.0.0.1:{port}: {e}",
-            match locale {
-                crate::locale::Locale::English => "cannot listen on",
-                crate::locale::Locale::Chinese => "无法监听",
-                crate::locale::Locale::Japanese => "待受できません",
-            }
+            crate::locale::pick(locale, "cannot listen on", "无法监听", "待受できません")
         )
     })?;
     listener.set_nonblocking(true)?;
@@ -84,11 +74,12 @@ pub fn cmd_setup_web(
         if !added.is_empty() {
             eprintln!(
                 "[rdsh setup] {}: {}",
-                match locale {
-                    crate::locale::Locale::English => "added detected routes",
-                    crate::locale::Locale::Chinese => "已添加检测到的路由",
-                    crate::locale::Locale::Japanese => "検出した経路を追加しました",
-                },
+                crate::locale::pick(
+                    locale,
+                    "added detected routes",
+                    "已添加检测到的路由",
+                    "検出した経路を追加しました"
+                ),
                 added.join(", ")
             );
         }
@@ -98,24 +89,22 @@ pub fn cmd_setup_web(
     let base = format!("http://127.0.0.1:{port}/");
     eprintln!(
         "[rdsh setup] {}: {base} ({})",
-        match locale {
-            crate::locale::Locale::English => "floating UI",
-            crate::locale::Locale::Chinese => "浮动界面",
-            crate::locale::Locale::Japanese => "フローティングUI",
-        },
-        match locale {
-            crate::locale::Locale::English => "localhost only, Ctrl-C to stop",
-            crate::locale::Locale::Chinese => "仅限 localhost，按 Ctrl-C 停止",
-            crate::locale::Locale::Japanese => "localhost のみ、Ctrl-C で停止",
-        }
+        crate::locale::pick(locale, "floating UI", "浮动界面", "フローティングUI"),
+        crate::locale::pick(
+            locale,
+            "localhost only, Ctrl-C to stop",
+            "仅限 localhost，按 Ctrl-C 停止",
+            "localhost のみ、Ctrl-C で停止"
+        )
     );
     eprintln!(
         "[rdsh setup] {}: {}",
-        match locale {
-            crate::locale::Locale::English => "token handoff file",
-            crate::locale::Locale::Chinese => "令牌交接文件",
-            crate::locale::Locale::Japanese => "トークン引き渡しファイル",
-        },
+        crate::locale::pick(
+            locale,
+            "token handoff file",
+            "令牌交接文件",
+            "トークン引き渡しファイル"
+        ),
         handoff.path().display()
     );
     // Keep the bearer token out of the browser-launch argv: open a protected
@@ -248,11 +237,7 @@ fn handle(
                 "text/html; charset=utf-8",
                 Cow::Owned(HTML.replace(
                     "__RDSH_LOCALE__",
-                    match locale {
-                        crate::locale::Locale::English => "en",
-                        crate::locale::Locale::Chinese => "zh-CN",
-                        crate::locale::Locale::Japanese => "ja",
-                    },
+                    crate::locale::pick(locale, "en", "zh-CN", "ja"),
                 )),
             ),
             ("GET", "/setup-provision.js") => (

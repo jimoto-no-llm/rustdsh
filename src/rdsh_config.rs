@@ -1717,19 +1717,16 @@ fn settings_text(
     chinese: &'static str,
     japanese: &'static str,
 ) -> &'static str {
-    match locale {
-        crate::locale::Locale::English => english,
-        crate::locale::Locale::Chinese => chinese,
-        crate::locale::Locale::Japanese => japanese,
-    }
+    crate::locale::pick(locale, english, chinese, japanese)
 }
 
 fn settings_location(locale: crate::locale::Locale, line: usize, column: usize) -> String {
-    match locale {
-        crate::locale::Locale::English => format!("(line {line}, column {column})"),
-        crate::locale::Locale::Chinese => format!("（第 {line} 行，第 {column} 列）"),
-        crate::locale::Locale::Japanese => format!("（{line} 行、{column} 列）"),
-    }
+    crate::locale::pick(
+        locale,
+        format!("(line {line}, column {column})"),
+        format!("（第 {line} 行，第 {column} 列）"),
+        format!("（{line} 行、{column} 列）"),
+    )
 }
 
 fn canonical_language(raw: &str) -> Option<&'static str> {
@@ -1802,11 +1799,12 @@ fn parse_u16(raw: &str, key: &str, locale: crate::locale::Locale) -> anyhow::Res
     u16::try_from(value).map_err(|_| {
         anyhow::anyhow!(
             "{}: {raw}",
-            match locale {
-                crate::locale::Locale::English => format!("{key} is out of range for u16"),
-                crate::locale::Locale::Chinese => format!("{key} 超出 u16 范围"),
-                crate::locale::Locale::Japanese => format!("{key} は u16 の範囲外です"),
-            }
+            crate::locale::pick(
+                locale,
+                format!("{key} is out of range for u16"),
+                format!("{key} 超出 u16 范围"),
+                format!("{key} は u16 の範囲外です")
+            )
         )
     })
 }
@@ -1816,11 +1814,12 @@ fn parse_u32(raw: &str, key: &str, locale: crate::locale::Locale) -> anyhow::Res
     u32::try_from(value).map_err(|_| {
         anyhow::anyhow!(
             "{}: {raw}",
-            match locale {
-                crate::locale::Locale::English => format!("{key} is out of range for u32"),
-                crate::locale::Locale::Chinese => format!("{key} 超出 u32 范围"),
-                crate::locale::Locale::Japanese => format!("{key} は u32 の範囲外です"),
-            }
+            crate::locale::pick(
+                locale,
+                format!("{key} is out of range for u32"),
+                format!("{key} 超出 u32 范围"),
+                format!("{key} は u32 の範囲外です")
+            )
         )
     })
 }

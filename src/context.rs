@@ -1772,11 +1772,7 @@ fn text(
     chinese: &'static str,
     japanese: &'static str,
 ) -> &'static str {
-    match locale {
-        crate::locale::Locale::English => english,
-        crate::locale::Locale::Chinese => chinese,
-        crate::locale::Locale::Japanese => japanese,
-    }
+    crate::locale::pick(locale, english, chinese, japanese)
 }
 
 struct Assembled {

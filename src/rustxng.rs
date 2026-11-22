@@ -677,11 +677,12 @@ pub fn cmd_status(json_out: bool, locale: crate::locale::Locale) -> Result<()> {
     match &binary {
         Some(path) => println!(
             "{}",
-            match locale {
-                crate::locale::Locale::English => format!("rustxng binary: {path}"),
-                crate::locale::Locale::Chinese => format!("rustxng 可执行文件：{path}"),
-                crate::locale::Locale::Japanese => format!("rustxng 実行ファイル: {path}"),
-            }
+            crate::locale::pick(
+                locale,
+                format!("rustxng binary: {path}"),
+                format!("rustxng 可执行文件：{path}"),
+                format!("rustxng 実行ファイル: {path}")
+            )
         ),
         None => println!("{}", missing_binary_hint(locale)),
     }
@@ -717,34 +718,28 @@ pub fn cmd_status(json_out: bool, locale: crate::locale::Locale) -> Result<()> {
     }
     if let Some(url) = url {
         let state = if running {
-            match locale {
-                crate::locale::Locale::English => "running",
-                crate::locale::Locale::Chinese => "运行中",
-                crate::locale::Locale::Japanese => "稼働中",
-            }
+            crate::locale::pick(locale, "running", "运行中", "稼働中")
         } else {
-            match locale {
-                crate::locale::Locale::English => "not answering",
-                crate::locale::Locale::Chinese => "无响应",
-                crate::locale::Locale::Japanese => "応答なし",
-            }
+            crate::locale::pick(locale, "not answering", "无响应", "応答なし")
         };
         println!(
             "{}",
-            match locale {
-                crate::locale::Locale::English => format!("url: {url} ({state})"),
-                crate::locale::Locale::Chinese => format!("地址：{url}（{state}）"),
-                crate::locale::Locale::Japanese => format!("URL: {url}（{state}）"),
-            }
+            crate::locale::pick(
+                locale,
+                format!("url: {url} ({state})"),
+                format!("地址：{url}（{state}）"),
+                format!("URL: {url}（{state}）")
+            )
         );
     } else {
         println!(
             "{}",
-            match locale {
-                crate::locale::Locale::English => "no recorded instance in $DSH_HOME",
-                crate::locale::Locale::Chinese => "$DSH_HOME 中没有已记录的实例",
-                crate::locale::Locale::Japanese => "$DSH_HOME に記録されたインスタンスはありません",
-            }
+            crate::locale::pick(
+                locale,
+                "no recorded instance in $DSH_HOME",
+                "$DSH_HOME 中没有已记录的实例",
+                "$DSH_HOME に記録されたインスタンスはありません"
+            )
         );
     }
     Ok(())
@@ -755,11 +750,12 @@ pub fn cmd_start(locale: crate::locale::Locale) -> Result<()> {
     let url = ensure().map_err(anyhow::Error::new)?;
     println!(
         "{}",
-        match locale {
-            crate::locale::Locale::English => format!("rustxng ready at {url}"),
-            crate::locale::Locale::Chinese => format!("rustxng 已就绪：{url}"),
-            crate::locale::Locale::Japanese => format!("rustxng は {url} で利用できます"),
-        }
+        crate::locale::pick(
+            locale,
+            format!("rustxng ready at {url}"),
+            format!("rustxng 已就绪：{url}"),
+            format!("rustxng は {url} で利用できます")
+        )
     );
     Ok(())
 }
@@ -884,12 +880,12 @@ fn install_path(home: &Path) -> PathBuf {
 fn install_failed(locale: crate::locale::Locale, detail: &str) -> anyhow::Error {
     anyhow::anyhow!(
         "{}",
-        match locale {
-            crate::locale::Locale::English => format!("rustxng install failed: {detail}"),
-            crate::locale::Locale::Chinese => format!("rustxng 安装失败：{detail}"),
-            crate::locale::Locale::Japanese =>
-                format!("rustxng のインストールに失敗しました: {detail}"),
-        }
+        crate::locale::pick(
+            locale,
+            format!("rustxng install failed: {detail}"),
+            format!("rustxng 安装失败：{detail}"),
+            format!("rustxng のインストールに失敗しました: {detail}")
+        )
     )
 }
 
@@ -1002,23 +998,24 @@ pub fn cmd_install(locale: crate::locale::Locale) -> Result<()> {
     if let Some(path) = binary() {
         println!(
             "{}",
-            match locale {
-                crate::locale::Locale::English => format!(
+            crate::locale::pick(
+                locale,
+                format!(
                     "rustxng is already installed at {} ({})",
                     path.display(),
                     update::update_hint(locale)
                 ),
-                crate::locale::Locale::Chinese => format!(
+                format!(
                     "rustxng 已安装：{}（{}）",
                     path.display(),
                     update::update_hint(locale)
                 ),
-                crate::locale::Locale::Japanese => format!(
+                format!(
                     "rustxng は導入済みです: {}（{}）",
                     path.display(),
                     update::update_hint(locale)
-                ),
-            }
+                )
+            )
         );
         return Ok(());
     }
@@ -1029,20 +1026,21 @@ pub fn cmd_install(locale: crate::locale::Locale) -> Result<()> {
     let path = install_sidecar(&dest, locale)?;
     println!(
         "{}",
-        match locale {
-            crate::locale::Locale::English => format!(
+        crate::locale::pick(
+            locale,
+            format!(
                 "rustxng installed at {}; start it with: rdsh rustxng start",
                 path.display()
             ),
-            crate::locale::Locale::Chinese => format!(
+            format!(
                 "rustxng 已安装到 {}；启动：rdsh rustxng start",
                 path.display()
             ),
-            crate::locale::Locale::Japanese => format!(
+            format!(
                 "rustxng を {} へ導入しました。起動: rdsh rustxng start",
                 path.display()
-            ),
-        }
+            )
+        )
     );
     Ok(())
 }

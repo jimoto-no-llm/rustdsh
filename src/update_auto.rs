@@ -339,7 +339,7 @@ fn enable(dry_run: bool, json: bool, force: bool, locale: crate::locale::Locale)
     let directory = unit_directory();
     let Some(script) = sync_script() else {
         bail!(
-            match locale { crate::locale::Locale::English => "sync-dsh.sh was not found; set RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh (a timer that cannot run the updater would fail silently every day)", crate::locale::Locale::Chinese => "未找到 sync-dsh.sh；请设置 RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh（无法运行更新器的计时器会每天失败）", crate::locale::Locale::Japanese => "sync-dsh.sh が見つかりません。RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh を設定してください（更新処理を実行できないタイマーは毎日失敗します）" }
+            crate::locale::pick(locale, "sync-dsh.sh was not found; set RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh (a timer that cannot run the updater would fail silently every day)", "未找到 sync-dsh.sh；请设置 RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh（无法运行更新器的计时器会每天失败）", "sync-dsh.sh が見つかりません。RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh を設定してください（更新処理を実行できないタイマーは毎日失敗します）")
         );
     };
     // Refuse before writing a unit: a timer that shuts itself off is worse than

@@ -380,20 +380,21 @@ fn scan(
 fn report_line(locale: crate::locale::Locale, found: Scan, base: &Path) -> String {
     let mb = found.bytes as f64 / 1_000_000.0;
     let base = base.display();
-    match locale {
-        crate::locale::Locale::English => format!(
+    crate::locale::pick(
+        locale,
+        format!(
             "[rdsh] tmp guard: removed {} orphan snapshot dir(s) ({mb:.1} MB) under {base}",
             found.dirs
         ),
-        crate::locale::Locale::Chinese => format!(
+        format!(
             "[rdsh] tmp guard: 已从 {base} 清理 {} 个孤儿快照目录（{mb:.1} MB）",
             found.dirs
         ),
-        crate::locale::Locale::Japanese => format!(
+        format!(
             "[rdsh] tmp guard: {base} 配下の孤立スナップショット {} 個（{mb:.1} MB）を削除しました",
             found.dirs
         ),
-    }
+    )
 }
 
 /// Lightweight orphan reclaim, once per process, right before handing over
@@ -464,17 +465,13 @@ fn large_untracked_lines(locale: crate::locale::Locale) -> Vec<String> {
     big.into_iter()
         .map(|(group, bytes)| {
             let mb = *bytes as f64 / 1_000_000.0;
-            match locale {
-                crate::locale::Locale::English => format!(
-                    "[rdsh] tmp guard: untracked '{group}' holds {mb:.0} MB — add it to .git/info/exclude or .gitignore to keep dsh workspace snapshots small"
-                ),
-                crate::locale::Locale::Chinese => format!(
-                    "[rdsh] tmp guard: 未跟踪的 '{group}' 占用 {mb:.0} MB——请加入 .git/info/exclude 或 .gitignore，让 dsh 工作区快照保持小巧"
-                ),
-                crate::locale::Locale::Japanese => format!(
-                    "[rdsh] tmp guard: 未追跡の '{group}' は {mb:.0} MB です。dsh のワークスペーススナップショットを小さく保つため .git/info/exclude か .gitignore に追加してください"
-                ),
-            }
+            crate::locale::pick(locale, format!(
+                "[rdsh] tmp guard: untracked '{group}' holds {mb:.0} MB — add it to .git/info/exclude or .gitignore to keep dsh workspace snapshots small"
+            ), format!(
+                "[rdsh] tmp guard: 未跟踪的 '{group}' 占用 {mb:.0} MB——请加入 .git/info/exclude 或 .gitignore，让 dsh 工作区快照保持小巧"
+            ), format!(
+                "[rdsh] tmp guard: 未追跡の '{group}' は {mb:.0} MB です。dsh のワークスペーススナップショットを小さく保つため .git/info/exclude か .gitignore に追加してください"
+            ))
         })
         .collect()
 }
@@ -494,35 +491,27 @@ fn orphan_lines(locale: crate::locale::Locale) -> Vec<String> {
     let mb = found.bytes as f64 / 1_000_000.0;
     let base = base.display();
     let line = if disabled() {
-        match locale {
-            crate::locale::Locale::English => format!(
-                "[rdsh] tmp guard: {n} orphan dsh workspace snapshot dir(s) ({mb:.1} MB) under {base} — automatic reclaim is off (RDSH_NO_TMP_GUARD=1)",
-                n = found.dirs
-            ),
-            crate::locale::Locale::Chinese => format!(
-                "[rdsh] tmp guard: {base} 下有 {} 个孤儿 dsh 工作区快照目录（{mb:.1} MB）——自动清理已关闭（RDSH_NO_TMP_GUARD=1）",
-                found.dirs
-            ),
-            crate::locale::Locale::Japanese => format!(
-                "[rdsh] tmp guard: {base} 配下に孤立した dsh ワークスペーススナップショットが {} 個（{mb:.1} MB）あります。自動回収は無効です（RDSH_NO_TMP_GUARD=1）",
-                found.dirs
-            ),
-        }
+        crate::locale::pick(locale, format!(
+            "[rdsh] tmp guard: {n} orphan dsh workspace snapshot dir(s) ({mb:.1} MB) under {base} — automatic reclaim is off (RDSH_NO_TMP_GUARD=1)",
+            n = found.dirs
+        ), format!(
+            "[rdsh] tmp guard: {base} 下有 {} 个孤儿 dsh 工作区快照目录（{mb:.1} MB）——自动清理已关闭（RDSH_NO_TMP_GUARD=1）",
+            found.dirs
+        ), format!(
+            "[rdsh] tmp guard: {base} 配下に孤立した dsh ワークスペーススナップショットが {} 個（{mb:.1} MB）あります。自動回収は無効です（RDSH_NO_TMP_GUARD=1）",
+            found.dirs
+        ))
     } else {
-        match locale {
-            crate::locale::Locale::English => format!(
-                "[rdsh] tmp guard: {n} orphan dsh workspace snapshot dir(s) ({mb:.1} MB) under {base} — the next delegated run reclaims them (opt out: RDSH_NO_TMP_GUARD=1)",
-                n = found.dirs
-            ),
-            crate::locale::Locale::Chinese => format!(
-                "[rdsh] tmp guard: {base} 下有 {} 个孤儿 dsh 工作区快照目录（{mb:.1} MB）——下一次委派运行时会回收（可用 RDSH_NO_TMP_GUARD=1 退出）",
-                found.dirs
-            ),
-            crate::locale::Locale::Japanese => format!(
-                "[rdsh] tmp guard: {base} 配下に孤立した dsh ワークスペーススナップショットが {} 個（{mb:.1} MB）あります。次の委譲実行時に回収します（無効化: RDSH_NO_TMP_GUARD=1）",
-                found.dirs
-            ),
-        }
+        crate::locale::pick(locale, format!(
+            "[rdsh] tmp guard: {n} orphan dsh workspace snapshot dir(s) ({mb:.1} MB) under {base} — the next delegated run reclaims them (opt out: RDSH_NO_TMP_GUARD=1)",
+            n = found.dirs
+        ), format!(
+            "[rdsh] tmp guard: {base} 下有 {} 个孤儿 dsh 工作区快照目录（{mb:.1} MB）——下一次委派运行时会回收（可用 RDSH_NO_TMP_GUARD=1 退出）",
+            found.dirs
+        ), format!(
+            "[rdsh] tmp guard: {base} 配下に孤立した dsh ワークスペーススナップショットが {} 個（{mb:.1} MB）あります。次の委譲実行時に回収します（無効化: RDSH_NO_TMP_GUARD=1）",
+            found.dirs
+        ))
     };
     vec![line]
 }

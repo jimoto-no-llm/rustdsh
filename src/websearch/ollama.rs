@@ -9,11 +9,7 @@ const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 fn message(locale: Locale, en: &str, zh: &str, ja: &str) -> anyhow::Error {
     anyhow::anyhow!(
         "Ollama Web Search: {}",
-        match locale {
-            Locale::English => en,
-            Locale::Chinese => zh,
-            Locale::Japanese => ja,
-        }
+        crate::locale::pick(locale, en, zh, ja)
     )
 }
 

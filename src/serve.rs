@@ -21,16 +21,13 @@ pub fn cmd_serve(port: u16, locale: crate::locale::Locale) -> anyhow::Result<()>
     let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
         anyhow::anyhow!(
             "{} {addr}: {e} ({})",
-            match locale {
-                crate::locale::Locale::English => "cannot listen on",
-                crate::locale::Locale::Chinese => "无法监听",
-                crate::locale::Locale::Japanese => "待受できません",
-            },
-            match locale {
-                crate::locale::Locale::English => "dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0",
-                crate::locale::Locale::Chinese => "dsh Web GUI 使用 3080；rdsh serve 默认使用 38080，也可尝试 --port 0",
-                crate::locale::Locale::Japanese => "dsh Web GUI は 3080、rdsh serve は既定で 38080 を使います。--port 0 も試せます",
-            }
+            crate::locale::pick(locale, "cannot listen on", "无法监听", "待受できません"),
+            crate::locale::pick(
+                locale,
+                "dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0",
+                "dsh Web GUI 使用 3080；rdsh serve 默认使用 38080，也可尝试 --port 0",
+                "dsh Web GUI は 3080、rdsh serve は既定で 38080 を使います。--port 0 も試せます"
+            )
         )
     })?;
     listener.set_nonblocking(true)?;
@@ -40,35 +37,32 @@ pub fn cmd_serve(port: u16, locale: crate::locale::Locale) -> anyhow::Result<()>
     let handoff = crate::token_handoff::TokenHandoff::create(&token, locale)?;
     log_line(format_args!(
         "[rdsh] {}: http://127.0.0.1:{port}/ ({})",
-        match locale {
-            crate::locale::Locale::English => "dashboard",
-            crate::locale::Locale::Chinese => "仪表板",
-            crate::locale::Locale::Japanese => "ダッシュボード",
-        },
-        match locale {
-            crate::locale::Locale::English => "Ctrl-C to stop, localhost only",
-            crate::locale::Locale::Chinese => "按 Ctrl-C 停止，仅限 localhost",
-            crate::locale::Locale::Japanese => "Ctrl-C で停止、localhost のみ",
-        }
+        crate::locale::pick(locale, "dashboard", "仪表板", "ダッシュボード"),
+        crate::locale::pick(
+            locale,
+            "Ctrl-C to stop, localhost only",
+            "按 Ctrl-C 停止，仅限 localhost",
+            "Ctrl-C で停止、localhost のみ"
+        )
     ));
     log_line(format_args!(
         "[rdsh] {}: {}",
-        match locale {
-            crate::locale::Locale::English => "token handoff file",
-            crate::locale::Locale::Chinese => "令牌交接文件",
-            crate::locale::Locale::Japanese => "トークン引き渡しファイル",
-        },
+        crate::locale::pick(
+            locale,
+            "token handoff file",
+            "令牌交接文件",
+            "トークン引き渡しファイル"
+        ),
         handoff.path().display()
     ));
     log_line(format_args!(
         "[rdsh] {}",
-        match locale {
-            crate::locale::Locale::English =>
-                "enter the file contents in the dashboard; the token is never printed",
-            crate::locale::Locale::Chinese => "请在仪表板中输入文件内容；令牌绝不会打印",
-            crate::locale::Locale::Japanese =>
-                "ダッシュボードでファイル内容を入力してください。トークンは表示されません",
-        }
+        crate::locale::pick(
+            locale,
+            "enter the file contents in the dashboard; the token is never printed",
+            "请在仪表板中输入文件内容；令牌绝不会打印",
+            "ダッシュボードでファイル内容を入力してください。トークンは表示されません"
+        )
     ));
     let connections = Arc::new(AtomicUsize::new(0));
     while !crate::shutdown::requested() {
@@ -185,11 +179,7 @@ fn handle(
             Cow::Owned(
                 UI.replace(
                     "__RDSH_LOCALE__",
-                    match locale {
-                        crate::locale::Locale::English => "en",
-                        crate::locale::Locale::Chinese => "zh-CN",
-                        crate::locale::Locale::Japanese => "ja",
-                    },
+                    crate::locale::pick(locale, "en", "zh-CN", "ja"),
                 )
                 // The build version is already public (rdsh --version and the
                 // terminal banner), so render it immediately instead of leaving
