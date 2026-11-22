@@ -39,7 +39,7 @@ function assertClosed(rows) {
 
 test("pure retained factory and direct native agree byte-for-byte in all locales without Node/settings", async () => {
   assert.deepEqual(operations, ["start", "resume", "send", "interrupt", "stop", "usage"]);
-  assert.deepEqual(versions, ["0.2.0-rc.2"]);
+  assert.deepEqual(versions, ["0.2.0-rc.2", "0.2.2-rc.5"]);
   assert.deepEqual(adapterCatalog().map(row => row.id), ["dsh", "codex", "claude", "kimi"]);
   const root = await scratch(); await fs.writeFile(path.join(root, "rdsh.json"), "broken settings");
   for (const language of ["en", "ja", "zh-CN"]) {
