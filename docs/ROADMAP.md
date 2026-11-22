@@ -11,10 +11,9 @@ Update this file at each minor release; status churn stays in issues.
 
 ## Now (`P0`-`P1`, released through `v0.7.0`) — shipped
 
-`v0.7.0` is the latest published release, with its Unix and Windows
-digests pinned. `[Unreleased]` on `main` turns delegated `dsh` telemetry
-and Discord Rich Presence off by default (`features.telemetry`,
-`features.discord`; see `docs/PRIVACY.md`, #585).
+This "Now" section is the roadmap snapshot at `v0.7.0`; releases have
+continued through `v0.16.0`. For the current version see `Cargo.toml`,
+`CHANGELOG.md` and `docs/releases/`.
 
 - `v0.7.0` ships native Linux packages (`.deb` / `.rpm`) and pinned
   Homebrew, Scoop and winget manifests that
