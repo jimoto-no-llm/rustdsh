@@ -196,6 +196,12 @@ updates:
     open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /desktop/sdk
+    # DSH cohorts must move together; the sdk contract suite pins the
+    # matching dsh-client-ui-slots release next to dsh-sdk-client.
+    groups:
+      dsh-runtime:
+        patterns:
+          - "@deepseek-ai/dsh-*"
     schedule:
       interval: weekly
       day: monday
