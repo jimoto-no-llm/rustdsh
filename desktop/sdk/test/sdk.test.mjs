@@ -68,7 +68,7 @@ for await (const line of createInterface({input:process.stdin})) {
  const request=JSON.parse(line); let result;
  if(request.method==='initialize') {
   appendFileSync(process.env.RDSH_SDK_TEST_TRACE,JSON.stringify({route:request.params,home:process.env.DSH_HOME,hasNodeHooks:Boolean(process.env.NODE_OPTIONS)})+'\\n');
-  result={serverInfo:{name:'deepseek-harness-sdk-runtime',version:'0.2.1-alpha.2'}};
+  result={serverInfo:{name:'deepseek-harness-sdk-runtime',version:'0.2.1-rc.5'}};
  } else if(request.method==='session/working-directory/get') result={cwd:process.cwd()};
  else if(request.method==='shutdown') result=null;
  else {process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request.id,error:{code:-32601,message:'fixture method unavailable'}})+'\\n');continue;}

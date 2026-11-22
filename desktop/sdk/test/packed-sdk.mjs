@@ -10,7 +10,8 @@ const require = createRequire(join(consumer, 'package.json'));
 const entry = require.resolve('@jimoto-no-llm/rdsh-desktop-sdk');
 const { createHarness, configureUpdater, desktopPaths, FEED_URL } = await import(pathToFileURL(entry));
 const manifest = JSON.parse(await readFile(new URL('./package.json', pathToFileURL(entry)), 'utf8'));
-assert.equal(manifest.dependencies['@deepseek-ai/dsh-sdk-client'], '0.2.1-alpha.2');
+const source = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+assert.equal(manifest.dependencies['@deepseek-ai/dsh-sdk-client'], source.dependencies['@deepseek-ai/dsh-sdk-client']);
 assert.match(await readFile(new URL('./index.d.ts', pathToFileURL(entry)), 'utf8'), /export function createHarness/);
 const harness = createHarness({ sdkHome: join(consumer, 'synthetic-home'), cwd: consumer,
   dshBin: fileURLToPath(new URL('./fixtures/wire-runtime.mjs', import.meta.url)),
