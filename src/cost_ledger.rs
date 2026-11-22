@@ -25,7 +25,7 @@
 //! alongside it; the outputs are byte-identical, and `tests/cost_ledger_cli.rs`
 //! pins the same JSON the JS module produced.
 
-use std::io::{Read, Write};
+use std::io::Write;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
@@ -1656,61 +1656,27 @@ pub fn cost_report_schema() -> Value {
 /// Read one JSON file with the dashboard CLI's `localJson` rules: a regular
 /// file of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_json(input_file: &str, locale: crate::locale::Locale) -> Result<Value> {
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NONBLOCK);
-    }
-    let file = options.open(input_file).with_context(|| {
-        localized_format!(
+    let context = localized_format!(
+        locale,
+        "cannot read JSON {}",
+        "无法读取 JSON {}",
+        "JSONを読み取れません {}",
+        input_file
+    );
+    let limits = crate::json_input::Limits::capped(
+        crate::json_input::DEFAULT_MAX_BYTES,
+        crate::locale::diagnostic(
             locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    let metadata = file.metadata().with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    if !metadata.is_file() || metadata.len() > 256 * 1024 {
-        bail!(crate::locale::diagnostic(
-            locale,
-            "Input JSON must be a regular file of at most 256 KiB"
-        )
-        .to_string());
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take(256 * 1024 + 1)
-        .read_to_end(&mut bytes)
-        .with_context(|| {
-            localized_format!(
-                locale,
-                "cannot read JSON {}",
-                "无法读取 JSON {}",
-                "JSONを読み取れません {}",
-                input_file
-            )
-        })?;
-    if bytes.len() > 256 * 1024 {
-        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB").to_string());
-    }
-    let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
-    };
-    // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let mut value = serde_json::from_str(text).map_err(|_| {
-        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
-    })?;
+            "Input JSON must be a regular file of at most 256 KiB",
+        ),
+        crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB"),
+    );
+    let mut value = crate::json_input::read_value(
+        std::path::Path::new(input_file),
+        &context,
+        &limits,
+        crate::locale::diagnostic(locale, "Input JSON is invalid"),
+    )?;
     normalize_js_value(&mut value);
     Ok(value)
 }

@@ -25,7 +25,7 @@
 //! same JSON the JS module produced.
 
 use std::collections::BTreeMap;
-use std::io::{Read, Write};
+use std::io::Write;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
@@ -2059,71 +2059,27 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
 /// Read one JSON request document, refusing anything over 128 MiB.
 fn read_json(input_file: &str, locale: crate::locale::Locale) -> Result<Value> {
     const MAX_INPUT_BYTES: usize = 128 * 1024 * 1024;
-    let file = open_json_input(input_file).with_context(|| {
-        localized_format!(
+    let context = localized_format!(
+        locale,
+        "cannot read JSON {}",
+        "无法读取 JSON {}",
+        "JSONを読み取れません {}",
+        input_file
+    );
+    let limits = crate::json_input::Limits::capped(
+        MAX_INPUT_BYTES,
+        crate::locale::diagnostic(
             locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    let metadata = file.metadata().with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!(crate::locale::diagnostic(
-            locale,
-            "Input JSON must be a regular file of at most 128 MiB"
-        )
-        .to_string());
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_INPUT_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .with_context(|| {
-            localized_format!(
-                locale,
-                "cannot read JSON {}",
-                "无法读取 JSON {}",
-                "JSONを読み取れません {}",
-                input_file
-            )
-        })?;
-    if bytes.len() > MAX_INPUT_BYTES {
-        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 128 MiB").to_string());
-    }
-    let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
-    };
-    // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| {
-        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
-    })
-}
-
-#[cfg(unix)]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-
-    std::fs::OpenOptions::new()
-        .read(true)
-        // A FIFO swapped into the path cannot block between the pathname check
-        // and `open`: `read_json` validates the metadata of this same handle.
-        .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
-        .open(input_file)
-}
-
-#[cfg(not(unix))]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    std::fs::File::open(input_file)
+            "Input JSON must be a regular file of at most 128 MiB",
+        ),
+        crate::locale::diagnostic(locale, "Input JSON exceeds 128 MiB"),
+    );
+    crate::json_input::read_value(
+        std::path::Path::new(input_file),
+        &context,
+        &limits,
+        crate::locale::diagnostic(locale, "Input JSON is invalid"),
+    )
 }
 
 /// The document shape every action accepts: `{ operation, state, input, now,

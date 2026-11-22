@@ -37,7 +37,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, ensure, Result};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use super::{
     choose_asset, env, exe_name, home_dir, install_path, looks_like_executable,
@@ -608,12 +607,8 @@ pub(crate) fn normalize_hex(text: &str) -> Option<String> {
         .then(|| text.to_ascii_lowercase())
 }
 
-pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
+/// Lowercase hex SHA256 of a byte slice.
+pub(crate) use crate::digest::sha256_hex;
 
 /// `<hex>  <file>` (sha256sum) or a bare hex digest.
 pub(crate) fn parse_sha256_file(text: &str) -> Option<String> {

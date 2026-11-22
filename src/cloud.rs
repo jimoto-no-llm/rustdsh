@@ -10,7 +10,6 @@ mod json_input_tests;
 use clap::{Args, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
-use std::io::Read;
 use std::path::PathBuf;
 use std::pin::Pin;
 
@@ -259,36 +258,13 @@ pub struct PoolPlan {
     pub expected_resource_version: Option<String>,
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> anyhow::Result<T> {
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        // A FIFO swapped into the path must not block before the handle check.
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK);
-    }
-    let file = options.open(path)?;
-    let metadata = file.metadata()?;
-    anyhow::ensure!(
-        metadata.is_file() && metadata.len() <= MAX_JSON_INPUT_BYTES as u64,
-        "Input JSON must be a regular file of at most 128 MiB"
+fn read_json<T: for<'de> Deserialize<'de>>(path: &std::path::Path) -> anyhow::Result<T> {
+    let limits = crate::json_input::Limits::capped(
+        MAX_JSON_INPUT_BYTES,
+        "Input JSON must be a regular file of at most 128 MiB",
+        "Input JSON exceeds 128 MiB",
     );
-    read_json_from(file, metadata.len() as usize)
-}
-
-fn read_json_from<T: for<'de> Deserialize<'de>>(
-    reader: impl Read,
-    initial_length: usize,
-) -> anyhow::Result<T> {
-    let mut bytes = Vec::with_capacity(initial_length.min(MAX_JSON_INPUT_BYTES));
-    reader
-        .take((MAX_JSON_INPUT_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)?;
-    anyhow::ensure!(
-        bytes.len() <= MAX_JSON_INPUT_BYTES,
-        "Input JSON exceeds 128 MiB"
-    );
+    let bytes = crate::json_input::read_bytes(path, None, &limits)?;
     Ok(serde_json::from_slice(&bytes)?)
 }
 

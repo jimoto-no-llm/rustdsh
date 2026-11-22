@@ -1450,29 +1450,6 @@ mod tests {
         crate::test_support::env_lock()
     }
 
-    struct EnvGuard {
-        saved: Vec<(String, Option<String>)>,
-    }
-    impl EnvGuard {
-        fn set(keys: &[&str]) -> Self {
-            let saved = keys
-                .iter()
-                .map(|k| (k.to_string(), std::env::var(k).ok()))
-                .collect();
-            Self { saved }
-        }
-    }
-    impl Drop for EnvGuard {
-        fn drop(&mut self) {
-            for (k, v) in &self.saved {
-                match v {
-                    Some(v) => std::env::set_var(k, v),
-                    None => std::env::remove_var(k),
-                }
-            }
-        }
-    }
-
     #[cfg(unix)]
     fn make_exec(path: &std::path::Path) {
         use std::os::unix::fs::PermissionsExt;
@@ -1535,13 +1512,14 @@ mod tests {
     #[test]
     fn path_lookup_skips_non_executable_dsh_and_node() {
         let _guard = env_lock();
-        let env = EnvGuard::set(&[
+        let _env = crate::test_support::EnvGuard::save(&[
             "PATH",
             "RDSH_ORIG_BIN",
             "DSH_ORIG_BIN",
             "HOME",
             "USERPROFILE",
         ]);
+        let sys_path = std::env::var("PATH").unwrap_or_default();
         let root = std::env::temp_dir().join(format!(
             "rdsh-passthrough-path-{}-{}",
             std::process::id(),
@@ -1572,7 +1550,6 @@ mod tests {
         }
         // PATH keeps working system dirs after our fixtures; fixtures come
         // first to prove they are skipped when non-executable.
-        let sys_path = env.saved[0].1.clone().unwrap_or_default();
         let mut parts = vec![first.clone(), second];
         parts.extend(std::env::split_paths(&sys_path));
         std::env::set_var("PATH", std::env::join_paths(&parts).unwrap());
@@ -1838,7 +1815,8 @@ mod tests {
     #[test]
     fn delegated_runs_disable_upstream_telemetry_by_default() {
         let _lock = env_lock();
-        let _env = EnvGuard::set(&["DSH_TELEMETRY_DISABLED", "RDSH_TELEMETRY"]);
+        let _env =
+            crate::test_support::EnvGuard::save(&["DSH_TELEMETRY_DISABLED", "RDSH_TELEMETRY"]);
         std::env::remove_var("DSH_TELEMETRY_DISABLED");
         std::env::remove_var("RDSH_TELEMETRY");
 
