@@ -611,4 +611,78 @@ mod tests {
         assert!(manager.check_cancelled().is_err());
         assert!(!manager.status()["job"]["running"].as_bool().unwrap());
     }
+    #[test]
+    fn running_job_rejects_another_start_and_can_still_be_cancelled() {
+        let manager = Arc::new(Manager::default());
+        manager.state.lock().unwrap().running = true;
+        assert!(!manager.close_if_idle());
+        assert_eq!(
+            manager
+                .start(br#"{"action":"runtime"}"#)
+                .unwrap_err()
+                .to_string(),
+            "ALREADY_RUNNING"
+        );
+        manager.start(br#"{"action":"cancel"}"#).unwrap();
+        assert_eq!(manager.state.lock().unwrap().phase, "cancelling");
+        assert_eq!(
+            manager.check_cancelled().unwrap_err().to_string(),
+            "CANCELLED"
+        );
+    }
+    #[test]
+    fn request_validation_rejects_wrong_types_and_unexpected_provider_fields() {
+        let manager = Arc::new(Manager::default());
+        for body in [
+            br#"{"action":1}"#.as_slice(),
+            br#"{"action":"runtime","provider":"openai"}"#,
+            br#"{"action":"local-model","model":"qwen3:4b","provider":"openai"}"#,
+            br#"{"action":"select","model":"model"}"#,
+            br#"{"action":"select","provider":"provider"}"#,
+        ] {
+            assert!(manager.start(body).is_err());
+            assert!(!manager.state.lock().unwrap().running);
+        }
+    }
+    #[test]
+    fn operation_failures_never_expose_child_output_or_lose_cancellation() {
+        assert_eq!(
+            operation_error(
+                anyhow::anyhow!("token=secret child output"),
+                "RUNTIME_INSTALL_FAILED"
+            )
+            .to_string(),
+            "RUNTIME_INSTALL_FAILED"
+        );
+        assert_eq!(
+            operation_error(anyhow::anyhow!("CANCELLED"), "RUNTIME_INSTALL_FAILED").to_string(),
+            "CANCELLED"
+        );
+    }
+    #[cfg(unix)]
+    #[test]
+    fn command_success_failure_and_timeout_are_bounded_and_keep_output_private() {
+        let manager = Manager::default();
+        let mut success = std::process::Command::new("sh");
+        success.args(["-c", "printf private-output; printf private-error >&2"]);
+        command(&manager, success, Duration::from_secs(2)).unwrap();
+        let mut failure = std::process::Command::new("sh");
+        failure.args(["-c", "printf secret >&2; exit 7"]);
+        assert_eq!(
+            command(&manager, failure, Duration::from_secs(2))
+                .unwrap_err()
+                .to_string(),
+            "PROVISION_FAILED"
+        );
+        let mut timeout = std::process::Command::new("sh");
+        timeout.args(["-c", "sleep 20"]);
+        let start = Instant::now();
+        assert_eq!(
+            command(&manager, timeout, Duration::from_millis(20))
+                .unwrap_err()
+                .to_string(),
+            "PROVISION_FAILED"
+        );
+        assert!(start.elapsed() < Duration::from_secs(2));
+    }
 }

@@ -16,6 +16,8 @@ try {
   & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot '../install.ps1') -RuntimeOnly -Prefix $prefix
   if ($LASTEXITCODE -ne 0) { throw 'Runtime bootstrap failed' }
   $private = Join-Path $env:HOME '.local/share/rdsh/runtime'
+  $manifest = Get-Content -Raw -LiteralPath (Join-Path $private 'package.json') | ConvertFrom-Json
+  if ($manifest.overrides.undici -ne '8.12.3' -or $manifest.overrides.'zod@>=4 <4.6.7' -ne '4.6.7' -or $manifest.overrides.'@modelcontextprotocol/client' -ne '2.3.1' -or $manifest.overrides.fflate -ne '0.8.3') { throw 'Private dependency fixes were not applied' }
   $pnpm = & (Join-Path $private 'bin/pnpm.cmd') --version
   if ($LASTEXITCODE -ne 0 -or $pnpm -notmatch '^10\.34\.9$') { throw 'Private pnpm did not run' }
   $dsh = & (Join-Path $private 'bin/dsh.cmd') --version

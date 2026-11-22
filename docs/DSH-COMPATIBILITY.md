@@ -51,3 +51,13 @@ npmの `latest`・`next`・`alpha` は更新される配布タグです。公開
 自動導入の固定先を `0.2.2-rc.5` に移した後も、解決した `undici 8.11.2`、`@modelcontextprotocol/client 2.2.0`、`fflate 0.8.2` が
 既知advisoryの対象に残ることを再確認しました（[rc.5の解決結果](evidence/dsh-rc5/rc5-audit.json)）。
 固定版の変更は依存の修正ではありません。`0.2.2-rc.5` の依存脆弱性が解消したとは扱わないでください。
+
+利用者専用 runtime（`install.sh` / `install.ps1` が作る隔離ディレクトリ）では、DSH の導入前に manifest の
+`overrides` へ修正版を固定します（`undici 8.12.3`、Zod 4 のみ `4.6.7`、
+`@modelcontextprotocol/client 2.3.1`、`fflate 0.8.3`）。既存の依存・無関係な override は保持し、
+不正な manifest やシンボリックリンクは拒否します。DSH 本体と監査済みバイト列は変更しません。
+`0.2.2-rc.5` では、2026-11-22 に素の状態で75件のadvisoryを再現し、上記4つの override を入れると
+`npm audit` が0件になり、`npm ls` にも invalid が出ないことを再確認しました。
+2026-11-10 の初回検証は[記録](evidence/one-command-install/dependency-repair-20261110.md)（当時の固定版 alpha.3）にあります。
+この修正は利用者専用 runtime のみが対象で、別途導入した DSH や上の未修正の解決結果は変わりません。
+Windows 実機の実行は未確認です。

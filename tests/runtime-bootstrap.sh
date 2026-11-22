@@ -12,6 +12,7 @@ cat > "$T/bin/node" <<'NODE'
 #!/bin/sh
 case "${1:-}" in
   --version) echo v24.22.1 ;;
+  -) cat >/dev/null ;;
   */pnpm.cjs) echo 10.34.9 ;;
   */dsh/lib/bin.js) echo 0.2.2-rc.5 ;;
   *) exit 9 ;;
@@ -26,7 +27,7 @@ mkdir -p "$3/node_modules/pnpm/bin" "$3/node_modules/@deepseek-ai/dsh/lib"
 : > "$3/node_modules/@deepseek-ai/dsh/lib/bin.js"
 NPM
 chmod +x "$T/bin/node" "$T/bin/npm"
-HOME="$T/home with space'quote" PATH="$T/bin" DSH_ORIG_BIN= RDSH_ORIG_BIN= RDSH_SKIP_RUNTIME=0 bash "$ROOT/install.sh" --runtime-only --prefix="$T/home with space'quote/bin" > "$T/result" 2>&1
+HOME="$T/home with space'quote" PATH="$T/bin" DSH_ORIG_BIN='' RDSH_ORIG_BIN='' RDSH_SKIP_RUNTIME=0 bash "$ROOT/install.sh" --runtime-only --prefix="$T/home with space'quote/bin" > "$T/result" 2>&1
 [ -x "$T/home with space'quote/bin/pnpm" ]
 [ -x "$T/home with space'quote/bin/dsh" ]
 [ "$(HOME="$T/home with space'quote" PATH="$T/bin" "$T/home with space'quote/bin/pnpm" --version)" = 10.34.9 ]
@@ -57,7 +58,7 @@ printf '# keep my settings\n' > "$T/shell home'quote/.zshrc"
 mkdir -p "$T/shell home'quote/.config/rdsh"
 printf 'CUSTOM_SETUP_MARKER=kept\n' > "$T/shell home'quote/.config/rdsh/env"
 for attempt in 1 2; do
-  (cd "$T/repo" && HOME="$T/shell home'quote" PATH="$T/bin" CI=1 RDSH_SKIP_RUNTIME=0 RDSH_SKIP_PLUGINS=1 DSH_ORIG_BIN= RDSH_ORIG_BIN= bash ./install.sh --no-setup --prefix="$T/shell home'quote/bin'quote") > "$T/full-install-$attempt" 2>&1
+  (cd "$T/repo" && HOME="$T/shell home'quote" PATH="$T/bin" CI=1 RDSH_SKIP_RUNTIME=0 RDSH_SKIP_PLUGINS=1 DSH_ORIG_BIN='' RDSH_ORIG_BIN='' bash ./install.sh --no-setup --prefix="$T/shell home'quote/bin'quote") > "$T/full-install-$attempt" 2>&1
  done
 for startup in .profile .bashrc .zshrc; do
   [ "$(grep -c '# rdsh user PATH' "$T/shell home'quote/$startup")" = 1 ]
@@ -86,7 +87,7 @@ exit 9
 CURL
 chmod +x "$T/bin/node" "$T/bin/curl"
 mkdir -p "$T/bad-digest"
-if HOME="$T/bad-digest" PATH="$T/bin" RDSH_SKIP_RUNTIME=0 DSH_ORIG_BIN= RDSH_ORIG_BIN= bash "$ROOT/install.sh" --runtime-only --prefix="$T/bad-digest/bin" > "$T/bad-result" 2>&1; then
+if HOME="$T/bad-digest" PATH="$T/bin" RDSH_SKIP_RUNTIME=0 DSH_ORIG_BIN='' RDSH_ORIG_BIN='' bash "$ROOT/install.sh" --runtime-only --prefix="$T/bad-digest/bin" > "$T/bad-result" 2>&1; then
   echo 'FAIL: unverified Node archive accepted'; exit 1
 fi
 grep -q 'checksum mismatch' "$T/bad-result"
