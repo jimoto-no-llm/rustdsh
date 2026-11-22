@@ -94,7 +94,7 @@ export async function setup(t) {
     binding: "confirmed",
     run_id: "run-qa",
     cli: "dsh",
-    cli_version: "0.2.0-rc.2",
+    cli_version: "0.2.2-rc.5",
     cli_session_id: "native-root",
     cwd,
   };
