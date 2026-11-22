@@ -57,7 +57,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci --prefix dashboard
       - name: Install only public native test dependencies
-        run: npm install --prefix "${{ runner.temp }}/rdsh-plan-native" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-workflow-ptc@0.2.0-rc.2 @deepseek-ai/dsh-subagent@0.2.0-rc.2 @deepseek-ai/dsh-subagent-spawn-in-process@0.2.0-rc.2 @deepseek-ai/cordis@4.0.4
+        run: npm install --prefix "${{ runner.temp }}/rdsh-plan-native" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-workflow-ptc@0.2.2-rc.5 @deepseek-ai/dsh-subagent@0.2.2-rc.5 @deepseek-ai/dsh-subagent-spawn-in-process@0.2.2-rc.5 @deepseek-ai/cordis@4.1.0
       - if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -336,7 +336,7 @@ jobs:
       - name: Verify Rust launcher, official profiles and kernel enforcement together
         run: RDSH_GUARDED_MATRIX_REQUIRED=1 node --test tests/guarded-launcher-matrix.test.mjs
       - name: Install pinned upstream tool-bash for approval integrity test
-        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.2-rc.5
       - name: Test approval integrity against pinned upstream source
         run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'

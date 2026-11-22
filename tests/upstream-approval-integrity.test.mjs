@@ -14,7 +14,7 @@ assert.ok(path.isAbsolute(source), 'DSH_TOOL_BASH_SOURCE must be an absolute fil
 const packageJsonPath = path.resolve(path.dirname(source), '..', 'package.json');
 const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
 assert.equal(packageJson.name, '@deepseek-ai/dsh-tool-bash');
-assert.equal(packageJson.version, '0.2.0-rc.2', 'test the audited DSH runtime version');
+assert.equal(packageJson.version, '0.2.2-rc.5', 'test the audited DSH runtime version');
 
 test('pinned DSH approval is linked to the exact presented bash call', async t => {
   const bash = await import(pathToFileURL(source));
@@ -45,6 +45,7 @@ test('pinned DSH approval is linked to the exact presented bash call', async t =
     },
     systemPrompt: { section() {}, getSectionOrder() { return 1; } },
     shellEnv: { collect() { return {}; } },
+    workingDirectory: { async ensure(agent) { return agent.session.header.cwd; } },
   };
   bash.apply(ctx, { enableRunInBackground: false });
   const presented = tool.presentCall(args);
