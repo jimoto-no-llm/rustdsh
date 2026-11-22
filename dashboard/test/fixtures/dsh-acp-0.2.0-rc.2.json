@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.2.0-rc.2",
+  "protocol_version": 1,
+  "initialize": {
+    "protocolVersion": 1,
+    "agentInfo": { "name": "deepseek-harness-acp", "version": "0.0.1" },
+    "agentCapabilities": {
+      "mcpCapabilities": { "http": true },
+      "promptCapabilities": {
+        "image": false,
+        "audio": false,
+        "embeddedContext": false
+      },
+      "sessionCapabilities": { "close": {}, "list": {}, "resume": {} }
+    },
+    "authMethods": []
+  },
+  "start": { "sessionId": "fixture-session" },
+  "resume": {},
+  "updates": [
+    {
+      "sessionUpdate": "agent_message_chunk",
+      "content": { "type": "text", "text": "fixture reply" }
+    },
+    { "sessionUpdate": "usage_update", "used": 135, "size": 8192 }
+  ],
+  "send": { "stopReason": "end_turn" },
+  "interrupt": { "stopReason": "cancelled" },
+  "stop": {},
+  "error": { "code": -32000, "message": "fixture-error-secret-must-not-print" }
+}
