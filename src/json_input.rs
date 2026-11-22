@@ -236,7 +236,13 @@ mod tests {
     fn read_value_refuses_directories_and_input_past_the_ceiling() {
         let root = fixture("bounds");
         let error = read_value(&root, "context", &limits(), INVALID).unwrap_err();
-        assert_eq!(error.to_string(), "must be a regular file");
+        // Opening a directory succeeds on Unix (metadata check reports it) but
+        // fails on Windows, where the open context error surfaces instead.
+        if cfg!(unix) {
+            assert_eq!(error.to_string(), "must be a regular file");
+        } else {
+            assert_eq!(error.to_string(), "context");
+        }
 
         let path = root.join("large.json");
         std::fs::write(&path, vec![b' '; DEFAULT_MAX_BYTES + 1]).unwrap();
