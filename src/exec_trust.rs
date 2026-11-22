@@ -86,20 +86,20 @@ pub(crate) fn find_trusted_or_well_known(name: &str, fallbacks: &[&str]) -> Opti
             .map(Path::to_path_buf)
     })
 }
-/// First PATH entry hosting a trusted, executable `name`.
+/// First PATH entry hosting a trusted, executable `name`. Trust policy stays
+/// here; the PATH walk, the empty-entry skip and the `.exe` suffix are shared.
+/// This lookup is deliberately unbounded: a trusted binary may sit past the
+/// diagnostics scan limit, and skipping entries would change what is accepted.
 pub(crate) fn find_trusted_on_path(name: &str) -> Option<PathBuf> {
     let path_env = std::env::var_os("PATH")?;
-    let extension = if cfg!(windows) { ".exe" } else { "" };
-    for directory in std::env::split_paths(&path_env) {
-        if directory.as_os_str().is_empty() {
-            continue;
-        }
-        let candidate = directory.join(format!("{name}{extension}"));
-        if crate::executable::is_executable(&candidate) && untrusted_reason(&candidate).is_none() {
-            return Some(candidate);
-        }
-    }
-    None
+    let names = crate::executable::candidate_names(name, crate::executable::NATIVE_ONLY);
+    crate::executable::find_in_dirs(
+        crate::executable::path_directories(&path_env, None, true),
+        &names,
+        |candidate| {
+            crate::executable::is_executable(candidate) && untrusted_reason(candidate).is_none()
+        },
+    )
 }
 
 #[cfg(test)]

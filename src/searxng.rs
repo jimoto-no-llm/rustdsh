@@ -434,13 +434,25 @@ fn probe(host: &str, port: u16, timeout: Duration) -> bool {
     false
 }
 
+/// Presence check only: a container runtime is reported when the name exists
+/// as a file, without the executable-bit probe a runtime spawn would need. The
+/// bare name is tried before the Windows suffix and the whole PATH is walked:
+/// doctor's answer should not depend on a scan bound.
 fn on_path(name: &str) -> bool {
     let Some(path) = std::env::var_os("PATH") else {
         return false;
     };
-    std::env::split_paths(&path).any(|dir| {
-        dir.join(name).is_file() || (cfg!(windows) && dir.join(format!("{name}.exe")).is_file())
-    })
+    #[cfg(windows)]
+    let extensions: &[&str] = &["", ".exe"];
+    #[cfg(not(windows))]
+    let extensions: &[&str] = &[""];
+    let names = crate::executable::candidate_names(name, extensions);
+    crate::executable::find_in_dirs(
+        crate::executable::path_directories(&path, None, false),
+        &names,
+        |candidate| candidate.is_file(),
+    )
+    .is_some()
 }
 
 #[cfg(test)]

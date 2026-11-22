@@ -1930,6 +1930,13 @@ fn note_env_dsh_home() {
     }
 }
 
+/// Deliberately NOT swapped for `executable::is_executable` (AT_EACCESS): this
+/// asks whether installing the provider CLI would put a usable command on PATH.
+/// The 0o111 test is a property of the file, so a binary that only its owner
+/// may run (a setuid-root or ACL-gated helper) still counts for a login attempt,
+/// while an effective-access check would reject it. Switching policies here
+/// would change which login helper the wizard offers, so the mode-bit rule and
+/// its own PATH split stay local.
 fn which_bin(bin: &str) -> bool {
     if bin.contains('/') || bin.contains('\\') {
         return false;

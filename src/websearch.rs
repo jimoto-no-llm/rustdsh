@@ -1038,7 +1038,7 @@ mod tests {
             nondet_nonce()
         ));
         std::fs::create_dir_all(&dir).unwrap();
-        let _env = EngineEnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("SEARXNG_URL", None),
             ("RUSTXNG_URL", None),
             ("RUSTXNG_PORT", None),
@@ -1069,7 +1069,7 @@ mod tests {
     #[test]
     fn auto_engine_prefers_searxng_url_then_rustxng_url() {
         let _lock = engine_env_lock();
-        let _env = EngineEnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("SEARXNG_URL", Some("http://127.0.0.1:9999/")),
             ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
         ]);
@@ -1090,7 +1090,7 @@ mod tests {
     #[test]
     fn explicit_searxng_never_spawns_rustxng() {
         let _lock = engine_env_lock();
-        let _env = EngineEnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
             ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
         ]);
@@ -1113,7 +1113,7 @@ mod tests {
     #[test]
     fn explicit_rustxng_uses_only_the_configured_or_local_engine() {
         let _lock = engine_env_lock();
-        let _env = EngineEnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
             ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
         ]);
@@ -1192,7 +1192,7 @@ mod tests {
             .and_then(|l| l.local_addr())
             .map(|a| a.port())
             .unwrap();
-        let _env = EngineEnvGuard::apply(&[(
+        let _env = crate::test_support::EnvGuard::apply(&[(
             "RUSTXNG_URL",
             Some(format!("http://127.0.0.1:{port}").as_str()),
         )]);
@@ -1206,36 +1206,6 @@ mod tests {
     /// Serialises the environment-touching resolution tests in this module.
     fn engine_env_lock() -> crate::test_support::EnvLock {
         crate::test_support::env_lock()
-    }
-
-    /// Sets variables for one test and restores them on drop.
-    struct EngineEnvGuard {
-        saved: Vec<(String, Option<String>)>,
-    }
-
-    impl EngineEnvGuard {
-        fn apply(pairs: &[(&str, Option<&str>)]) -> Self {
-            let mut saved = Vec::new();
-            for (name, value) in pairs {
-                saved.push(((*name).to_string(), std::env::var(name).ok()));
-                match value {
-                    Some(value) => std::env::set_var(name, value),
-                    None => std::env::remove_var(name),
-                }
-            }
-            Self { saved }
-        }
-    }
-
-    impl Drop for EngineEnvGuard {
-        fn drop(&mut self) {
-            for (name, value) in &self.saved {
-                match value {
-                    Some(value) => std::env::set_var(name, value),
-                    None => std::env::remove_var(name),
-                }
-            }
-        }
     }
 
     #[test]

@@ -30,6 +30,7 @@ mod cost_ledger;
 mod deps;
 mod desktop;
 mod desktop_webui;
+mod digest;
 mod distro;
 mod doctor;
 mod dsh_args;
@@ -44,6 +45,7 @@ mod harness_adapter;
 mod inspect;
 mod instruction_queue;
 mod js_json;
+mod json_input;
 mod local_http;
 mod locale;
 #[cfg(test)]

@@ -14,9 +14,9 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
-use std::io::{Read, Write};
+use std::io::Write;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -815,51 +815,26 @@ pub fn plan_subagents_with(
 /// Read one request file with the JS CLI's `localJson` rules: a regular file
 /// of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_request(input_file: &str, locale: crate::locale::Locale) -> Result<Value> {
-    let file = std::fs::File::open(input_file).with_context(|| {
-        localized_format!(
+    let context = localized_format!(
+        locale,
+        "cannot read input JSON {input_file}",
+        "无法读取输入 JSON {input_file}",
+        "入力JSON {input_file} を読み取れません"
+    );
+    let limits = crate::json_input::Limits::capped(
+        crate::json_input::DEFAULT_MAX_BYTES,
+        crate::locale::diagnostic(
             locale,
-            "cannot read input JSON {input_file}",
-            "无法读取输入 JSON {input_file}",
-            "入力JSON {input_file} を読み取れません"
-        )
-    })?;
-    let metadata = file.metadata().with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read input JSON {input_file}",
-            "无法读取输入 JSON {input_file}",
-            "入力JSON {input_file} を読み取れません"
-        )
-    })?;
-    if !metadata.is_file() || metadata.len() > 256 * 1024 {
-        bail!(crate::locale::diagnostic(
-            locale,
-            "Input JSON must be a regular file of at most 256 KiB"
-        )
-        .to_string());
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take(256 * 1024 + 1)
-        .read_to_end(&mut bytes)
-        .with_context(|| {
-            localized_format!(
-                locale,
-                "cannot read input JSON {input_file}",
-                "无法读取输入 JSON {input_file}",
-                "入力JSON {input_file} を読み取れません"
-            )
-        })?;
-    if bytes.len() > 256 * 1024 {
-        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB").to_string());
-    }
-    let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
-    };
-    // TextDecoder("utf-8") in the former dashboard CLI removed a leading BOM.
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| {
-        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
-    })
+            "Input JSON must be a regular file of at most 256 KiB",
+        ),
+        crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB"),
+    );
+    crate::json_input::read_value(
+        std::path::Path::new(input_file),
+        &context,
+        &limits,
+        crate::locale::diagnostic(locale, "Input JSON is invalid"),
+    )
 }
 
 /// Planner defaults from `$DSH_HOME/rdsh.json` (`subagents` section), with

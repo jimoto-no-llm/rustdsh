@@ -21,7 +21,6 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const PROBE_MAX_BYTES: u64 = 4096;
 /// Directory scans are bounded like doctor's PATH scan.
 const DIR_SCAN_MAX_ENTRIES: usize = 64;
-const PATH_SCAN_MAX_DIRS: usize = 64;
 /// A pnpm policy file is small; anything larger is not one we understand.
 const CONFIG_MAX_BYTES: u64 = 65536;
 
@@ -38,53 +37,28 @@ pub(crate) fn first_line(bytes: &[u8]) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Suffixes a shim directory uses for a tool, in probing order. Windows
+/// npm/pnpm shims are batch files rather than symlinks.
+#[cfg(windows)]
+const TOOL_SHIM_EXTENSIONS: &[&str] = &[".cmd", ".exe", ".bat", ".ps1", ""];
+#[cfg(not(windows))]
+const TOOL_SHIM_EXTENSIONS: &[&str] = &[""];
+
 /// Executable names a shim directory uses for a tool, in probing order.
-/// Windows npm/pnpm shims are batch files rather than symlinks.
 pub(crate) fn tool_file_names(tool: &str) -> Vec<String> {
-    #[cfg(windows)]
-    {
-        vec![
-            format!("{tool}.cmd"),
-            format!("{tool}.exe"),
-            format!("{tool}.bat"),
-            format!("{tool}.ps1"),
-            tool.to_string(),
-        ]
-    }
-    #[cfg(not(windows))]
-    {
-        vec![tool.to_string()]
-    }
+    crate::executable::candidate_names(tool, TOOL_SHIM_EXTENSIONS)
 }
 
 /// First executable tool on PATH, bounded. An empty PATH entry is skipped like
-/// the shell does; only execute-permitted files count.
+/// the shell does; only execute-permitted files count. The shim names
+/// (`tool.cmd`, `tool.ps1`, …) and the trust rule stay local: both are
+/// this lookup's own policy, not PATH mechanics.
 pub(crate) fn find_on_path(tool: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path).take(PATH_SCAN_MAX_DIRS) {
-        if dir.as_os_str().is_empty() {
-            continue;
-        }
-        for name in tool_file_names(tool) {
-            let candidate = dir.join(name);
-            if crate::executable::is_executable(&candidate)
-                && crate::exec_trust::untrusted_reason(&candidate).is_none()
-            {
-                return Some(candidate);
-            }
-        }
-    }
-    None
-}
-
-/// True when path is runnable as a delegated entrypoint: a plain JavaScript
-/// file only has to exist, anything else must be executable. Kept in step with
-/// passthrough's rule for the original binary.
-fn runnable_entry(path: &Path) -> bool {
-    if path.extension().is_some_and(|ext| ext == "js") {
-        return path.is_file();
-    }
-    crate::executable::is_executable(path)
+    crate::executable::find_on_path(&path, tool, TOOL_SHIM_EXTENSIONS, |candidate| {
+        crate::executable::is_executable(candidate)
+            && crate::exec_trust::untrusted_reason(candidate).is_none()
+    })
 }
 
 fn is_same_file(candidate: &Path, me: Option<&Path>) -> bool {
@@ -388,7 +362,7 @@ pub(crate) fn find_tool_fallback(tool: &str, me: Option<&Path>) -> Option<String
         ));
     }
     for candidate in candidates {
-        if !runnable_entry(&candidate) || is_same_file(&candidate, me) {
+        if !crate::executable::is_runnable_entry(&candidate) || is_same_file(&candidate, me) {
             continue;
         }
         return Some(candidate.to_string_lossy().into_owned());

@@ -61,7 +61,12 @@ fn bounds_reads_when_input_grows_after_metadata() {
         }
     }
     let mut reader = GrowingInput { read: 0 };
-    let error = read_json_from::<serde_json::Value>(&mut reader, 0).unwrap_err();
+    let limits = crate::json_input::Limits::capped(
+        LIMIT as usize,
+        "Input JSON must be a regular file of at most 128 MiB",
+        "Input JSON exceeds 128 MiB",
+    );
+    let error = crate::json_input::read_bounded(&mut reader, 0, &limits, None).unwrap_err();
     assert_eq!(error.to_string(), "Input JSON exceeds 128 MiB");
     assert_eq!(reader.read, LIMIT as usize + 1);
 }

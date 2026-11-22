@@ -32,8 +32,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::UNIX_EPOCH;
 
-use sha2::{Digest, Sha256};
-
 /// Feature id gating the whole cache (`features.web_assets` in rdsh.json).
 pub const FEATURE_ID: &str = "web_assets";
 
@@ -210,16 +208,7 @@ fn fingerprint(files: &[SourceFile], brotli_quality: i32, gzip_level: u32) -> St
         input.extend_from_slice(file.mtime_ns.to_string().as_bytes());
         input.push(LF);
     }
-    hex_prefix(&Sha256::digest(&input), FINGERPRINT_HEX_CHARS)
-}
-
-/// Lowercase hex of the leading bytes of a digest.
-fn hex_prefix(digest: &[u8], hex_chars: usize) -> String {
-    digest
-        .iter()
-        .take(hex_chars / 2)
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    crate::digest::hex_prefix(&input, FINGERPRINT_HEX_CHARS)
 }
 
 /// Text assets are worth compressing; pre-compressed binaries are not.
@@ -292,8 +281,7 @@ fn build(source: &Path, files: &[SourceFile], cache_dir: &Path) -> Option<()> {
 /// Compress one asset and write its .br and .gz products.
 fn process_job(job: &Job, cache_dir: &Path) -> Option<(String, AssetEntry)> {
     let bytes = fs::read(&job.abs_path).ok()?;
-    let digest = Sha256::digest(&bytes);
-    let hex = hex_prefix(&digest, ETAG_HEX_CHARS);
+    let hex = crate::digest::hex_prefix(&bytes, ETAG_HEX_CHARS);
     let quote = '"';
     let etag = format!("{quote}{hex}{quote}");
     let (br, gzip) = if job.compressible && !bytes.is_empty() {
@@ -447,7 +435,7 @@ mod tests {
 
     fn etag_for(bytes: &[u8]) -> String {
         let quote = '"';
-        let hex = hex_prefix(&Sha256::digest(bytes), ETAG_HEX_CHARS);
+        let hex = crate::digest::hex_prefix(bytes, ETAG_HEX_CHARS);
         format!("{quote}{hex}{quote}")
     }
 
@@ -523,7 +511,7 @@ mod tests {
             expected.extend_from_slice(mtime_ns.to_string().as_bytes());
             expected.push(LF);
         }
-        let expected = hex_prefix(&Sha256::digest(&expected), FINGERPRINT_HEX_CHARS);
+        let expected = crate::digest::hex_prefix(&expected, FINGERPRINT_HEX_CHARS);
         assert_eq!(expected.len(), FINGERPRINT_HEX_CHARS);
         assert_eq!(fingerprint(&files, BROTLI_QUALITY, GZIP_LEVEL), expected);
     }

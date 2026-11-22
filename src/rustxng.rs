@@ -151,11 +151,14 @@ fn binary_with(
     }
     let name = exe_name(BIN_NAME);
     if let Some(path) = path {
-        for dir in std::env::split_paths(path) {
-            let candidate = dir.join(&name);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
+        // A plain file is enough here, so `binary()` can still report a
+        // non-executable install and let the caller explain it.
+        if let Some(candidate) = crate::executable::find_in_dirs(
+            crate::executable::path_directories(path, None, false),
+            std::slice::from_ref(&name),
+            |candidate| candidate.is_file(),
+        ) {
+            return Some(candidate);
         }
     }
     for dir in fallback_dirs(home) {
@@ -1243,37 +1246,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// Set or clear environment variables for one test, restoring every value
-    /// afterwards even when an assertion unwinds the stack.
-    struct EnvGuard {
-        saved: Vec<(String, Option<String>)>,
-    }
-
-    impl EnvGuard {
-        fn apply(pairs: &[(&str, Option<&str>)]) -> Self {
-            let mut saved = Vec::new();
-            for (name, value) in pairs {
-                saved.push(((*name).to_string(), std::env::var(name).ok()));
-                match value {
-                    Some(value) => std::env::set_var(name, value),
-                    None => std::env::remove_var(name),
-                }
-            }
-            Self { saved }
-        }
-    }
-
-    impl Drop for EnvGuard {
-        fn drop(&mut self) {
-            for (name, value) in &self.saved {
-                match value {
-                    Some(value) => std::env::set_var(name, value),
-                    None => std::env::remove_var(name),
-                }
-            }
-        }
-    }
-
     struct KillOnDrop(std::process::Child);
 
     impl Drop for KillOnDrop {
@@ -1580,7 +1552,7 @@ pub(crate) mod tests {
         std::fs::create_dir_all(&home).unwrap();
         let state = home.join("rustxng.port");
         write_state(&state, port, Some(999_999)).unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_BIN", None),
             ("RUSTXNG_URL", None),
@@ -1605,7 +1577,7 @@ pub(crate) mod tests {
         let occupied_port = occupied.local_addr().unwrap().port();
         let recorded = free_port().unwrap();
         write_state(&home.join("rustxng.port"), recorded, Some(4242)).unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_URL", None),
             ("RUSTXNG_PORT", Some(occupied_port.to_string().as_str())),
@@ -1620,7 +1592,7 @@ pub(crate) mod tests {
         let dir = test_dir("base-url-none");
         let home = dir.join("home");
         std::fs::create_dir_all(&home).unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_URL", None),
             ("RUSTXNG_PORT", None),
@@ -1638,7 +1610,7 @@ pub(crate) mod tests {
         let home = dir.join("home");
         std::fs::create_dir_all(&home).unwrap();
         let dead = free_port().unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_BIN", Some("/nonexistent/rdsh-test-rustxng")),
             ("RUSTXNG_URL", Some(base.as_str())),
@@ -1659,7 +1631,7 @@ pub(crate) mod tests {
         let dir = test_dir("ensure-missing");
         let home = dir.join("home");
         std::fs::create_dir_all(&home).unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_BIN", None),
             ("RUSTXNG_URL", None),
@@ -1690,7 +1662,7 @@ pub(crate) mod tests {
         // has to be named exactly like the real binary.
         let program = dir.join(exe_name(BIN_NAME));
         std::fs::copy(stub_program(), &program).unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(home.to_string_lossy().as_ref())),
             ("RUSTXNG_BIN", Some(program.to_string_lossy().as_ref())),
             ("RUSTXNG_URL", None),
@@ -1730,7 +1702,7 @@ pub(crate) mod tests {
         let dir = test_dir("config");
         let config = dir.join("settings.yml");
         std::fs::write(&config, "search: {}\n").unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("RUSTXNG_SETTINGS", None),
             ("RUSTXNG_PROFILE", None),
             ("DSH_HOME", Some(dir.to_string_lossy().as_ref())),
@@ -1801,7 +1773,7 @@ pub(crate) mod tests {
             r#"{"search":{"rustxng_profile":"full"}}"#,
         )
         .unwrap();
-        let _env = EnvGuard::apply(&[
+        let _env = crate::test_support::EnvGuard::apply(&[
             ("DSH_HOME", Some(dir.to_string_lossy().as_ref())),
             ("RUSTXNG_PROFILE", None),
             ("RUSTXNG_SETTINGS", None),

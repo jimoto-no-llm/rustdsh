@@ -6,6 +6,8 @@
 //! `--share-file`, or `RDSH_SECURITY=1`. Unknown runtimes and unsupported
 //! hosts are still refused when the boundary is active.
 use anyhow::Context;
+
+use crate::digest::sha256_hex;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -247,15 +249,6 @@ fn read_tools_manifest(
     };
     let bytes = std::fs::read(path).with_context(|| message)?;
     serde_json::from_slice(&bytes).with_context(|| message)
-}
-
-/// Lowercase hex SHA256 of a byte slice.
-fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::Digest as _;
-    sha2::Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
 
 /// The audited pair is matched by manifest alone unless the entry file that

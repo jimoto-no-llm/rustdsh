@@ -25,7 +25,7 @@
 //! `tests/task_outcomes_cli.rs` pins the same JSON the JS module produced.
 
 use std::collections::HashSet;
-use std::io::{Read, Write};
+use std::io::Write;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
@@ -546,75 +546,26 @@ pub fn milestone_schema() -> Value {
 /// Read one JSON file with the dashboard CLI's `localJson` rules: a regular
 /// file of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_json(input_file: &str, locale: crate::locale::Locale) -> Result<Value> {
-    let file = open_json_input(input_file).with_context(|| {
-        localized_format!(
+    let context = localized_format!(
+        locale,
+        "cannot read JSON {input_file}",
+        "无法读取 JSON {input_file}",
+        "JSON {input_file} を読み取れません"
+    );
+    let limits = crate::json_input::Limits::capped(
+        crate::json_input::DEFAULT_MAX_BYTES,
+        crate::locale::diagnostic(
             locale,
-            "cannot read JSON {input_file}",
-            "无法读取 JSON {input_file}",
-            "JSON {input_file} を読み取れません"
-        )
-    })?;
-    read_json_file(file, input_file, locale)
-}
-
-fn read_json_file(
-    file: std::fs::File,
-    input_file: &str,
-    locale: crate::locale::Locale,
-) -> Result<Value> {
-    const MAX_INPUT_BYTES: usize = 256 * 1024;
-    let metadata = file.metadata().with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read JSON {input_file}",
-            "无法读取 JSON {input_file}",
-            "JSON {input_file} を読み取れません"
-        )
-    })?;
-    if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!(crate::locale::diagnostic(
-            locale,
-            "Input JSON must be a regular file of at most 256 KiB"
-        )
-        .to_string());
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_INPUT_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .with_context(|| {
-            localized_format!(
-                locale,
-                "cannot read JSON {input_file}",
-                "无法读取 JSON {input_file}",
-                "JSON {input_file} を読み取れません"
-            )
-        })?;
-    if bytes.len() > MAX_INPUT_BYTES {
-        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB").to_string());
-    }
-    let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
-    };
-    // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| {
-        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
-    })
-}
-
-#[cfg(unix)]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-
-    std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
-        .open(input_file)
-}
-
-#[cfg(not(unix))]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    std::fs::File::open(input_file)
+            "Input JSON must be a regular file of at most 256 KiB",
+        ),
+        crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB"),
+    );
+    crate::json_input::read_value(
+        std::path::Path::new(input_file),
+        &context,
+        &limits,
+        crate::locale::diagnostic(locale, "Input JSON is invalid"),
+    )
 }
 
 /// `rdsh task-outcomes <apply|validate|schema> --input-file <json>`.
@@ -761,12 +712,21 @@ mod tests {
         let path = root.join("input.json");
         let original = r#"{"operation":"schema","state":{"schema":1,"tasks":[]}}"#;
         std::fs::write(&path, original).unwrap();
-        let file = open_json_input(path.to_str().unwrap()).unwrap();
+        let file = crate::json_input::open_input(&path).unwrap();
         std::fs::rename(&path, root.join("opened.json")).unwrap();
         std::fs::write(&path, "not the validated input").unwrap();
 
-        let parsed =
-            read_json_file(file, path.to_str().unwrap(), crate::locale::Locale::English).unwrap();
+        let parsed = crate::json_input::read_value_from(
+            file,
+            "cannot read JSON",
+            &crate::json_input::Limits::capped(
+                crate::json_input::DEFAULT_MAX_BYTES,
+                "Input JSON must be a regular file of at most 256 KiB",
+                "Input JSON exceeds 256 KiB",
+            ),
+            "Input JSON is invalid",
+        )
+        .unwrap();
         assert_eq!(parsed["operation"], "schema");
         assert_eq!(parsed["state"]["tasks"], json!([]));
         std::fs::remove_dir_all(root).unwrap();

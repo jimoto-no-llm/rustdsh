@@ -260,21 +260,15 @@ fn is_desktop_runtime_path(path: &Path) -> bool {
 /// "Manage dsh Command..." can put exactly that command on PATH even when the
 /// application lives outside the standard location.
 fn scan_paths(dirs: impl Iterator<Item = PathBuf>) -> Option<PathBuf> {
-    for dir in dirs {
-        for name in ["dsh", "dsh.cmd", "dsh.exe"] {
-            let candidate = dir.join(name);
-            if !candidate.is_file() {
-                continue;
-            }
-            let Ok(resolved) = std::fs::canonicalize(&candidate) else {
-                continue;
-            };
-            if is_desktop_runtime_path(&resolved) {
-                return Some(absolute(&candidate));
-            }
-        }
-    }
-    None
+    // Only the in-app runtime counts, so the accept closure narrows the shared
+    // walk to a canonicalized path and the caller gets the unresolved one.
+    let names = ["dsh", "dsh.cmd", "dsh.exe"];
+    crate::executable::find_in_dirs(dirs, &names.map(str::to_string), |candidate| {
+        candidate.is_file()
+            && std::fs::canonicalize(candidate)
+                .is_ok_and(|resolved| is_desktop_runtime_path(&resolved))
+    })
+    .map(|candidate| absolute(&candidate))
 }
 
 fn desktop_command_on_path() -> Option<PathBuf> {

@@ -1,10 +1,9 @@
 //! Native validation, projections, and state transitions for Dashboard instruction queues.
 use std::collections::BTreeSet;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufWriter, Write};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 
 const MAX_JSON_BYTES: usize = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: usize = MAX_JSON_BYTES - 1024 * 1024;
@@ -304,8 +303,7 @@ fn input_sequence(command: &Value) -> Option<i64> {
 }
 
 fn sha256_text(value: &str) -> String {
-    let digest = Sha256::digest(value.as_bytes());
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    crate::digest::sha256_hex(value.as_bytes())
 }
 
 fn js_json_value(value: &Value) -> Value {
@@ -1611,70 +1609,25 @@ fn instruction_context(state: &Value, consumer_id: &str) -> Result<Value> {
 }
 
 fn read_json(input_file: &str, locale: crate::locale::Locale) -> Result<Value> {
-    let file = open_json_input(input_file).with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    let metadata = file.metadata().with_context(|| {
-        localized_format!(
-            locale,
-            "cannot read JSON {}",
-            "无法读取 JSON {}",
-            "JSONを読み取れません {}",
-            input_file
-        )
-    })?;
-    if !metadata.is_file() {
-        bail!(crate::locale::diagnostic(locale, "Input JSON must be a regular file").to_string());
-    }
-    let mut reader = BufReader::new(file);
-    let starts_with_bom = reader
-        .fill_buf()
-        .with_context(|| {
-            localized_format!(
-                locale,
-                "cannot read JSON {}",
-                "无法读取 JSON {}",
-                "JSONを読み取れません {}",
-                input_file
-            )
-        })?
-        .starts_with(b"\xef\xbb\xbf");
-    if starts_with_bom {
-        reader.consume(3);
-    }
-    serde_json::from_reader(reader).map_err(|error| {
-        if error.is_io() {
-            anyhow!(localized_format!(
-                locale,
-                "cannot read JSON {}",
-                "无法读取 JSON {}",
-                "JSONを読み取れません {}",
-                input_file
-            ))
-        } else {
-            anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
-        }
-    })
-}
-
-#[cfg(unix)]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
-        .open(input_file)
-}
-
-#[cfg(not(unix))]
-fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
-    std::fs::File::open(input_file)
+    let context = localized_format!(
+        locale,
+        "cannot read JSON {}",
+        "无法读取 JSON {}",
+        "JSONを読み取れません {}",
+        input_file
+    );
+    // The queue CLI accepts documents of any length; only the file type is
+    // checked before the bounded read.
+    let limits = crate::json_input::Limits::regular_file_only(crate::locale::diagnostic(
+        locale,
+        "Input JSON must be a regular file",
+    ));
+    crate::json_input::read_value(
+        std::path::Path::new(input_file),
+        &context,
+        &limits,
+        crate::locale::diagnostic(locale, "Input JSON is invalid"),
+    )
 }
 
 fn run_instruction_queue(action: &str, document: &Value) -> Result<Value> {
