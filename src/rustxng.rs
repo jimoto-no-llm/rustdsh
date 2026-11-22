@@ -151,11 +151,14 @@ fn binary_with(
     }
     let name = exe_name(BIN_NAME);
     if let Some(path) = path {
-        for dir in std::env::split_paths(path) {
-            let candidate = dir.join(&name);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
+        // A plain file is enough here, so `binary()` can still report a
+        // non-executable install and let the caller explain it.
+        if let Some(candidate) = crate::executable::find_in_dirs(
+            crate::executable::path_directories(path, None, false),
+            std::slice::from_ref(&name),
+            |candidate| candidate.is_file(),
+        ) {
+            return Some(candidate);
         }
     }
     for dir in fallback_dirs(home) {

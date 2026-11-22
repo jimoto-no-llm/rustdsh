@@ -3988,7 +3988,6 @@ const WRAPPER_DIR_MAX_ENTRIES: usize = 256;
 const WRAPPER_TEXT_MAX_BYTES: u64 = 65536;
 const WRAPPER_TEXT_MAX_FILES: usize = 64;
 const WRAPPER_WARN_MAX: usize = 10;
-const PATH_SCAN_MAX_DIRS: usize = 64;
 
 /// Wrapper dir used by the installers: ~/.local/bin on Unix and
 /// %LOCALAPPDATA%\rdsh\bin on Windows. PATH is not scanned: a checkout
@@ -4047,7 +4046,7 @@ fn scan_local_wrappers(dir: &std::path::Path) -> WrapperScan {
         #[cfg(unix)]
         if name.contains("dsh")
             && (text.starts_with("#!") || text.contains("exec "))
-            && !is_executable_file(&path)
+            && !executable::is_executable(&path)
         {
             scan.non_executable.push(name.clone());
         }
@@ -4268,48 +4267,6 @@ fn referenced_binary_paths(text: &str) -> Vec<String> {
     out
 }
 
-/// Read-only executable probe matching passthrough's is_executable_candidate:
-/// mode bits owned by another permission class must not count.
-fn is_executable_file(path: &std::path::Path) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
-        return false;
-    };
-    if !metadata.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::ffi::CString;
-        use std::os::unix::ffi::OsStrExt;
-        let Ok(c_path) = CString::new(path.as_os_str().as_bytes()) else {
-            return false;
-        };
-        // SAFETY: c_path is NUL-terminated and AT_FDCWD keeps this read-only.
-        unsafe {
-            libc::faccessat(
-                libc::AT_FDCWD,
-                c_path.as_ptr(),
-                libc::X_OK,
-                libc::AT_EACCESS,
-            ) == 0
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
-
-/// A .js entrypoint only has to exist (Node runs it); anything else must be
-/// executable. Mirrors passthrough's runnable-original rule.
-fn usable_original(path: &std::path::Path) -> bool {
-    if path.extension().is_some_and(|ext| ext == "js") {
-        path.is_file()
-    } else {
-        is_executable_file(path)
-    }
-}
-
 /// First executable name on PATH, bounded by PATH_SCAN_MAX_DIRS. An absolute
 /// name is checked directly, so a shebang like #!/bin/sh works too.
 fn command_on_path(name: &str) -> Option<std::path::PathBuf> {
@@ -4323,50 +4280,68 @@ fn command_on_path_in(name: &str, path_var: &std::ffi::OsStr) -> Option<std::pat
     let path = std::path::Path::new(name);
     let has_separator = name.contains('/') || (cfg!(windows) && name.contains('\\'));
     if path.is_absolute() || has_separator {
-        if is_executable_file(path) {
-            return Some(path.to_path_buf());
-        }
+        // A name that already carries a path is taken literally, then given the
+        // Windows suffix as a last try when it has none.
         #[cfg(windows)]
-        if path.extension().is_none() {
-            let with_exe = path.with_extension("exe");
-            if is_executable_file(&with_exe) {
-                return Some(with_exe);
-            }
-        }
-        return None;
+        let extensions: &[&str] = if path.extension().is_none() {
+            &["", ".exe"]
+        } else {
+            &[""]
+        };
+        #[cfg(not(windows))]
+        let extensions: &[&str] = &[""];
+        let names = executable::candidate_names(name, extensions);
+        return executable::find_in_dirs(
+            std::iter::once(std::path::PathBuf::new()),
+            &names,
+            executable::is_executable,
+        );
     }
 
+    // Only the platform suffix is appended here, matching Command::new's
+    // documented search order rather than a full PATHEXT sweep.
     #[cfg(windows)]
-    let executable_name = if path.extension().is_none() {
-        format!("{name}.exe")
+    let extensions: &[&str] = if path.extension().is_some() {
+        &[""]
     } else {
-        name.to_string()
+        &[".exe"]
     };
     #[cfg(not(windows))]
-    let executable_name = name.to_string();
+    let extensions: &[&str] = &[""];
 
-    let directories: Vec<std::path::PathBuf> = std::env::split_paths(path_var)
-        .take(PATH_SCAN_MAX_DIRS)
-        .collect();
-    #[cfg(windows)]
-    let directories = {
-        let mut directories = directories;
-        if let Ok(executable) = std::env::current_exe() {
-            if let Some(parent) = executable.parent() {
-                directories.push(parent.to_path_buf());
-            }
+    let names = executable::candidate_names(name, extensions);
+    executable::find_in_dirs(
+        command_search_dirs(path_var),
+        &names,
+        executable::is_executable,
+    )
+}
+
+/// `Command::new` falls back to the directory of the running executable and to
+/// System32 on Windows. Those extras stay here: they are a Windows resolution
+/// rule, not a PATH rule, and only this probe claims to mirror `Command::new`.
+#[cfg(windows)]
+fn command_search_dirs(path_var: &std::ffi::OsStr) -> Vec<std::path::PathBuf> {
+    let limit = Some(executable::PATH_SCAN_MAX_DIRS);
+    let mut directories: Vec<std::path::PathBuf> =
+        executable::path_directories(path_var, limit, false).collect();
+    if let Ok(current) = std::env::current_exe() {
+        if let Some(parent) = current.parent() {
+            directories.push(parent.to_path_buf());
         }
-        if let Some(root) = std::env::var_os("SystemRoot").map(std::path::PathBuf::from) {
-            directories.push(root.join("System32"));
-            directories.push(root);
-        }
-        directories
-    };
+    }
+    if let Some(root) = std::env::var_os("SystemRoot").map(std::path::PathBuf::from) {
+        directories.push(root.join("System32"));
+        directories.push(root);
+    }
+    // The probe budget covers the appended extras too, as it always has.
+    directories.truncate(executable::PATH_SCAN_MAX_DIRS);
     directories
-        .into_iter()
-        .take(PATH_SCAN_MAX_DIRS)
-        .map(|directory| directory.join(&executable_name))
-        .find(|candidate| is_executable_file(candidate))
+}
+
+#[cfg(not(windows))]
+fn command_search_dirs(path_var: &std::ffi::OsStr) -> Vec<std::path::PathBuf> {
+    executable::path_directories(path_var, Some(executable::PATH_SCAN_MAX_DIRS), false).collect()
 }
 
 /// Why one wrapper in the local bin dir cannot run, if the scan can tell. Only
@@ -4388,7 +4363,7 @@ fn broken_wrapper_reason(
     }
     for p in referenced_binary_paths(text) {
         let path = std::path::Path::new(&p);
-        if usable_original(path) {
+        if executable::is_runnable_entry(path) {
             continue;
         }
         let why = if path.exists() {
@@ -4495,20 +4470,14 @@ fn shadow_warnings(shadowed: bool, orig: Option<&str>, locale: locale::Locale) -
 /// PATH entries holding an executable base name (dsh/rdsh), in resolution
 /// order, deduplicated by canonical path and bounded by PATH_SCAN_MAX_DIRS.
 fn path_binary_hits_in(path_var: &std::ffi::OsStr, base: &str) -> Vec<std::path::PathBuf> {
-    #[cfg(windows)]
-    let names = [format!("{base}.exe"), base.to_string()];
-    #[cfg(not(windows))]
-    let names = [base.to_string()];
+    let names = executable::candidate_names(base, executable::EXE_THEN_BARE);
 
     let mut hits: Vec<std::path::PathBuf> = Vec::new();
     let mut seen: Vec<std::path::PathBuf> = Vec::new();
-    for dir in std::env::split_paths(path_var).take(PATH_SCAN_MAX_DIRS) {
-        if dir.as_os_str().is_empty() {
-            continue;
-        }
+    for dir in executable::path_directories(path_var, Some(executable::PATH_SCAN_MAX_DIRS), true) {
         for name in &names {
             let candidate = dir.join(name);
-            if !is_executable_file(&candidate) {
+            if !executable::is_executable(&candidate) {
                 continue;
             }
             let key = std::fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
@@ -4581,7 +4550,7 @@ fn original_override_warnings(locale: locale::Locale) -> Vec<String> {
         let node_entrypoint = path.extension().is_some_and(|ext| ext == "js");
         let explicit_path = value.contains('/') || (cfg!(windows) && value.contains('\\'));
         let usable = if node_entrypoint || explicit_path {
-            usable_original(path)
+            executable::is_runnable_entry(path)
         } else {
             command_on_path_in(&value, &path_var).is_some()
         };
@@ -4622,7 +4591,7 @@ fn origin_ledger_warnings_in(
             ledger.display()
         )];
     }
-    if !usable_original(path) {
+    if !executable::is_runnable_entry(path) {
         return vec![localized_format!(locale, "[rdsh] warn: install ledger {} records {recorded}, which is not executable; passthrough ignores it", "[rdsh] 警告：安装记录 {} 中的 {recorded} 不可执行；passthrough 将忽略它", "[rdsh] 警告: インストール記録 {} の {recorded} に実行権限がありません。passthroughは使用しません",
             ledger.display()
         )];
@@ -4662,7 +4631,7 @@ fn shadow_backup_warnings(
     let mut unrunnable: Option<std::path::PathBuf> = None;
     for name in BACKUPS {
         let candidate = dir.join(name);
-        if is_executable_file(&candidate) {
+        if executable::is_executable(&candidate) {
             return Vec::new();
         }
         if unrunnable.is_none() && candidate.exists() {
@@ -4707,17 +4676,15 @@ fn path_executable(path: &std::ffi::OsStr, name: &str) -> Option<std::path::Path
         .chain(std::iter::once(name.to_string()))
         .collect();
     #[cfg(not(windows))]
-    let names = [name];
+    let names = vec![name.to_string()];
 
-    for dir in std::env::split_paths(path) {
-        for candidate_name in &names {
-            let candidate = dir.join(candidate_name);
-            if executable::is_executable(&candidate) {
-                return Some(candidate);
-            }
-        }
-    }
-    None
+    // Unbounded on purpose: this asks which file a shell would actually run,
+    // so a diagnostic scan limit must not change the answer.
+    executable::find_in_dirs(
+        executable::path_directories(path, None, false),
+        &names,
+        executable::is_executable,
+    )
 }
 
 fn bench(n: u32, locale: locale::Locale) -> anyhow::Result<()> {

@@ -55,12 +55,10 @@ fn warn_if_risky_origin(path: &str, via: &str) {
 #[cfg(not(unix))]
 fn warn_if_risky_origin(_path: &str, _via: &str) {}
 /// True when `path` is runnable as the original DSH: an executable binary,
-/// or a `.js` entry launched via Node (regular file suffices there).
+/// or a `.js` entry launched via Node (regular file suffices there). The same
+/// rule serves doctor and dsh_env, so it lives in `executable`.
 fn is_runnable_original(path: &std::path::Path) -> bool {
-    if path.extension().is_some_and(|e| e == "js") {
-        return path.is_file();
-    }
-    is_executable_candidate(path)
+    crate::executable::is_runnable_entry(path)
 }
 
 /// True when the delegated entrypoint is a Node script, which must run through
@@ -120,6 +118,18 @@ fn shebang_line(path: &std::path::Path) -> Option<Vec<u8>> {
     Some(head[..end].to_vec())
 }
 
+/// True when `candidate` resolves to the running binary, which must never be
+/// taken for the original dsh. An unresolved candidate is not ourselves.
+fn is_current_binary(candidate: &std::path::Path, me: Option<&std::path::Path>) -> bool {
+    let Some(me) = me else {
+        return false;
+    };
+    match (std::fs::canonicalize(candidate), std::fs::canonicalize(me)) {
+        (Ok(candidate), Ok(me)) => candidate == me,
+        _ => false,
+    }
+}
+
 /// Locate the original Node-based dsh (never ourselves).
 pub fn find_original_dsh() -> Option<String> {
     // Canonical name first, legacy DSH_ORIG_BIN kept as fallback.
@@ -150,28 +160,20 @@ pub fn find_original_dsh() -> Option<String> {
             }
         }
     }
+    // `var`, not `var_os`: a non-UTF-8 PATH was skipped here before and this
+    // lookup must keep resolving exactly the same dsh.
     if let Ok(path) = std::env::var("PATH") {
-        // split_paths handles : on unix and ; on Windows.
-        for dir in std::env::split_paths(&path) {
-            #[cfg(target_os = "windows")]
-            let names = ["dsh.exe", "dsh"];
-            #[cfg(not(target_os = "windows"))]
-            let names = ["dsh"];
-            for n in names {
-                let cand = dir.join(n);
-                if !is_executable_candidate(&cand) {
-                    continue;
-                }
-                let mut skip = false;
-                if let (Some(m), Ok(c)) = (&me, std::fs::canonicalize(&cand)) {
-                    if let Ok(m) = std::fs::canonicalize(m) {
-                        skip = m == c;
-                    }
-                }
-                if !skip {
-                    return Some(cand.to_string_lossy().into_owned());
-                }
-            }
+        // "Never ourselves" is this lookup's rule, so the skip lives in the
+        // accept closure and the walk stays shared. The walk is unbounded and
+        // keeps empty components: an empty PATH entry means the working
+        // directory, and stopping early would change which dsh is delegated to.
+        let names = crate::executable::candidate_names("dsh", crate::executable::EXE_THEN_BARE);
+        if let Some(found) = crate::executable::find_in_dirs(
+            crate::executable::path_directories(std::ffi::OsStr::new(&path), None, false),
+            &names,
+            |cand| is_executable_candidate(cand) && !is_current_binary(cand, me.as_deref()),
+        ) {
+            return Some(found.to_string_lossy().into_owned());
         }
     }
     if let Some(home) = crate::inspect::home_dir() {
@@ -297,13 +299,14 @@ pub fn find_node_bin() -> Option<String> {
     #[cfg(not(target_os = "windows"))]
     const NAMES: &[&str] = &["node"];
     if let Ok(path) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&path) {
-            for n in NAMES {
-                let cand = dir.join(n);
-                if is_executable_candidate(&cand) {
-                    return Some(cand.to_string_lossy().into_owned());
-                }
-            }
+        // Whole PATH, empty components included, like the original scan.
+        let names: Vec<String> = NAMES.iter().map(|name| name.to_string()).collect();
+        if let Some(cand) = crate::executable::find_in_dirs(
+            crate::executable::path_directories(std::ffi::OsStr::new(&path), None, false),
+            &names,
+            is_executable_candidate,
+        ) {
+            return Some(cand.to_string_lossy().into_owned());
         }
     }
     if let Some(tree) = latest_node_tree() {

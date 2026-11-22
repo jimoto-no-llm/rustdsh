@@ -112,7 +112,8 @@ pub fn start_chat(kind: &str) -> anyhow::Result<()> {
 }
 
 /// First match on PATH, as a full path: a new shell must not resolve a bare
-/// name against its working directory first (CWE-427).
+/// name against its working directory first (CWE-427). The absolute-directory
+/// filter is this helper's own rule, so the shared walk is filtered here.
 fn resolve_on_path(bin: &str) -> Option<PathBuf> {
     if bin.contains('/') || bin.contains('\\') {
         return None;
@@ -122,14 +123,12 @@ fn resolve_on_path(bin: &str) -> Option<PathBuf> {
     #[cfg(not(windows))]
     const EXTENSIONS: &[&str] = &[""];
     let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .filter(|dir| dir.is_absolute())
-        .flat_map(|dir| {
-            EXTENSIONS
-                .iter()
-                .map(move |ext| dir.join(format!("{bin}{ext}")))
-        })
-        .find(|candidate| crate::executable::is_executable(candidate))
+    let names = crate::executable::candidate_names(bin, EXTENSIONS);
+    crate::executable::find_in_dirs(
+        crate::executable::path_directories(&path, None, true).filter(|dir| dir.is_absolute()),
+        &names,
+        crate::executable::is_executable,
+    )
 }
 
 fn terminal_available() -> bool {

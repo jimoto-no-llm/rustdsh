@@ -58,7 +58,15 @@ fn executable_on_path(name: &str, path: Option<&OsStr>) -> bool {
     let Some(path) = path else {
         return false;
     };
-    std::env::split_paths(path).any(|dir| crate::executable::is_executable(&dir.join(name)))
+    // The tool names are literal (`zstd`, `bwrap`, `bubblewrap`); the injected
+    // PATH is walked in full, without the diagnostics bound or the empty-entry
+    // skip, because this is a lookup the caller supplied directories for.
+    crate::executable::find_in_dirs(
+        crate::executable::path_directories(path, None, false),
+        &[name.to_string()],
+        crate::executable::is_executable,
+    )
+    .is_some()
 }
 
 /// Optional tools this host is missing, as (package, feature) pairs.
