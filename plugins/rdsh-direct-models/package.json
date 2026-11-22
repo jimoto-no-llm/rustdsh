@@ -7,7 +7,7 @@
     "test:hermetic": "node --test agy-sdk.test.mjs cursor-sdk.test.mjs claude-cli.test.mjs claude-catalog.test.mjs devin-tool.test.mjs json-turn.test.mjs"
   },
   "dependencies": {
-    "@cursor/sdk": "1.4.1",
+    "@cursor/sdk": "1.4.2",
     "ajv": "^8.17.1"
   },
   "version": "0.1.0",
