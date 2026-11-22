@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-// Audited published @deepseek-ai/dsh-llm 0.2.0-rc.2. Transform only in memory.
+// Audited published @deepseek-ai/dsh-llm 0.2.2-rc.5. Transform only in memory.
 export const modelRuntimeHash =
-  "9132c8a8053ee82b9fb1ded4f98c85cf557f288a15a85c552c6b1fb319ead120";
+  "1ed664800193b1ee9906fdb6fb79971a5a2817c20b939d151bc0ec596c5827d2";
 export const modelBoundaryKey = "rdsh.model-dispatch-boundary.v1";
 export const modelSourceHash = (bytes) =>
   createHash("sha256").update(bytes).digest("hex");

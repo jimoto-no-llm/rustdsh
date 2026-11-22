@@ -1,5 +1,5 @@
 {
-  "cli_version": "0.2.0-rc.2",
+  "cli_version": "0.2.2-rc.5",
   "protocol_version": 1,
   "initialize": {
     "protocolVersion": 1,

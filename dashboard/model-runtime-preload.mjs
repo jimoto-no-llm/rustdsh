@@ -60,7 +60,7 @@ registerHooks({
         "utf8",
       ),
     );
-    if (pkg.name !== "@deepseek-ai/dsh-llm" || pkg.version !== "0.2.0-rc.2")
+    if (pkg.name !== "@deepseek-ai/dsh-llm" || pkg.version !== "0.2.2-rc.5")
       throw new Error("Native model guard: unsupported LLM runtime");
     const source =
       typeof loaded.source === "string"

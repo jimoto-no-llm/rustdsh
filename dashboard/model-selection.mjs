@@ -143,7 +143,7 @@ export function requestedSelection(
   };
 }
 
-// DSH 0.2.0-rc.2 encodes the model selector as JSON [provider, model].
+// DSH 0.2.2-rc.5 encodes the model selector as JSON [provider, model].
 // Missing reasoning options are unknown, not invented provider-default values.
 export function nativeSelection(options, source, cliVersion) {
   const observation = {

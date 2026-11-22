@@ -86,7 +86,7 @@ async function setup(t, selection = first, entrypoint = fixture) {
   const record = await ledger.confirm(
     unconfirmed.run_id,
     "fixture-native-session",
-    "0.2.0-rc.2",
+    "0.2.2-rc.5",
   );
   const routing = ModelRouting.open(ledger.project);
   await routing.bind(record, requestedSelection(selection));
