@@ -9,5 +9,6 @@
   "files": ["index.js", "index.d.ts", "README.md"],
   "scripts": { "test": "node --test test/*.test.mjs", "test:packed": "node test/install-packed.mjs" },
   "dependencies": { "@deepseek-ai/dsh-sdk-client": "0.2.1-rc.5" },
+  "devDependencies": { "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.5" },
   "overrides": { "fflate": "^0.8.3", "@modelcontextprotocol/client": "2.3.0" }
 }
