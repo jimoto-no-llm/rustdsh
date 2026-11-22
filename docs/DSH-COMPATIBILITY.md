@@ -7,7 +7,7 @@
 | 機能 | 版・条件 | 根拠 |
 | --- | --- | --- |
 | Rustの保護付きツール委譲 | DSH / toolsが同一の `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.2-alpha.2`、`0.2.2-alpha.3`、`0.2.2-rc.1`..`0.2.2-rc.5`。Linux x86_64と隔離用ツールが必要 | [`AUDITED_ADAPTERS`](../src/tool_security.rs)と[プリロード検証](../security/preload.mjs)。版名に加え、実際の入口・ツール本体のバイト列を検証する |
-| DashboardのDSH ACPセッション操作 | `0.2.0-rc.2`。版のプローブに加えてACP初期化・能力確認が必要 | [`adapter-catalog.mjs`](../dashboard/adapter-catalog.mjs)と[CLIアダプター](CLI-ADAPTERS.md)。以前の文書にあったalpha.1は、現在のカタログにはない |
+| DashboardのDSH ACPセッション操作 | `0.2.0-rc.2` / `0.2.2-rc.5`。版のプローブに加えてACP初期化・能力確認が必要 | [`adapter-catalog.mjs`](../dashboard/adapter-catalog.mjs)と[CLIアダプター](CLI-ADAPTERS.md)。以前の文書にあったalpha.1は、現在のカタログにはない |
 | Dashboardのプロジェクト固定更新 | DSH `0.2.0-rc.2` と、取得・検証したNode、CLI、アダプター、プラグインの組み合わせ | [`release-artifacts.mjs`](../dashboard/release-artifacts.mjs)と[固定更新](STAGED-UPDATES.md#capture-trusted-runtime-code) |
 | 任意の `rdsh-mcp-exposure` | DSH関連peerの宣言は `0.2.0-rc.2`、`0.2.1-alpha.3`、`0.2.1-rc.3`、`0.2.1-rc.4`。`0.2.2-rc.5` は未検証のため宣言に加えていない。Cordisの条件も別にある | [`package.json`](../plugins/rdsh-mcp-exposure/package.json)。peer範囲だけで実通信や全機能の検証成功を意味しない |
 | 同梱の `dsh-mobile-maxxing` v1.0.4 | 同梱READMEが明記する検証対象は `0.2.1-rc.2` / `0.2.1-rc.3` / `0.2.2-alpha.2` | [同梱README](../plugins/dsh-mobile-maxxing/README.md)。別コミットの上流READMEや次版PRでの検証を、同梱物へ自動適用しない |

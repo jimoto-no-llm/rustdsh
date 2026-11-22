@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import readline from "node:readline";
 if (process.argv.includes("--version")) {
-  console.log("0.2.0-rc.2");
+  console.log("0.2.2-rc.5");
   process.exit(0);
 }
 const { fixtureWorkflow } = await import("./plan-native-services.mjs");
@@ -10,7 +10,7 @@ const { engine, parent, dispatches } = fixtureWorkflow();
 const fixture = JSON.parse(
   fs.readFileSync(
     new URL(
-      "../../dashboard/test/fixtures/dsh-acp-0.2.0-rc.2.json",
+      "../../dashboard/test/fixtures/dsh-acp-0.2.2-rc.5.json",
       import.meta.url,
     ),
     "utf8",

@@ -412,7 +412,7 @@ function database(v, project) {
           p.binding.run_id === p.definition.run_id &&
           text(p.binding.session_id) &&
           path.isAbsolute(p.binding.cwd) &&
-          p.binding.cli_version === "0.2.0-rc.2"),
+          p.binding.cli_version === "0.2.2-rc.5"),
       "plan_state_invalid",
     );
     check(
@@ -644,7 +644,7 @@ export class ExecutionPlans {
     check(
       record?.binding === "confirmed" &&
         record.cli === "dsh" &&
-        record.cli_version === "0.2.0-rc.2" &&
+        record.cli_version === "0.2.2-rc.5" &&
         text(record.cli_session_id) &&
         context?.id === this.project.id,
       "plan_native_context_unconfirmed",

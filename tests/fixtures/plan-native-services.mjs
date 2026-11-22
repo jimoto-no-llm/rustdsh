@@ -26,6 +26,7 @@ export function fixtureWorkflow(scenario = "match") {
     lifecycle = { maximum_active: 0 },
     childReady = Promise.withResolvers(),
     parent = {
+      id: "native-root",
       session: { id: "native-root", header: { delegationDepth: 0 } },
       options: {},
     };
@@ -33,9 +34,26 @@ export function fixtureWorkflow(scenario = "match") {
     maxDepth: { get: () => 2 },
     maxActiveSubagents: { get: () => 8 },
   });
+  const agents = new Service(ctx, "agents");
+  agents.get = (id) => (id === parent.id ? parent : undefined);
+  agents.list = () => [parent];
+  const startVia = async (spec, start) => {
+    const { provider, delivery, childId, name, ...request } = spec;
+    const run = await start(request);
+    return { ...run, childId: run.childId ?? run.id };
+  };
+  subagents.manager = {
+    startExternal: startVia,
+    startLocal: startVia,
+    async waitForTreeWork() {
+      return false;
+    },
+    interrupt() {},
+  };
   applySpawn(ctx, { providerName: "fixture" });
   Object.assign(subagents.getProvider("fixture"), {
     name: "fixture",
+    prepareContinuable: undefined,
     capabilities: {
       agentOptions: true,
       outputSchema: true,
@@ -88,6 +106,7 @@ export function fixtureWorkflow(scenario = "match") {
     });
   const ptc = new Service(ctx, "ptcRuntime");
   ptc.language = "typescript";
+  ptc.programFormat = "function-body";
   ptc.resolve = (request) => request;
   ptc.run = async (request) => {
     // The original guest PROGRAM is unchanged. This transport fixture does
@@ -120,7 +139,12 @@ export function fixtureWorkflow(scenario = "match") {
     }
   };
   const sandbox = new Service(ctx, "sandboxPolicy");
-  sandbox.resolve = () => ({ workspaceRoot: process.cwd() });
+  sandbox.resolve = () => ({
+    workspaceRoot: process.cwd(),
+    mode: "danger-full-access",
+  });
+  const workingDirectory = new Service(ctx, "workingDirectory");
+  workingDirectory.ensure = async () => process.cwd();
   const engine = new Workflow(ctx, {
     provider: scenario === "external" ? "external" : "fixture",
     maxConcurrentAgents: 4,

@@ -84,7 +84,7 @@ async function setup(t, limits = {}, entrypoint = fixture) {
       cwd,
       env,
     }),
-    record = await ledger.confirm(draft.run_id, "native-root", "0.2.0-rc.2"),
+    record = await ledger.confirm(draft.run_id, "native-root", "0.2.2-rc.5"),
     plans = ExecutionPlans.open(project),
     state = await ProjectStore.open(project);
   for (const id of ["a", "b", "c", "d"])
