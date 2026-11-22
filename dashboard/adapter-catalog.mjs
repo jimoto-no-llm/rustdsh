@@ -6,7 +6,7 @@ export const operations = Object.freeze([
   "stop",
   "usage",
 ]);
-export const versions = ["0.2.0-rc.2"];
+export const versions = ["0.2.0-rc.2", "0.2.2-rc.5"];
 
 export function adapterCatalog() {
   return ["dsh", "codex", "claude", "kimi"].map((id) => ({

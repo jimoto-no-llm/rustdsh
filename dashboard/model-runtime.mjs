@@ -101,7 +101,7 @@ export async function prepareModelAttachment(project, record, env) {
   if (!required?.native_dispatch_required) return null;
   const policy = await routing.read(record);
   if (!policy) throw denial("route_policy_missing");
-  if (record.cli_version !== "0.2.0-rc.2")
+  if (record.cli_version !== "0.2.2-rc.5")
     throw denial("native_runtime_unsupported");
   const preload = new URL("./model-runtime-preload.mjs", import.meta.url).href;
   if ((env.NODE_OPTIONS || "").includes(preload))

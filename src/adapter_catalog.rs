@@ -30,7 +30,7 @@ pub fn catalog() -> Value {
             json!({
                 "id": id,
                 "protocol": if dsh { Some("acp-stdio-v1") } else { None },
-                "verified_versions": if dsh { vec!["0.2.0-rc.2"] } else { vec![] },
+                "verified_versions": if dsh { vec!["0.2.0-rc.2", "0.2.2-rc.5"] } else { vec![] },
                 "verification": if dsh {
                     "versioned wire fixtures and isolated DSH ACP lifecycle smoke"
                 } else {

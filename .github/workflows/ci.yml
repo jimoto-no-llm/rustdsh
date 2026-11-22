@@ -336,7 +336,7 @@ jobs:
       - name: Verify Rust launcher, official profiles and kernel enforcement together
         run: RDSH_GUARDED_MATRIX_REQUIRED=1 node --test tests/guarded-launcher-matrix.test.mjs
       - name: Install pinned upstream tool-bash for approval integrity test
-        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.2-rc.5
       - name: Test approval integrity against pinned upstream source
         run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'

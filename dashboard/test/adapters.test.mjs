@@ -81,7 +81,7 @@ test("capability catalog names all six operations and does not claim unimplement
   for (const row of adapterCatalog()) {
     assert.deepEqual(Object.keys(row.operations), operations);
     if (row.id === "dsh")
-      assert.deepEqual(row.verified_versions, ["0.2.0-rc.2"]);
+      assert.deepEqual(row.verified_versions, ["0.2.0-rc.2", "0.2.2-rc.5"]);
     else {
       assert.deepEqual(row.verified_versions, []);
       const adapter = createCliAdapter({ cli: row.id });
