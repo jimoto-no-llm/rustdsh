@@ -1,0 +1,24 @@
+name: no-feedback-contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: no-feedback-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-feedback-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node --test tests/no-feedback.test.mjs

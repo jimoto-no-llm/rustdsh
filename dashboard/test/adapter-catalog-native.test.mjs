@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -10,11 +11,15 @@ const repo = fileURLToPath(new URL("../../", import.meta.url));
 const binary = path.resolve(repo, process.env.RDSH_BIN || process.env.BIN || path.join("target/debug", process.platform === "win32" ? "rdsh.exe" : "rdsh"));
 const host = new URL("../adapter-catalog-native.mjs", import.meta.url).href;
 const expected = JSON.stringify({ adapters: adapterCatalog() }, null, 2) + "\n";
+const scratchRoots = new Set();
 async function scratch() {
-  const parent = path.join(repo, "target/adapter-catalog-tests");
-  await fs.mkdir(parent, { recursive: true });
-  return await fs.mkdtemp(path.join(parent, "case-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-adapter-catalog-"));
+  scratchRoots.add(root);
+  return root;
 }
+test.after(async () => {
+  await Promise.all([...scratchRoots].map(root => fs.rm(root, { recursive: true, force: true })));
+});
 function checked(executable, args, options) {
   const result = spawnSync(executable, args, { encoding: "utf8", timeout: 10000, ...options });
   assert.ifError(result.error); return result;

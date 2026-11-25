@@ -52,5 +52,5 @@ npm run test:packed -- ../../target/desktop-sdk-consumer .
 初期化の失敗、タイムアウト、突然の終了、終了処理の重複呼び出しを検証し、
 SDKが所有する子プロセスの終了を確認します。実際のモデルや個人のDSH設定は使いません。
 
-対応する公式SDKは **0.2.1-alpha.2** です。
+対応する公式SDKは **0.2.2-rc.5** です。
 参照：[公式SDK](https://github.com/deepseek-ai/deepseek-harness/tree/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/sdk/client)。
