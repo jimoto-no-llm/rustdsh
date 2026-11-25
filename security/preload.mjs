@@ -59,9 +59,10 @@ const messages = Object.freeze({
   UNSUPPORTED_CONSTRUCTOR: Object.freeze({ en: 'unsupported runtime constructor', zh: '不支持的运行时构造函数', ja: '対応していないランタイムコンストラクターです' }),
 });
 const securityError = code => new Error(`RDSH_SECURITY[${code}]: ${messages[code][language]}`);
-// Keep legacy direct rc2 probes compatible; launchers select an explicit adapter.
-const expected = adapters[process.env.RDSH_TOOL_ADAPTER ?? 'dsh-tools-0.2.0-rc.2'];
-if (expected === undefined) throw securityError('UNKNOWN_ADAPTER');
+// Keep legacy direct probes compatible across the 0.2.0-rc.2 and 0.2.2-rc.5
+// cohorts; launchers select an explicit adapter via RDSH_TOOL_ADAPTER.
+if (process.env.RDSH_TOOL_ADAPTER !== undefined && adapters[process.env.RDSH_TOOL_ADAPTER] === undefined)
+  throw securityError('UNKNOWN_ADAPTER');
 const runtime = realpathSync(process.env.RDSH_TOOL_RUNTIME);
 const workspace = realpathSync(process.env.RDSH_SECURE_WORKSPACE);
 let approvedFiles;
@@ -70,7 +71,11 @@ catch (cause) { throw new Error(securityError('INVALID_APPROVED_FILES').message,
 if (!Array.isArray(approvedFiles)) throw securityError('INVALID_APPROVED_FILES');
 const sharedFiles = Object.freeze(approvedFiles);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-if (digest(readFileSync(runtime)) !== expected) throw securityError('UNSUPPORTED_RUNTIME');
+const runtimeDigest = digest(readFileSync(runtime));
+const selectedAdapter = process.env.RDSH_TOOL_ADAPTER
+  ?? (runtimeDigest === adapters['dsh-tools-0.2.2-rc.5'] ? 'dsh-tools-0.2.2-rc.5' : 'dsh-tools-0.2.0-rc.2');
+const expected = adapters[selectedAdapter];
+if (runtimeDigest !== expected) throw securityError('UNSUPPORTED_RUNTIME');
 const target = pathToFileURL(runtime).href;
 const key = Symbol.for('rdsh.tool-boundary.install');
 Object.defineProperty(globalThis, key, { value: tools => installToolBoundary(tools, { workspace, sharedFiles }), writable: false, configurable: false });
@@ -86,7 +91,7 @@ registerHooks({
     if (url !== target) return loaded;
     const source = typeof loaded.source === 'string' ? loaded.source : Buffer.from(loaded.source).toString('utf8');
     if (digest(source) !== expected) throw securityError('RUNTIME_CHANGED');
-    const marker = constructors[process.env.RDSH_TOOL_ADAPTER ?? 'dsh-tools-0.2.0-rc.2'] ?? LEGACY_CONSTRUCTOR;
+    const marker = constructors[selectedAdapter] ?? LEGACY_CONSTRUCTOR;
     if (source.split(marker).length !== 2) throw securityError('UNSUPPORTED_CONSTRUCTOR');
     const patched = source
       .replace(marker, marker + '\n\t\tglobalThis[Symbol.for("rdsh.tool-boundary.install")](this);');

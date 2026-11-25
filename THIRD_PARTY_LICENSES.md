@@ -13,6 +13,7 @@ declare MIT at those versions:
 | Package | Pinned version | License |
 | --- | --- | --- |
 | `@deepseek-ai/dsh` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-hook-protocol` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
 | `@deepseek-ai/dsh-tool-bash` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
 | `@deepseek-ai/dsh-subagent` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
 | `@deepseek-ai/dsh-workflow-ptc` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |

@@ -3,6 +3,7 @@
   "type": "module",
   "dependencies": {
     "@deepseek-ai/dsh": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-hook-protocol": "0.2.2-rc.5",
     "@deepseek-ai/dsh-llm-pi-ai": "0.2.2-rc.5",
     "@earendil-works/pi-ai": "1.6.0",
     "ws": "8.22.0",
