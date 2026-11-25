@@ -5,9 +5,9 @@
   "metadata": {
     "component": {
       "type": "application",
-      "bom-ref": "pkg:cargo/rdsh@0.16.0",
+      "bom-ref": "pkg:cargo/rdsh@0.17.0",
       "name": "rdsh",
-      "version": "0.16.0"
+      "version": "0.17.0"
     },
     "properties": [
       {
@@ -5374,7 +5374,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/rdsh@0.16.0",
+      "ref": "pkg:cargo/rdsh@0.17.0",
       "dependsOn": [
         "pkg:cargo/anyhow@1.0.104",
         "pkg:cargo/axum@0.8.9",

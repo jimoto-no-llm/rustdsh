@@ -4,8 +4,8 @@ message: If you use rdsh, please cite it as below.
 type: software
 repository-code: https://github.com/jimoto-no-llm/rustdsh
 license: MIT
-version: "0.16.0"
-date-released: "2026-11-14"
+version: "0.17.0"
+date-released: "2026-11-26"
 authors:
   - name: sahenjp
     website: https://github.com/sahenjp
