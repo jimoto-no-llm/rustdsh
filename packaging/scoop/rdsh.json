@@ -1,12 +1,12 @@
 {
-    "version": "0.16.0",
+    "version": "0.17.0",
     "description": "Fast, safe Rust launcher for DeepSeek Harness (dsh)",
     "homepage": "https://github.com/jimoto-no-llm/rustdsh",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.16.0/rdsh-windows-x64.zip",
-            "hash": "37aa4f1ef73b393867b3d7957e097df192ade774e1c5266d14d4f97db729ff69"
+            "url": "https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.17.0/rdsh-windows-x64.zip",
+            "hash": "e75bfd9bb74805b8f59b4956ea537c31aecfceb8d484223a56134ca2dff4614f"
         }
     },
     "bin": "rdsh.exe",
