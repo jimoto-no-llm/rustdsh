@@ -229,22 +229,27 @@ window.__ModuleLoader__.load({
       };
     }
 
-    const occurrence = (kind, from, to) => JSON.stringify([kind || "update", from || "", to]);
+    const occurrence = (kind, from, to, at) =>
+      at ? JSON.stringify([kind || "update", from || "", to, at]) : JSON.stringify([kind || "update", from || "", to]);
     const short = (value) => typeof value === "string" && value.length > 0 && value.length <= 512;
-    const noticeKey = (kind, from, to) => occurrence(kind, from, to);
+    const validAt = (value) => {
+      const timestamp = Number(value);
+      return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+    };
+    const noticeKey = (kind, from, to, at) => occurrence(kind, from, to, kind === "dsh" ? null : at);
 
     function makeNotice(type, kind, from, to, at) {
       if (!short(to) || typeof kind !== "string" || !kind || kind.length > 64) return null;
       const source = short(from) ? from : null;
       if (source !== null && source === to) return null;
-      const timestamp = Number(at);
+      const timestamp = validAt(at);
       return {
         type: type,
         kind: kind,
         from: source,
         to: to,
-        at: Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null,
-        id: noticeKey(kind, source, to),
+        at: timestamp,
+        id: noticeKey(kind, source, to, timestamp),
       };
     }
 
@@ -252,7 +257,16 @@ window.__ModuleLoader__.load({
       if (!record || !notice || record.kind !== notice.kind || record.to !== notice.to) return false;
       const left = short(record.from) ? record.from : null;
       const right = short(notice.from) ? notice.from : null;
-      return left === null || right === null || left === right;
+      if (!(left === null || right === null || left === right)) return false;
+      if (notice.kind === "dsh") return true;
+      const recordAt = validAt(record.at);
+      const noticeAt = validAt(notice.at);
+      if (recordAt !== null && noticeAt !== null) return recordAt === noticeAt;
+      if (recordAt === null && noticeAt !== null) {
+        const closedAt = validAt(record.closedAt);
+        return closedAt !== null && closedAt >= noticeAt;
+      }
+      return recordAt === noticeAt;
     }
 
     function storageGet(key) {
@@ -284,10 +298,10 @@ window.__ModuleLoader__.load({
           kind: record && record.kind,
           from: record && short(record.from) ? record.from : null,
           to: record && record.to,
+          at: record && record.kind !== "dsh" ? validAt(record.at) : null,
           closedAt: Number(record && record.closedAt) || 0,
         };
-        if (validDismissal(value) && !list.some((item) => item.kind === value.kind && item.to === value.to &&
-          (item.from === null || value.from === null || item.from === value.from))) list.push(value);
+        if (validDismissal(value) && !list.some((item) => matchesTarget(item, value))) list.push(value);
       }
       let migrated = false;
       for (const key of LEGACY_KEYS) {
@@ -297,8 +311,8 @@ window.__ModuleLoader__.load({
           const old = JSON.parse(raw);
           const kind = key.endsWith(":dsh:v3") ? "dsh" : old && old.kind;
           const value = old && short(old.to) && (kind === "dsh" || short(kind))
-            ? { kind: kind, from: null, to: old.to, closedAt: Number(old.at) || 0 } : null;
-          if (value && !list.some((item) => item.kind === value.kind && item.to === value.to)) list.push(value);
+            ? { kind: kind, from: null, to: old.to, at: kind !== "dsh" ? validAt(old.at) : null, closedAt: Number(old.at) || 0 } : null;
+          if (value && !list.some((item) => matchesTarget(item, value))) list.push(value);
           storageRemove(key);
           migrated = true;
         } catch (error) {}
@@ -316,7 +330,13 @@ window.__ModuleLoader__.load({
     }
     function addDismissal(notice) {
       if (!notice || notice.kind === "error" || notice.kind === "check") return;
-      const record = { kind: notice.kind, from: notice.from || null, to: notice.to, closedAt: Date.now() };
+      const record = {
+        kind: notice.kind,
+        from: notice.from || null,
+        to: notice.to,
+        at: notice.kind !== "dsh" ? validAt(notice.at) : null,
+        closedAt: Date.now(),
+      };
       if (!validDismissal(record)) return;
       const list = loadDismissals().filter((item) => !matchesTarget(item, record));
       list.push(record);
@@ -327,6 +347,7 @@ window.__ModuleLoader__.load({
         kind: record.kind,
         from: short(record.from) ? record.from : null,
         to: record.to,
+        at: record.kind !== "dsh" ? validAt(record.at) : null,
         closedAt: Number(record.closedAt) || 0,
       }));
       saveDismissals(valid);
@@ -879,7 +900,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ["slots"],
+      inject: ["slots", "locale"],
       apply: apply,
       __internals: {
         dictionaries: DICTIONARIES,
