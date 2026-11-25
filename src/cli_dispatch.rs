@@ -169,7 +169,23 @@ pub(crate) fn run() {
     // native session caches; an explicit environment variable still wins.
     crate::slim::configure(&cfg);
     crate::passthrough::configure_web_search_provider(&cfg);
-    crate::tool_security::configure(agent_tool_sandbox(&cfg, !cli.share_file.is_empty()));
+    // GHSA-2jgv-45g4-58rj: `--share-file` only confines the agent while the
+    // strict boundary is active. An explicit `features.agent_tool_sandbox =
+    // false` must fail closed instead of silently launching unconfined.
+    let share_files_requested = !cli.share_file.is_empty();
+    if share_file_requires_sandbox(&cfg, share_files_requested) {
+        eprintln!(
+            "[rdsh] error: {}",
+            locale::pick(
+                locale,
+                "--share-file requires the agent tool sandbox, but rdsh.json sets features.agent_tool_sandbox = false; refusing to launch unconfined. Enable it with `rdsh features on agent_tool_sandbox` or drop --share-file",
+                "--share-file 需要代理工具沙箱，但 rdsh.json 设置了 features.agent_tool_sandbox = false；拒绝在未隔离的状态下启动。请运行 `rdsh features on agent_tool_sandbox` 启用，或去掉 --share-file",
+                "--share-file にはエージェントツールのサンドボックスが必要ですが、rdsh.json で features.agent_tool_sandbox = false が明示されています。無防備なまま起動することを拒否します。`rdsh features on agent_tool_sandbox` で有効にするか、--share-file を外してください"
+            )
+        );
+        std::process::exit(2);
+    }
+    crate::tool_security::configure(agent_tool_sandbox(&cfg, share_files_requested));
     if !rdsh_config::feature_enabled(&cfg, "sessions_token_cache")
         && std::env::var_os("RDSH_TOKENS_CACHE").is_none()
     {
@@ -1377,6 +1393,75 @@ fn agent_tool_sandbox(cfg: &rdsh_config::RdshSettings, share_files_requested: bo
     share_files_requested
 }
 
+/// GHSA-2jgv-45g4-58rj: true when `--share-file` was passed while rdsh.json
+/// explicitly disables the boundary the flag depends on. Callers must refuse
+/// to launch instead of falling back to unconfined execution.
+fn share_file_requires_sandbox(
+    cfg: &rdsh_config::RdshSettings,
+    share_files_requested: bool,
+) -> bool {
+    share_files_requested
+        && rdsh_config::feature_is_explicit(cfg, "agent_tool_sandbox")
+        && !rdsh_config::feature_enabled(cfg, "agent_tool_sandbox")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cfg_with_agent_tool_sandbox(value: Option<bool>) -> rdsh_config::RdshSettings {
+        let mut cfg = rdsh_config::RdshSettings::default();
+        if let Some(value) = value {
+            cfg.features
+                .values
+                .insert("agent_tool_sandbox".to_string(), value);
+        }
+        cfg
+    }
+
+    #[test]
+    fn share_file_with_explicitly_disabled_sandbox_fails_closed() {
+        // The GHSA-2jgv-45g4-58rj case: explicit false + --share-file conflict.
+        assert!(share_file_requires_sandbox(
+            &cfg_with_agent_tool_sandbox(Some(false)),
+            true
+        ));
+        // No --share-file: no conflict, the explicit off is honored.
+        assert!(!share_file_requires_sandbox(
+            &cfg_with_agent_tool_sandbox(Some(false)),
+            false
+        ));
+        // Explicit on, or absent (default off), never conflicts.
+        assert!(!share_file_requires_sandbox(
+            &cfg_with_agent_tool_sandbox(Some(true)),
+            true
+        ));
+        assert!(!share_file_requires_sandbox(
+            &cfg_with_agent_tool_sandbox(None),
+            true
+        ));
+    }
+
+    #[test]
+    fn sandbox_decision_keeps_explicit_settings_and_share_file_opt_in() {
+        // Explicit setting always wins over the --share-file opt-in.
+        assert!(agent_tool_sandbox(
+            &cfg_with_agent_tool_sandbox(Some(true)),
+            false
+        ));
+        assert!(!agent_tool_sandbox(
+            &cfg_with_agent_tool_sandbox(Some(false)),
+            true
+        ));
+        // Without an explicit setting, --share-file is the opt-in.
+        assert!(agent_tool_sandbox(&cfg_with_agent_tool_sandbox(None), true));
+        assert!(!agent_tool_sandbox(
+            &cfg_with_agent_tool_sandbox(None),
+            false
+        ));
+    }
+}
+
 /// `rdsh features`: every optional capability with its effective state.
 fn features_list(
     cfg: &rdsh_config::RdshSettings,
@@ -1452,7 +1537,7 @@ fn feature_summary(locale: locale::Locale, def: &rdsh_config::FeatureDef) -> &'s
         "compute" => ("允许常驻计算桥（RDSH_COMPUTE=1）", "常駐コンピュートブリッジを許可（RDSH_COMPUTE=1）"),
         "budget_guard" => ("DSH 插件中的预算保护 hook", "DSH プラグイン内の予算ガードフック"),
         "feedback" => ("DSH 的 Like/Dislike 与 /feedback 反馈界面（默认 OFF；OFF 时安装 rdsh-no-feedback）", "DSH の Like/Dislike と /feedback のフィードバック画面（既定OFF。OFF で rdsh-no-feedback を導入）"),
-        "agent_tool_sandbox" => ("将委派的代理工具限制为 --share-file 文件（无网络、无主机写入）", "委譲したエージェントツールを --share-file のファイルに制限（ネットワーク・ホスト書き込みなし）"),
+        "agent_tool_sandbox" => ("注册内核隔离的 rdsh_inspect 工具并限制为 --share-file 文件（无网络、无主机写入）；其他 DSH 工具保持上游权限", "カーネル分離された rdsh_inspect ツールを --share-file のファイルに限定して登録（ネットワーク・ホスト書き込みなし）。その他の DSH ツールは上流の権限のまま"),
         "release_probe" => ("在设置环境时运行发布资格检查", "環境設定時にリリース適格性プローブを実行"),
         "setup_web" => ("rdsh setup --web 本地设置页面", "rdsh setup --web ローカル設定ページ"),
         "sessions_token_cache" => ("缓存解压后会话的令牌数", "展開済みセッションのトークン数をキャッシュ"),

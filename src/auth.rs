@@ -351,7 +351,6 @@ fn flush_entry(
 }
 
 fn load_doc(path: &str) -> CredsDoc {
-    let mut doc = CredsDoc::default();
     // dsh refuses to read a credentials file that others can read, so a
     // 0644 file turns into a silent "no key"; tell the person at the terminal.
     // A pipe (tests, delegation) keeps stderr clean for the child's output.
@@ -365,8 +364,23 @@ fn load_doc(path: &str) -> CredsDoc {
     }
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
-        Err(_) => return doc,
+        Err(_) => return CredsDoc::default(),
     };
+    parse_doc_text(text)
+}
+
+/// The parser behind [load_doc], usable on an already-open file handle so the
+/// permission check and the read share one descriptor (no check/open race).
+fn load_doc_from_reader<R: std::io::Read>(mut reader: R) -> CredsDoc {
+    let mut text = String::new();
+    if reader.read_to_string(&mut text).is_err() {
+        return CredsDoc::default();
+    }
+    parse_doc_text(text)
+}
+
+fn parse_doc_text(text: String) -> CredsDoc {
+    let mut doc = CredsDoc::default();
     // Parse borrowed lines instead of allocating a String per line.
     let mut section = "";
     let mut cur_key = String::new();
@@ -668,31 +682,25 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
         drop(file);
+        // Windows has no Unix mode bits: strip inherited ACLs so only the
+        // current user keeps access. This must happen BEFORE the rename makes
+        // the file visible at `path` (the ACL travels with the rename), and a
+        // failure must fail the whole write instead of leaving a readable
+        // credentials file behind.
+        #[cfg(target_os = "windows")]
+        lockdown_creds_file(&tmp)?;
         std::fs::rename(&tmp, path)?;
         Ok(())
     })();
     if result.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
-    result?;
-    #[cfg(target_os = "windows")]
-    {
-        // No Unix mode bits here: strip inherited ACLs so only the current
-        // user keeps access. Best effort — a failure warns instead of
-        // breaking the save (the file itself is already written).
-        if let Err(e) = lockdown_creds_file(path) {
-            eprintln!(
-                "[rdsh auth] warning: could not restrict {path} to the current user ({e:#}); \
-                 run: icacls \"{path}\" /inheritance:r"
-            );
-        }
-    }
-    Ok(())
+    result
 }
 
 /// Windows-only: confine a credentials file to the current user via icacls.
 /// No shell is involved (argv only). Returns Err when whoami/icacls is
-/// missing or refuses; the caller warns and keeps the saved file.
+/// missing or refuses; write_creds fails closed in that case.
 #[cfg(target_os = "windows")]
 fn lockdown_creds_file(path: &str) -> anyhow::Result<()> {
     let who = std::process::Command::new("whoami")

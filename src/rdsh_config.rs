@@ -202,7 +202,8 @@ pub const FEATURES: &[FeatureDef] = &[
     FeatureDef {
         id: "agent_tool_sandbox",
         default: false,
-        summary: "confine delegated agent tools to --share-file files (no network, no host writes)",
+        summary:
+            "register the kernel-isolated rdsh_inspect tool confined to --share-file files (no network, no host writes); other DSH tools keep upstream permissions",
     },
     FeatureDef {
         id: "release_probe",

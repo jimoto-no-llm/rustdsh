@@ -282,12 +282,12 @@ test('install and verify refuse an uninitialized Desktop profile', async (t) => 
   assert.equal(JSON.parse(verify.stdout).missing.length, 1);
 });
 
-test('a --plugins-dir without the plugins is skipped for a real checkout', async (t) => {
+test('a --plugins-dir without the plugins is skipped for a configured checkout while cwd stays untrusted', async (t) => {
   const { box, env } = await baseEnv(t);
   const command = await stubCommand(box);
   await initProfile(box, { name: 'dsh-profile-desktop' });
   const { code, stdout } = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', join(box.root, 'nope')], {
-    ...env, DSH_DESKTOP_CLI: command,
+    ...env, DSH_DESKTOP_CLI: command, RDSH_PLUGINS_DIR: box.checkout,
   });
   assert.equal(code, 0, stdout);
   const report = JSON.parse(stdout);
@@ -295,6 +295,11 @@ test('a --plugins-dir without the plugins is skipped for a real checkout', async
   assert.notEqual(resolved, join(box.root, 'nope'));
   assert.match(resolved, /plugins$/);
   assert.equal(existsSync(join(resolved, 'rdsh-settings', 'package.json')), true);
+
+  const untrustedCwd = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', join(box.root, 'nope')], {
+    ...env, DSH_DESKTOP_CLI: command,
+  });
+  assert.notEqual(untrustedCwd.code, 0);
 });
 
 test('the packaged app layout is discovered without DSH_DESKTOP_CLI', async (t) => {
