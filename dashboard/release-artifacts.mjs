@@ -31,7 +31,7 @@ async function eachFile(items, operation) {
   await Promise.all(workers);
   if (failure !== null) throw failure;
 }
-const supportedDsh = "0.2.0-rc.2";
+const supportedDsh = new Set(["0.2.0-rc.2", "0.2.2-rc.5"]);
 export class ReleaseError extends Error {
   constructor(code) {
     super("Managed release: " + code);
@@ -70,7 +70,7 @@ const text = (value) =>
 export function compatible(manifest) {
   if (
     manifest.schema !== 1 ||
-    manifest.tuple?.dsh !== supportedDsh ||
+    !supportedDsh.has(manifest.tuple?.dsh) ||
     manifest.tuple?.adapter_contract !== "acp-stdio-v1" ||
     manifest.tuple?.probe_contract !== 1 ||
     manifest.tuple?.dashboard !== "0.1.0" ||

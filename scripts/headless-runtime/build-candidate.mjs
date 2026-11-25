@@ -9,15 +9,15 @@ import { patchDshAdapterDirectory, patchPiAiDirectory } from './patch-pi-ai.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pinned = {
-  '@deepseek-ai/dsh': '0.2.0-rc.2',
-  '@deepseek-ai/dsh-llm-pi-ai': '0.2.0-rc.2',
-  '@earendil-works/pi-ai': '0.87.1',
+  '@deepseek-ai/dsh': '0.2.2-rc.5',
+  '@deepseek-ai/dsh-llm-pi-ai': '0.2.2-rc.5',
+  '@earendil-works/pi-ai': '1.6.0',
   ws: '8.22.0',
 };
 const sourceHashes = {
-  dshLlmPiAi: 'd46dbc30aeb3414190000e6f8aeaaf994246b5e5c651de07639f4a7e92de37ef',
+  dshLlmPiAi: 'e956da3d7300e1426e13e14f47e6f981dd1ca345633a406568ee5058ad93e9d8',
   sessionResources: '9228618eeaebc6b5a1746d28d1859b1e23f0f65e978dc9f6e20eb29d65b17e2a',
-  codexResponses: '6e69310d77278231cfc87d7f03ee815d4a0f2ff273e6c43fcee6835e7df2b0c7',
+  codexResponses: '0b791f5417669449c70d2e8a4cc9c3626b578c07f1c73abc455d6b69d15b50c6',
 };
 const pluginFiles = ['cleanup.mjs', 'cordis.patch.yml', 'diagnostics.mjs', 'index.js', 'package.json'];
 const nativeSetupHooks = [
@@ -27,7 +27,7 @@ const nativeSetupHooks = [
     sha256: '7e604b10f7769d7dc95947d3481c00513b9e3bb6c561d5264506350a16a0381a',
   },
   {
-    packageName: '@deepseek-ai/dsh-subprocess-local', version: '0.2.0-rc.2', script: 'scripts/ensure-spawn-helper.mjs',
+    packageName: '@deepseek-ai/dsh-subprocess-local', version: '0.2.2-rc.5', script: 'scripts/ensure-spawn-helper.mjs',
     packageScript: 'node scripts/ensure-spawn-helper.mjs',
     sha256: 'ca5509febf1e6ec1356df121835ebe5ed2f9cace4bdc2ba6d83d41c7e45e0f1b',
   },

@@ -7,31 +7,53 @@
     ".": "./index.js",
     "./catalog": "./catalog.js"
   },
-  "files": ["index.js", "catalog.js", "tools.js", "cordis.patch.yml", "README.md"],
-  "engines": { "node": ">=22.22.0" },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2"
+  "files": [
+    "index.js",
+    "catalog.js",
+    "tools.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.22.0"
   },
-  "dependencies": { "@deepseek-ai/schemastery": "~3.19.0" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-tool-executor-ptc": "0.2.2-rc.5"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-ptc-runtime-node": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-fs-local": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-subprocess-local": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-sandbox-local": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-sandbox-policy": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-session-projection": "0.2.0-rc.2",
-    "js-tiktoken": "1.0.21"
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-scope": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-ptc-runtime-node": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-fs-local": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-sandbox-local": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-sandbox-policy": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-session-projection": "0.2.2-rc.5",
+    "js-tiktoken": "1.0.21",
+    "@deepseek-ai/dsh-tool-executor-ptc": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-tool-executor-native": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-working-directory": "0.2.2-rc.5"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "benchmark": "node benchmark.mjs"
   },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "overrides": {
+    "zod": "4.6.7",
+    "undici": "8.12.3"
+  }
 }

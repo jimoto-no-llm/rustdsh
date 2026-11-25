@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "2.8.0",
-    "@deepseek-ai/dsh-win32-process": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-win32-process": "0.2.2-rc.5",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@modelcontextprotocol/server": "2.4.0",

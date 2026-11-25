@@ -93,7 +93,7 @@ test('inline budget is enforced, skipped declarations remain discoverable, unrel
   assert.doesNotMatch(sdk, /LARGE_SCHEMA_MARKER|hidden.configured/);
   assert.match(sdk, /omitted to meet the budget/);
   const result = f.catalog.describe(a, { name: 'read.large' }, 'typescript');
-  assert.equal(result.tool.description.length, f.tools.get('read.large').description.length);
+  assert.equal(result.tool.description.length, f.tools.executable('read.large').description.length);
   assert.match(result.declaration.source, /LARGE_SCHEMA_MARKER/);
   f.tools.register(tool('new.unrelated', 'Unrelated schema.'));
   assert.equal((await f.prompt.assemble({ scope: a })).sections.find(section => section.name === 'tools:sdk').text, sdk);
@@ -139,8 +139,8 @@ test('original run_code bindings dispatch discovered raw names, guards and typed
   const invalid = await f.run(a, bindings => bindings['invalid.return']({}));
   assert.equal(invalid.isError, true);
   assert.match(JSON.stringify(invalid), /invalid output|INVALID_TOOL_OUTPUT/);
-  const direct = await f.tools.execute({ name: SEARCH, arguments: {}, agent: a, callId: 'direct-catalog', signal: new AbortController().signal });
-  assert.equal(direct.isError, true, 'PTC still permits only run_code as a direct tool');
+  const direct = await f.tools.execute({ calls: [{ type: 'tool-call', id: 'direct-catalog', name: SEARCH, arguments: '{}' }], agent: a, signal: new AbortController().signal });
+  assert.equal(direct.results[0].result.isError, true, 'PTC still permits only run_code as a direct tool');
 });
 
 test('a restriction after discovery rejects the original captured binding instead of replaying or bypassing scope', async t => {
@@ -196,9 +196,9 @@ test('Native/complete prompts and disposal preserve original presentation and re
   f.tools.register(tool('retained.read'));
   const execute = f.tools.execute, schemas = f.tools.schemas, get = f.tools.get;
   f.dispose();
-  assert.equal(f.tools.get(SEARCH), undefined);
-  assert.equal(f.tools.get(DESCRIBE), undefined);
-  assert.ok(f.tools.get('retained.read'));
+  assert.equal(f.tools.executable(SEARCH), undefined);
+  assert.equal(f.tools.executable(DESCRIBE), undefined);
+  assert.ok(f.tools.executable('retained.read'));
   assert.equal(f.tools.execute, execute); assert.equal(f.tools.schemas, schemas); assert.equal(f.tools.get, get);
   assert.match((await f.prompt.assemble()).sections.find(section => section.name === 'tools:sdk').text, /retained\.read/);
 });
@@ -216,14 +216,14 @@ test('the real Cordis plugin lifecycle supplies defaults and disposes only its o
   const f = fixture({ catalog: false }); t.after(() => f.close());
   f.tools.register(tool('retained.lifecycle'));
   const plugin = await f.ctx.plugin(bundle, { inlineTools: ['retained.lifecycle'] });
-  assert.ok(f.tools.get(SEARCH));
-  assert.ok(f.tools.get(DESCRIBE));
+  assert.ok(f.tools.executable(SEARCH));
+  assert.ok(f.tools.executable(DESCRIBE));
   const agent = f.agent();
   const sdk = (await f.prompt.assemble({ scope: agent })).sections.find(section => section.name === 'tools:sdk').text;
   assert.ok(Buffer.byteLength(sdk) <= 16384);
   assert.match(sdk, /retained\.lifecycle/);
   await plugin.dispose();
-  assert.equal(f.tools.get(SEARCH), undefined);
-  assert.equal(f.tools.get(DESCRIBE), undefined);
-  assert.ok(f.tools.get('retained.lifecycle'));
+  assert.equal(f.tools.executable(SEARCH), undefined);
+  assert.equal(f.tools.executable(DESCRIBE), undefined);
+  assert.ok(f.tools.executable('retained.lifecycle'));
 });

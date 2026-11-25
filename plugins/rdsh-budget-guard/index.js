@@ -19,7 +19,7 @@ function featureEnabled(id, fallback, env = process.env) {
   }
 }
 
-export function createBudgetHook({ base, key, job_id, fetchImpl = fetch }) {
+export function createBudgetHook({ base, key, job_id, cli_version = "0.2.0-rc.2", fetchImpl = fetch }) {
   const url = new URL(base);
   if (
     url.protocol !== "http:" ||
@@ -33,6 +33,8 @@ export function createBudgetHook({ base, key, job_id, fetchImpl = fetch }) {
     !/^[a-zA-Z0-9_.:-]{1,160}$/.test(job_id)
   )
     throw new Error("Budget guard requires a scoped loopback credential");
+  if (!["0.2.0-rc.2", "0.2.2-rc.5"].includes(cli_version))
+    throw new Error("Budget guard requires a verified DSH version");
   async function request(action, body) {
     const response = await fetchImpl(
       new URL(`api/budget/producer/${action}`, url),
@@ -55,7 +57,7 @@ export function createBudgetHook({ base, key, job_id, fetchImpl = fetch }) {
   const initialize = () =>
     (ready ||= request("ready", {
       hook_version: 1,
-      cli_version: "0.2.0-rc.2",
+      cli_version,
     }).then((receipt) => {
       if (receipt.ready !== true || receipt.job_id !== job_id)
         throw new Error("Budget hook registration not confirmed");
@@ -116,6 +118,7 @@ export function apply(ctx) {
     base: process.env.RDSH_BUDGET_BASE,
     key: process.env.RDSH_BUDGET_KEY,
     job_id: process.env.RDSH_BUDGET_JOB,
+    cli_version: process.env.RDSH_DSH_CLI_VERSION,
   });
   ctx.on("llm/stream", hook.stream, { prepend: true });
   void hook.initialize().catch(() => {});
