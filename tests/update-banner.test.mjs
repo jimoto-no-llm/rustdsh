@@ -215,12 +215,22 @@ test('a dsh dismissal is stable across registry re-checks and only a new release
   assert.ok(tree); assert.match(text(tree), /1\.0\.0/); assert.match(text(tree), /1\.1\.0/);
 });
 
-test('a dismissed applied confirmation never returns; a different release notifies once', async (t) => {
+test('a dismissed applied confirmation never returns; a new at or different release notifies once', async (t) => {
   const fixture = await shown(t, { current: state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START }) });
   press(fixture, 'dismiss-rustdsh');
   await fixture.poll(); assert.equal(fixture.render(), null);
   fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-later', at: START + 1 }));
+  // Same `to` with a newer `at` (e.g. rebuilt payload or re-applied version) notifies again.
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-next', at: START + 5000 }));
+  await fixture.poll(); assert.ok(fixture.render());
+  press(fixture, 'dismiss-rustdsh');
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  // Replaced same-version rebuild without `from` at a newer `at` also notifies again.
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: null, to: 'v-next', at: START + 10000 }));
+  await fixture.poll(); assert.ok(fixture.render());
+  press(fixture, 'dismiss-rustdsh');
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setCurrent(state({ updated: true, kind: 'rustdsh', from: 'v-old', to: 'v-later', at: START + 15000 }));
   await fixture.poll(); assert.ok(fixture.render());
 });
 
