@@ -34,10 +34,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
       - run: cargo build --release --locked
       - run: node desktop/prepare.mjs --checkout target/desktop-native-fork --rdsh-bin ${{ matrix.binary }}
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 11.28.5
       - name: Install the pinned official dependency graph

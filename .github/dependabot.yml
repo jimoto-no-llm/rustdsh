@@ -76,6 +76,30 @@ updates:
     ignore:
       - dependency-name: "sha2"
         versions: [">= 0.11.1"]
+  - package-ecosystem: cargo
+    directory: /apps/rdsh-desktop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: cargo
+    directory: /crates/native-compaction
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /cloud/worker
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /dashboard
     schedule:

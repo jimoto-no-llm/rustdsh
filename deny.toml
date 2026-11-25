@@ -40,3 +40,15 @@ allow = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[advisories]
+# ratatui 0.29.0 still requires paste as a procedural-macro dependency. The
+# crate is unmaintained but has no known vulnerability or safe replacement in
+# this dependency tree; keep the transitive warning visible while ratatui moves.
+ignore = [
+  { id = "RUSTSEC-2024-0436", reason = "paste 1.0.15 is a transitive ratatui 0.29.0 procedural macro with no safe upgrade available; no runtime code is used." },
+  # lru 0.12.5 is pulled by ratatui 0.29.0. The patched releases require a
+  # ratatui upgrade, so these advisories remain tracked until that API change.
+  { id = "RUSTSEC-2026-0002", reason = "lru 0.12.5 is transitive through ratatui 0.29.0; upgrading requires a compatible ratatui release." },
+  { id = "RUSTSEC-2026-0253", reason = "lru 0.12.5 is transitive through ratatui 0.29.0; upgrading requires a compatible ratatui release." },
+]

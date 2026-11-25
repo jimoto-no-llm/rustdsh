@@ -31,6 +31,9 @@ exclude = [
   "/strix_runs/**",
   "/tests/**",
   "/tools/**",
+  "cobertura.xml",
+  "bench/",
+  ".githooks/",
   "/preview-*",
   "/sync-dsh.sh",
 ]

@@ -48,7 +48,9 @@ jobs:
         working-directory: dashboard
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
       - name: Build the native dashboard bridge and policy helper
         run: cargo build --locked --manifest-path ../Cargo.toml --bin rdsh
       - uses: actions/setup-node@v7

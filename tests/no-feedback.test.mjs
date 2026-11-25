@@ -111,10 +111,13 @@ test('the patch targets ids the shipped DSH web profile actually carries', async
 test('plugins/install.sh attaches the bundle only when the switch is off', { skip: process.platform === 'win32' }, async (t) => {
   const home = await mkdtemp(join(tmpdir(), 'rdsh-no-feedback-'));
   t.after(() => rm(home, { recursive: true, force: true }));
+  const rdshStub = join(home, 'rdsh-stub');
+  await writeFile(rdshStub, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   const base = {
     ...process.env,
     PATH: dirname(process.execPath) + ':' + (process.env.PATH ?? ''),
     HOME: home, DSH_HOME: home, PROFILE: 'web', DRY_RUN: '1', RECOMMENDED: 'none',
+    RDSH_BIN: process.env.RDSH_BIN ?? rdshStub,
   };
   // `document` is written verbatim so the corrupt-JSON case is expressible.
   const run = async (document, profile = 'web') => {

@@ -26,7 +26,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
       - name: Install the isolated DSH contract runtime
         run: npm install --prefix "${{ runner.temp }}/compaction-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh@0.2.1-rc.2
       - run: cargo test --locked --lib

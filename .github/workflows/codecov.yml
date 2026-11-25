@@ -22,19 +22,22 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-tarpaulin
-        uses: taiki-e/install-action@v2
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          tool: cargo-tarpaulin
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
+        with:
+          tool: cargo-llvm-cov
 
       # The suite shells out to zstd, exactly as the ci.yml test job assumes.
       - name: Ensure zstd is available
         run: command -v zstd || (sudo apt-get update && sudo apt-get install -y zstd)
 
       - name: Generate code coverage
-        run: cargo tarpaulin --workspace --out xml
+        run: cargo llvm-cov --workspace --cobertura --output-path cobertura.xml
 
       # A missing secret must be visible: without it the upload fails with
       # "Token required because branch is protected" while the job stays green
@@ -45,7 +48,7 @@ jobs:
         run: test -n "$CODECOV_TOKEN" || echo "::warning::CODECOV_TOKEN is empty; the Codecov upload is skipped"
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           # v5 renamed `file` to `files`; v7 is the current major.
           files: cobertura.xml
