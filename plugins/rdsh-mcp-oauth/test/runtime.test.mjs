@@ -34,7 +34,7 @@ test("native MCP resolves the patched SDK and one shared service graph", async (
   }
   const runtime = await loadRuntime();
   assert.equal(runtime.sdkVersion, "2.4.0");
-  assert.equal(runtime.nativeVersion, "0.2.0-rc.2");
+  assert.equal(runtime.nativeVersion, "0.2.2-rc.5");
   assert.equal(runtime.sdk, await import(pathToFileURL(sdkPath).href));
 });
 
@@ -69,7 +69,7 @@ async function versionFixture(t, version) {
     join(mcp, "package.json"),
     JSON.stringify({
       name: "@deepseek-ai/dsh-mcp-client",
-      version: "0.2.0-rc.2",
+      version: "0.2.2-rc.5",
       main: "lib/index.cjs",
     }),
   );

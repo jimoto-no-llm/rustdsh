@@ -32,7 +32,7 @@ async function fixture(t, version = "2.0.0") {
     join(mcp, "package.json"),
     JSON.stringify({
       name: "@deepseek-ai/dsh-mcp-client",
-      version: "0.2.0-rc.2",
+      version: "0.2.2-rc.5",
       main: "lib/index.mjs",
     }),
   );

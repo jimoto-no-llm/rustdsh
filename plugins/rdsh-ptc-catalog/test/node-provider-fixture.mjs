@@ -7,8 +7,10 @@ import Subprocess from '@deepseek-ai/dsh-subprocess-local';
 import Sandbox from '@deepseek-ai/dsh-sandbox-local';
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy';
 import SessionProjections from '@deepseek-ai/dsh-session-projection';
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory';
 import NodeRuntime from '@deepseek-ai/dsh-ptc-runtime-node';
 import ToolRuntime from '@deepseek-ai/dsh-tools';
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import { createScope } from '@deepseek-ai/dsh-scope';
 import { SEARCH, DESCRIBE } from '../catalog.js';
@@ -29,7 +31,9 @@ try {
   await ctx.plugin(SandboxPolicy, { mode: 'danger-full-access', workspaceRoot: process.cwd() });
   await ctx.plugin(NodeRuntime, { timeoutMs: 10000, maxTimeoutMs: 10000 });
   new SystemPrompt(ctx, { includeHarnessIdentity: false, includeRuntimeContext: false });
-  const tools = new ToolRuntime(ctx, { mode: 'ptc', maxParallelSubCalls: 8 });
+  await ctx.plugin(WorkingDirectory, { defaultDirectory: process.cwd() });
+  const tools = new ToolRuntime(ctx);
+  tools.setExecutor(new PtcExecutor(ctx, { maxParallelSubCalls: 8 }));
   apply(ctx);
   tools.register(tool('fixture/read.value', 'Read the fixed catalog fixture.', async args => {
     invoked++; return { value: args.key };
@@ -41,23 +45,23 @@ try {
   });
   agent.ctx = createScope(ctx, agent).ctx;
   agent.ctx.tools.restrict({ deny: ['fixture/hidden.value'] });
-  const outcome = await tools.execute({ name: 'run_code',
-    arguments: { description: 'Search, describe and invoke a fixed original Node PTC binding', code: `
+  const execute = async (id, args) => (await tools.execute({ calls: [{ type: 'tool-call', id, name: 'run_code', arguments: JSON.stringify(args) }],
+    agent, signal: new AbortController().signal })).results.find(result => result.callId === id)?.result;
+  const outcome = await execute('catalog-original-node', { description: 'Search, describe and invoke a fixed original Node PTC binding', code: `
       const search = await tools[${JSON.stringify(SEARCH)}]({query: "fixed catalog fixture", namespace: "fixture"});
       const name = search.tools[0].name;
       const described = await tools[${JSON.stringify(DESCRIBE)}]({name});
       const hidden = await tools[${JSON.stringify(DESCRIBE)}]({name: "fixture/hidden.value"});
       const value = await tools[name]({key: "ORIGINAL_NODE_BINDING"});
       return {value, name, completeTypes: described.status === "ok" && described.tool.input.type === "object" && described.tool.output.type === "object", hidden: hidden.status, credentialAbsent: process.env.DEEPSEEK_API_KEY === undefined};
-    ` }, agent, callId: 'catalog-original-node', signal: new AbortController().signal });
+    ` });
   const value = canonicalValue(outcome).result;
   assert.deepEqual(value, { value: { value: 'ORIGINAL_NODE_BINDING' }, name: 'fixture/read.value', completeTypes: true, hidden: 'not_found', credentialAbsent: true });
   assert.equal(invoked, 1);
   assert.deepEqual(events.filter(event => event.type === 'tool/ptc-dispatch').map(event => event.data.name),
     [SEARCH, DESCRIBE, DESCRIBE, 'fixture/read.value']);
   const deny = agent.ctx.tools.guard(exec => exec.name === 'fixture/read.value' ? 'fixture denied after discovery' : undefined);
-  const denied = await tools.execute({ name: 'run_code', arguments: { code: 'return tools["fixture/read.value"]({key: "NO_REPLAY"});', description: 'Check original guard' },
-    agent, callId: 'catalog-original-denied', signal: new AbortController().signal });
+  const denied = await execute('catalog-original-denied', { code: 'return tools["fixture/read.value"]({key: "NO_REPLAY"});', description: 'Check original guard' });
   assert.equal(denied.isError, true);
   assert.equal(invoked, 1);
   deny();

@@ -45,7 +45,7 @@ const packageInfo = JSON.parse(
     "utf8",
   ),
 );
-assert.equal(packageInfo.version, "0.2.0-rc.2");
+assert.ok(["0.2.0-rc.2", "0.2.2-rc.5"].includes(packageInfo.version));
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-budget-native-"));
 let dashboard;
 const exec = promisify(execFile);

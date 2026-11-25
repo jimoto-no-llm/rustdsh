@@ -1,5 +1,7 @@
 import { Context } from '@deepseek-ai/cordis';
-import ToolRuntime, { renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tools';
+import ToolRuntime from '@deepseek-ai/dsh-tools';
+import { renderToolsSdk, renderToolsSdkPy, PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc';
+import { NativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import { createScope } from '@deepseek-ai/dsh-scope';
 import { createCatalog } from '../catalog.js';
@@ -26,7 +28,9 @@ export function fixture({ mode = 'ptc', language = 'typescript', catalog = true,
     },
   };
   ctx.provide('ptcRuntime', runtime);
-  const tools = new ToolRuntime(ctx, { mode, maxParallelSubCalls: 8 });
+  ctx.provide('workingDirectory', { ensure: async agent => agent.session.header.cwd });
+  const tools = new ToolRuntime(ctx);
+  tools.setExecutor(mode === 'ptc' ? new PtcExecutor(ctx, { maxParallelSubCalls: 8 }) : new NativeToolExecutor(ctx));
   const dispose = catalog ? apply(ctx, config) : () => {};
   const events = [];
 
@@ -40,8 +44,10 @@ export function fixture({ mode = 'ptc', language = 'typescript', catalog = true,
   let calls = 0;
   async function run(scope, program) {
     programs.push(program);
-    return tools.execute({ name: 'run_code', arguments: { code: '// fixed fixture; the provider does not evaluate this source', description: 'Catalog integration fixture' },
-      agent: scope, callId: `catalog-fixture-${++calls}`, signal: new AbortController().signal });
+    const id = `catalog-fixture-${++calls}`;
+    const batch = await tools.execute({ calls: [{ type: 'tool-call', id, name: 'run_code', arguments: JSON.stringify({ code: '// fixed fixture; the provider does not evaluate this source', description: 'Catalog integration fixture' }) }],
+      agent: scope, signal: new AbortController().signal });
+    return batch.results.find(result => result.callId === id)?.result;
   }
 
   return { ctx, tools, prompt, runtime, requests, programs, events, agent, run, dispose,
@@ -59,7 +65,7 @@ export function tool(name, description = 'Read a scoped fixture value.', execute
 
 export function sdkSchemas(tools, scope) {
   return tools.schemas(scope).filter(schema => schema.name !== 'run_code')
-    .map(schema => ({ ...schema, output: structuredClone(tools.get(schema.name, scope).output.schema) }));
+    .map(schema => ({ ...schema, output: structuredClone(tools.executable(schema.name, scope).output.schema) }));
 }
 
 export function canonicalValue(outcome) {

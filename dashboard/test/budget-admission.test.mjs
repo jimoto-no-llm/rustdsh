@@ -406,6 +406,21 @@ test("two workers atomically reserve the remaining budget; late usage can exceed
   assert.equal(starts, 1);
 });
 
+test("launch and producer ready accept the verified 0.2.2-rc.5 cohort", async (t) => {
+  const f = await setup(t, true);
+  await budgetRequest(f.project, "policy", budgetPolicy({ baseline: "0" }));
+  const { status, result } = await f.post("launch", {
+    worker_id: "worker-rc5", run_id: "run-rc5", cli: "dsh", version: "0.2.2-rc.5",
+  });
+  assert.equal(status, 200);
+  assert.equal(result.allowed, true);
+  const ready = await f.post("producer/ready",
+    { job_id: result.job_id, hook_version: 1, cli_version: "0.2.2-rc.5" },
+    { "x-rdsh-budget-token": result.key });
+  assert.equal(ready.status, 200);
+  assert.equal(ready.result.ready, true);
+});
+
 test("lost admission response keeps the charge reservation; no retry, duplicate dispatch or restart release", async (t) => {
   const f = await setup(t, true);
   await budgetRequest(f.project, "policy", budgetPolicy({ baseline: "0" }));
@@ -574,6 +589,7 @@ test("real CLI input-file policy/inspect uses admin credential and rejects stray
   const env = {
     ...process.env,
     RDSH_DASHBOARD_HOME: path.join(f.root, "dashboard"),
+    RDSH_LANG: "en",
   };
   await exec(
     process.execPath,

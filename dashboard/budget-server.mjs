@@ -17,7 +17,7 @@ export class BudgetAdmissionServer {
         (k) => !["run_id", "worker_id", "cli", "version"].includes(k),
       ) ||
       input.cli !== "dsh" ||
-      input.version !== "0.2.0-rc.2"
+      !["0.2.0-rc.2", "0.2.2-rc.5"].includes(input.version)
     )
       throw new BudgetError("budget_adapter_unsupported");
     const job_id = randomUUID();
@@ -45,7 +45,7 @@ export class BudgetAdmissionServer {
     if (operation === "ready") {
       if (
         input.hook_version !== 1 ||
-        input.cli_version !== "0.2.0-rc.2" ||
+        !["0.2.0-rc.2", "0.2.2-rc.5"].includes(input.cli_version) ||
         Object.keys(input).some(
           (k) => !["job_id", "hook_version", "cli_version"].includes(k),
         )

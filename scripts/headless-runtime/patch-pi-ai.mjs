@@ -128,7 +128,7 @@ function patchDshAdapterSource(source) {
 function sha256(source) { return createHash('sha256').update(source).digest('hex'); }
 export async function patchPiAiDirectory(root, { helper, sourceHashes } = {}) {
   const metadata = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-  if (metadata.name !== '@earendil-works/pi-ai' || metadata.version !== '0.87.1') throw new Error('headless runtime requires @earendil-works/pi-ai@0.87.1');
+  if (metadata.name !== '@earendil-works/pi-ai' || metadata.version !== '1.6.0') throw new Error('headless runtime requires @earendil-works/pi-ai@1.6.0');
   const sessionPath = path.join(root, 'dist/session-resources.js');
   const codexPath = path.join(root, 'dist/api/openai-codex-responses.js');
   const sources = { sessionResources: await readFile(sessionPath, 'utf8'), codexResponses: await readFile(codexPath, 'utf8') };
@@ -139,7 +139,7 @@ export async function patchPiAiDirectory(root, { helper, sourceHashes } = {}) {
 }
 export async function patchDshAdapterDirectory(root, { sourceHash } = {}) {
   const metadata = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-  if (metadata.name !== '@deepseek-ai/dsh-llm-pi-ai' || metadata.version !== '0.2.0-rc.2') throw new Error('headless runtime requires @deepseek-ai/dsh-llm-pi-ai@0.2.0-rc.2');
+  if (metadata.name !== '@deepseek-ai/dsh-llm-pi-ai' || metadata.version !== '0.2.2-rc.5') throw new Error('headless runtime requires @deepseek-ai/dsh-llm-pi-ai@0.2.2-rc.5');
   const adapterPath = path.join(root, 'lib/index.js');
   const source = await readFile(adapterPath, 'utf8');
   if (sourceHash && sha256(source) !== sourceHash) throw new Error('dsh-llm-pi-ai source hash mismatch');

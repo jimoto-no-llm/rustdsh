@@ -57,10 +57,10 @@ export async function prepareBudgetAttachment(
   }).probe();
   if (
     probe.health !== "version_matched" ||
-    probe.detected_version !== "0.2.0-rc.2"
+    !["0.2.0-rc.2", "0.2.2-rc.5"].includes(probe.detected_version)
   )
     throw new Error(
-      "Budget enforcement requires verified native DSH 0.2.0-rc.2",
+      "Budget enforcement requires verified native DSH 0.2.0-rc.2 or 0.2.2-rc.5",
     );
   const { base, key } = await runtimeFor(project);
   const grant = await send(base, key, "launch", {
@@ -98,6 +98,7 @@ export async function prepareBudgetAttachment(
       RDSH_BUDGET_BASE: base,
       RDSH_BUDGET_KEY: grant.key,
       RDSH_BUDGET_JOB: grant.job_id,
+      RDSH_DSH_CLI_VERSION: probe.detected_version,
     },
     async ready() {
       for (let attempt = 0; attempt < 50; attempt++) {

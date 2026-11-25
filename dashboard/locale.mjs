@@ -116,7 +116,7 @@ export const entries = [
   ["budget.unconfirmed", "未確認", "Unconfirmed", "未确认"],
   ["budget.fits", "次のcallの予約はこの上限内に収まります。他のrun上限も受付時に確認します。", "The next call reservation fits this limit. Other run limits are checked on admission.", "下一次调用的预留符合此限制。接受请求时还会检查其他运行限制。"],
   ["budget.noFit", "次のcallの予約を受け付けられません。上限・未確定費用・期間を確認してください。", "The next call reservation cannot be admitted. Check limits, pending costs and the period.", "无法接受下一次调用的预留。请检查限制、待确认费用和期间。"],
-  ["budget.support", "DSH 0.2.0-rc.2の登録済みフックを使う実行だけが制御対象です。通常起動・Codex・Claude・Kimiは表示のみ。model/providerを自動変更しません。上限変更・再開はローカル管理者のbudgetコマンドから行います。", "Only runs using the registered DSH 0.2.0-rc.2 hook are controlled. Ordinary launches, Codex, Claude and Kimi are display-only. Models and providers are not changed automatically. A local administrator can change limits or resume using the budget command.", "仅控制使用已注册 DSH 0.2.0-rc.2 钩子的运行。普通启动、Codex、Claude 和 Kimi 仅显示状态。不会自动更改模型或提供商。本地管理员可通过 budget 命令更改限制或恢复。"],
+  ["budget.support", "DSH 0.2.0-rc.2/0.2.2-rc.5の登録済みフックを使う実行だけが制御対象です。通常起動・Codex・Claude・Kimiは表示のみ。model/providerを自動変更しません。上限変更・再開はローカル管理者のbudgetコマンドから行います。", "Only runs using the registered DSH 0.2.0-rc.2/0.2.2-rc.5 hook are controlled. Ordinary launches, Codex, Claude and Kimi are display-only. Models and providers are not changed automatically. A local administrator can change limits or resume using the budget command.", "仅控制使用已注册 DSH 0.2.0-rc.2/0.2.2-rc.5 钩子的运行。普通启动、Codex、Claude 和 Kimi 仅显示状态。不会自动更改模型或提供商。本地管理员可通过 budget 命令更改限制或恢复。"],
   ["budget.registered", "DSHフック登録済み", "DSH hook registered", "DSH 钩子已注册"],
   ["budget.ended", "実行終了", "Execution ended", "执行已结束"],
   ["budget.hookUnknown", "フック未確認・新規許可なし", "Hook unconfirmed; no new admission", "钩子未确认；不接受新请求"],

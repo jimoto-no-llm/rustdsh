@@ -13,14 +13,15 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-credentials-local": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-credentials-local": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-mcp-client": "0.2.2-rc.5",
     "@modelcontextprotocol/client": "2.4.0"
   },
   "overrides": {
-    "@deepseek-ai/dsh-mcp-client@0.2.0-rc.2": {
+    "@deepseek-ai/dsh-mcp-client@0.2.2-rc.5": {
       "@modelcontextprotocol/client": "2.4.0"
-    }
+    },
+    "undici": "8.12.3"
   }
 }

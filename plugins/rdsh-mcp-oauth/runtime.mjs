@@ -38,7 +38,7 @@ export async function loadRuntime(packagePath) {
   const pkg = JSON.parse(
     await readFile(join(dirname(mcpPath), "../package.json"), "utf8"),
   );
-  if (pkg.version !== "0.2.0-rc.2")
+  if (pkg.version !== "0.2.2-rc.5")
     throw new Error("MCP OAuth: unsupported DSH MCP version");
   const mcpRequire = createRequire(mcpPath);
   const sdkPath = mcpRequire.resolve("@modelcontextprotocol/client");

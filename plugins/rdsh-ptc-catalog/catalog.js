@@ -99,7 +99,7 @@ const DISCOVERY = `PTC tool discovery: only the catalog helpers and selected too
 
 /** No global registry, cross-scope cache, model calls, or execution adapter. */
 export function createCatalog(registry, renderers, config = {}) {
-  if (typeof registry?.schemas !== 'function' || typeof registry?.get !== 'function')
+  if (typeof registry?.schemas !== 'function' || typeof registry?.executable !== 'function')
     throw new CatalogError('RDSH_CATALOG_RUNTIME', 'The original DSH tools registry is required');
   const options = validateConfig(config);
 
@@ -132,7 +132,7 @@ export function createCatalog(registry, renderers, config = {}) {
     // Recheck this exact scope at describe/assembly time. The callback itself,
     // timeout metadata, internal guard reasons and server config never leave.
     const schema = visibleSchemas.find(candidate => candidate.name === name && name !== 'run_code');
-    const definition = schema && registry.get(name, scope);
+    const definition = schema && registry.executable(name, scope);
     if (!definition) return undefined;
     return {
       name: schema.name,
@@ -217,7 +217,7 @@ export function createCatalog(registry, renderers, config = {}) {
 
   function inline(scope, language, definitions) {
     for (const definition of definitions) {
-      if (registry.get(definition.name, scope) !== definition)
+      if (registry.executable(definition.name, scope) !== definition)
         throw new CatalogError('RDSH_CATALOG_SCOPE_UNAVAILABLE', 'This PTC scope does not expose the catalog helpers; no declarations were silently omitted');
     }
     const visibleSchemas = registry.schemas(scope);

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile, rename, unlink } from "node:fs/promises";
 
 export const ORIGINAL_SHA256 =
-  "758d8fc473b700b5d351158d06ce9f9e92c16e8b25497b08bb7bd2122a87f5dd";
+  "879b2364e28563626697dd5e3dcf64dcae61dd215dc8f21b283cb7616a672bde";
 const replacements = [
   [
     "function createTransport(config) {",
@@ -13,20 +13,28 @@ const replacements = [
     "{ ...httpOptions, requestInit: { headers: config.headers } });",
   ],
   [
-    "function startConnection(ctx, config, policy) {",
-    "function startConnection(ctx, config, policy, httpOptions) {",
+    "connect(config, timeoutMs) {",
+    "connect(config, timeoutMs, httpOptions) {",
   ],
   [
-    "transport = createTransport(config);",
-    "transport = createTransport(config, httpOptions);",
+    "const transport = this.transport = createTransport(config);",
+    "const transport = this.transport = createTransport(config, httpOptions);",
+  ],
+  [
+    "function startConnection(ctx, config, policy, status) {",
+    "function startConnection(ctx, config, policy, status, httpOptions) {",
+  ],
+  [
+    "await record.wire.connect(resolved, remaining());",
+    "await record.wire.connect(resolved, remaining(), httpOptions);",
   ],
   [
     "async function apply(ctx, config) {",
     "async function apply(ctx, config, httpOptions) {",
   ],
   [
-    "startConnection(ctx, config, reconnect);",
-    "startConnection(ctx, config, reconnect, httpOptions);",
+    "const connection = startConnection(ctx, config, reconnect, status);",
+    "const connection = startConnection(ctx, config, reconnect, status, httpOptions);",
   ],
 ];
 export const sha256 = (data) => createHash("sha256").update(data).digest("hex");

@@ -103,7 +103,7 @@ function profileOptions(profile) {
 async function writePiFixture(root) {
   const pi = path.join(root, 'pi-ai');
   await mkdir(path.join(pi, 'dist/api'), { recursive: true });
-  await writeFile(path.join(pi, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-ai', version: '0.87.1', type: 'module' }));
+  await writeFile(path.join(pi, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-ai', version: '1.6.0', type: 'module' }));
   await writeFile(path.join(pi, 'dist/session-resources.js'), sessionResources);
   await writeFile(path.join(pi, 'dist/api/openai-codex-responses.js'), codexResponses);
   return pi;
@@ -161,7 +161,7 @@ test('adapter fork accepts node-ws only as an explicit provider field', async ()
   const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-dsh-adapter-fixture-'));
   const adapterDir = path.join(root, 'dsh-llm-pi-ai');
   await mkdir(path.join(adapterDir, 'lib'), { recursive: true });
-  await writeFile(path.join(adapterDir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-llm-pi-ai', version: '0.2.0-rc.2' }));
+  await writeFile(path.join(adapterDir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-llm-pi-ai', version: '0.2.2-rc.5' }));
   await writeFile(path.join(adapterDir, 'lib/index.js'), adapter);
   await runtime.patchDshAdapterDirectory(adapterDir);
   const patched = await readFile(path.join(adapterDir, 'lib/index.js'), 'utf8');

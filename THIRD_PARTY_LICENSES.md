@@ -12,12 +12,13 @@ declare MIT at those versions:
 
 | Package | Pinned version | License |
 | --- | --- | --- |
-| `@deepseek-ai/dsh` | `0.2.0-rc.2` | MIT |
-| `@deepseek-ai/dsh-tool-bash` | `0.2.0-rc.2` | MIT |
-| `@deepseek-ai/dsh-subagent` | `0.2.0-rc.2` | MIT |
-| `@deepseek-ai/dsh-workflow-ptc` | `0.2.0-rc.2` | MIT |
-| `@deepseek-ai/dsh-mcp-client` | `0.2.0-rc.2` | MIT |
-| `@deepseek-ai/cordis` | `4.0.4` | MIT |
+| `@deepseek-ai/dsh` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-hook-protocol` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-tool-bash` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-subagent` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-workflow-ptc` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/dsh-mcp-client` | `0.2.0-rc.2`, `0.2.2-rc.5` | MIT |
+| `@deepseek-ai/cordis` | `4.0.4`, `4.1.0` | MIT |
 
 Other packages in that scope are published under their own terms and their
 license is not fixed across versions: check the package you install. The
