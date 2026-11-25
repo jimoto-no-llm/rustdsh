@@ -36,7 +36,7 @@ City停止で中断され、DSHセッションヘッダーのみが残った。A
 
 ```sh
 export RDSH_LOCAL_ROOT="$HOME/.local/share/deepflow-swarm/runs/gascity-dsh-ten-20261018-main2f89d31"
-repo=/mnt/c/Users/ryo-n/Codex_dev/rustdsh
+repo="${RDSH_REPO_DIR:-$HOME/Projects/rustdsh}"
 sh "$repo/scripts/gascity-local.sh" status
 ```
 

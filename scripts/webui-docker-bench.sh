@@ -19,8 +19,8 @@
 set -u
 
 IMAGE=node:22-slim
-DSH=/home/sahen/.local/opt/dsh-original
-PLUGIN=/var/tmp/wt-uiperf/plugins/rdsh-web-cache
+DSH=${DSH:-$HOME/.local/opt/dsh-original}
+PLUGIN=${PLUGIN:-${RDSH_BENCH_DIR:-$HOME/.local/share/rdsh-bench}/plugins/rdsh-web-cache}
 ROUNDS=${ROUNDS:-5}
 PORT_A=18210
 PORT_B=18211

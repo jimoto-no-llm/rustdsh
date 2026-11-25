@@ -66,6 +66,7 @@ https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/SETUP.md
 - [低スペック環境向け](#低スペック環境向け)
 - [Web UI とダッシュボード](#web-ui-とダッシュボード)
 - [Smart-DSH との併用](#smart-dsh-との併用)
+- [Web ダッシュボード](#web-ダッシュボード)
 - [実測ベンチマーク](#実測ベンチマーク)
 - [安全設計](#安全設計)
 - [よくある質問](#よくある質問)
@@ -614,6 +615,8 @@ rdsh --profile web                             # プラグイン付きで起動
 ```
 
 ポート番号（DSH Web: `3080`、rdsh serve: `38080`）も競合しません。
+
+## Web ダッシュボード
 
 DSH の会話 GUI に読み取り専用の workflow 進捗ボードを追加する場合は、[対応sourceへの適用・診断ツール](plugins/workflow-board/README.ja.md)を隔離された対象の checkout に適用して使用します。board と共通表示 projection を変更する18ファイルの patch や fixture テストを同梱していますが、patched DSH の build および採用は別工程となります。
 

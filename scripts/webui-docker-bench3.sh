@@ -16,9 +16,9 @@
 set -u
 
 IMAGE=node:22-trixie
-DSH=/home/sahen/.local/opt/dsh-original
-RDSH=/var/tmp/wt-uiperf/target/release/rdsh
-PLUGIN=/var/tmp/wt-uiperf/plugins/rdsh-web-cache
+DSH=${DSH:-$HOME/.local/opt/dsh-original}
+RDSH=${RDSH:-${RDSH_BENCH_DIR:-$HOME/.local/share/rdsh-bench}/target/release/rdsh}
+PLUGIN=${PLUGIN:-${RDSH_BENCH_DIR:-$HOME/.local/share/rdsh-bench}/plugins/rdsh-web-cache}
 ROUNDS=${ROUNDS:-5}
 WORK=/tmp/ct3
 OUT=/tmp/ct3-results.txt

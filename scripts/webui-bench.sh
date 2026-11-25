@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-DSH_ORIG=${DSH_ORIG:-$(command -v dsh-orig || echo /home/sahen/.local/bin/dsh-orig)}
+DSH_ORIG=${DSH_ORIG:-$(command -v dsh-orig || echo "$HOME/.local/bin/dsh-orig")}
 
 # boot_median: N isolated boots, each on its own port, printing every sample.
 boot_median() {

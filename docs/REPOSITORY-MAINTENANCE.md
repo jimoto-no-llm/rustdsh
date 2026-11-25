@@ -28,11 +28,12 @@ python3 scripts/prune-merged-branches.py
 ```
 
 適用するときは、すべての worktree の外側に新しいバックアップ先を指定します。
-この環境では外部保存先のマウントを確認してから使用します。
+外部保存先を使う環境では、まずそのマウントを確認してから指定します。
+`<backup-mount>` は実際の外部保存先に置き換えます。
 
 ```sh
-mountpoint /home/sahen/Projects/external-migration
-RDSH_BRANCH_BACKUP="/home/sahen/Projects/external-migration/rustdsh-maintenance/branches-$(date +%Y%m%d-%H%M%S)"
+mountpoint "<backup-mount>"
+RDSH_BRANCH_BACKUP="<backup-mount>/rustdsh-maintenance/branches-$(date +%Y%m%d-%H%M%S)"
 python3 scripts/prune-merged-branches.py --apply --backup-dir "$RDSH_BRANCH_BACKUP"
 ```
 
@@ -60,8 +61,8 @@ bundle 保存後に `git remote prune origin --dry-run` を確認し、対象が
 そこで実 head の照合処理をスクリプトへ追加し、追跡参照を整理しました。
 GitHub 上の実ブランチは、この作業では削除していません。
 
-復元用 bundle は
-`/home/sahen/Projects/external-migration/rustdsh-maintenance/branch-backups-20261013-1f36c90/refs.bundle`
+復元用 bundle は、`<backup-mount>` の実環境における
+`rustdsh-maintenance/branch-backups-20261013-1f36c90/refs.bundle`
 に保存済みです。別エージェントの作業中にも新しい参照が追加されるため、
 本数だけで削除を進めず、未統合および Open PR の差分を保持します。
 

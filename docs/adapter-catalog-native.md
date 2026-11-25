@@ -57,7 +57,7 @@ Rust統合1件・既存CLI locale 16件・native dispatch/help登録2件が成�
 Clippyは既存の7件（独立PR #667）で失敗する。無断install・依存のコピー・skipで回避しない。
 
 その後、baseline `4853688`・canonical `ffd2378` と同一のcatalog 11ファイルを持つ検証head `cba9774` の
-[専用CI](https://github.com/paisu-supai/rustdsh/actions/runs/38888443751)でWindows/Linux/macOSの各6件が
+検証用一時fork上の専用CIでWindows/Linux/macOSの各6件が
 成功した（full CLI 4件＋native 2件、全てfail/skipなし）。両complete checkoutに宣言済dependenciesを
 通常のnpm ciで導入し、3 warmup・7交互標本で旧実CLI・Rust直・qualified Node CLIを比較した。
 全出力byte一致、exit0、stderr空。旧CLI/直/bridgeの中央値msはLinux 349.970/2.462/360.898、

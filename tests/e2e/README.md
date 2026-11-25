@@ -182,7 +182,7 @@ node tests/e2e/discord-wsl.mjs
 製品側の判定と名前付きパイプへの接続が動くことを確認します。
 
 ```sh
-env -u WSL_DISTRO_NAME PATH=/home/sahen/.local/bin:/usr/local/bin:/usr/bin:/bin node tests/e2e/discord-wsl.mjs
+env -u WSL_DISTRO_NAME PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" node tests/e2e/discord-wsl.mjs
 ```
 
 The bundled dsh Application ID is used by default. To explicitly publish a live
