@@ -84,36 +84,44 @@ pub fn select_cut(request: &CutRequest<'_>) -> Option<Cut> {
     let mut end = len;
     let mut kept: u64 = 0;
     while end > start && kept.saturating_add(items[end - 1].size) <= request.retain {
-        kept += items[end - 1].size;
+        kept = kept.saturating_add(items[end - 1].size);
         end -= 1;
     }
 
     // 対象より前にある呼び出しへの答えは、対象に入れない。
-    loop {
-        let orphan = (start..end).find(|&index| match &items[index].kind {
-            ItemKind::ToolResult { call_id } => !has_call(&items[start..index], call_id),
-            _ => false,
-        });
-        match orphan {
-            Some(index) => start = index + 1,
-            None => break,
-        }
-    }
-
     // 切れ目で割れた組は、切れ目を新しい側へ動かして対象に入れる。
+    // end を広げると新しい orphan が範囲に入ることがあるので、どちらの
+    // 調整も動かなくなるまで固定点で繰り返す（start と end は単調にしか
+    // 動かないので必ず止まる）。
     loop {
-        let mut next = end;
-        for index in start..end {
-            if let Pairing::Answered(found) = pairing(items, index) {
-                if found >= next {
-                    next = found + 1;
-                }
+        let before = (start, end);
+        loop {
+            let orphan = (start..end).find(|&index| match &items[index].kind {
+                ItemKind::ToolResult { call_id } => !has_call(&items[start..index], call_id),
+                _ => false,
+            });
+            match orphan {
+                Some(index) => start = index + 1,
+                None => break,
             }
         }
-        if next == end {
+        loop {
+            let mut next = end;
+            for index in start..end {
+                if let Pairing::Answered(found) = pairing(items, index) {
+                    if found >= next {
+                        next = found + 1;
+                    }
+                }
+            }
+            if next == end {
+                break;
+            }
+            end = next;
+        }
+        if (start, end) == before {
             break;
         }
-        end = next;
     }
 
     // 答えの返っていない呼び出しは、残す側に置く。
@@ -137,7 +145,10 @@ pub fn select_cut(request: &CutRequest<'_>) -> Option<Cut> {
     if start >= end {
         return None;
     }
-    let size: u64 = items[start..end].iter().map(|item| item.size).sum();
+    let size: u64 = items[start..end]
+        .iter()
+        .map(|item| item.size)
+        .fold(0u64, u64::saturating_add);
     Some(Cut {
         range: start..end,
         size,
@@ -318,6 +329,56 @@ mod tests {
             retain: 0,
             keep_first_user: true,
         });
+        assert_eq!(cut, None);
+    }
+
+    #[test]
+    fn huge_sizes_saturate_instead_of_overflowing() {
+        let items = vec![
+            item(ItemKind::System, u64::MAX),
+            item(ItemKind::User, u64::MAX),
+            item(ItemKind::Assistant, u64::MAX),
+            item(ItemKind::Assistant, u64::MAX),
+        ];
+        // No panic, no wrap: the total saturates at u64::MAX.
+        let cut = select_cut(&CutRequest {
+            items: &items,
+            retain: 0,
+            keep_first_user: false,
+        })
+        .unwrap();
+        assert_eq!(cut.size, u64::MAX);
+        // With retain = u64::MAX everything fits in the tail and nothing is
+        // left to cut; saturating `kept` must not wrap around and cut anyway.
+        let none = select_cut(&CutRequest {
+            items: &items,
+            retain: u64::MAX,
+            keep_first_user: false,
+        });
+        assert_eq!(none, None);
+    }
+
+    #[test]
+    fn extending_end_rechecks_for_orphan_results() {
+        // b1's answer sits in the retained tail, so pairing widens the cut;
+        // the widening pulls in a ToolResult whose call is nowhere inside.
+        let items = vec![
+            item(ItemKind::User, 1),        // 0: kept first
+            item(calls(&["b1"]), 1),        // 1
+            item(calls(&["b2"]), 1),        // 2
+            item(ItemKind::Assistant, 1),   // 3
+            item(result("b2"), 1),          // 4
+            item(result("x"), 1),           // 5: orphan once pulled in
+            item(result("b1"), 1),          // 6
+            item(ItemKind::Assistant, 999), // 7
+        ];
+        let cut = select_cut(&CutRequest {
+            items: &items,
+            retain: 1001,
+            keep_first_user: true,
+        });
+        // The only safe outcome here is to give up; what must never happen is
+        // a range that contains the orphan ToolResult.
         assert_eq!(cut, None);
     }
 }

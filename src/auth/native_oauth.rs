@@ -25,13 +25,40 @@ fn load_at(path: &Path, provider: &str, now: i64) -> Result<Option<Grant>> {
     if !matches!(provider, "openai-codex") {
         return Ok(None);
     }
-    if !path.exists() {
-        return Ok(None);
+    // Open exactly once and keep the handle: the permission check and the
+    // parse must describe the same file, otherwise a symlink swapped between
+    // the check and the read could redirect the grant load. On Unix
+    // O_NOFOLLOW fails the open when the final component is a symlink, so a
+    // planted link can never be followed at all.
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
     }
-    if crate::file_security::others_can_read(path) {
-        bail!("NATIVE_OAUTH_STORE_PERMISSIONS");
+    let mut file = match options.open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        // A symlink (ELOOP), a permission refusal, or any other open failure
+        // fails closed with the permissions diagnosis.
+        Err(_) => bail!("NATIVE_OAUTH_STORE_PERMISSIONS"),
+    };
+    let meta = file.metadata()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if !meta.is_file() || meta.mode() & 0o077 != 0 {
+            bail!("NATIVE_OAUTH_STORE_PERMISSIONS");
+        }
     }
-    let doc = super::load_doc(&path.to_string_lossy());
+    #[cfg(not(unix))]
+    {
+        if !meta.is_file() {
+            bail!("NATIVE_OAUTH_STORE_PERMISSIONS");
+        }
+    }
+    let doc = super::load_doc_from_reader(&mut file);
     if !doc.version_ok {
         bail!("NATIVE_OAUTH_STORE_INVALID");
     }
@@ -150,6 +177,27 @@ mod tests {
             }
             std::fs::remove_file(path).unwrap();
         }
+    }
+    #[test]
+    #[cfg(unix)]
+    fn symlinked_store_is_never_trusted() {
+        use std::os::unix::fs::PermissionsExt;
+        let real = fixture(&document(TOKEN));
+        std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let link = real.with_extension("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        // The 0644 target would itself be rejected, and the symlink adds the
+        // repointing risk on top.
+        assert!(load_at(&link, "openai-codex", 0).is_err());
+        std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(
+            load_at(&link, "openai-codex", 0).is_err(),
+            "a symlink is never trusted, even onto a 0600 target"
+        );
+        // The same content in a real 0600 file still loads.
+        assert!(load_at(&real, "openai-codex", 0).unwrap().is_some());
+        std::fs::remove_file(&link).unwrap();
+        std::fs::remove_file(&real).unwrap();
     }
     #[test]
     #[cfg(unix)]

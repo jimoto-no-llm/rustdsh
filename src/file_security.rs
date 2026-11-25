@@ -727,6 +727,12 @@ pub(crate) fn others_can_read(path: &Path) -> bool {
         let Ok(metadata) = std::fs::symlink_metadata(path) else {
             return false;
         };
+        // A symlink is never acceptable: its target can be repointed between
+        // any check and the read, so it counts as exposed no matter what mode
+        // the current target carries.
+        if metadata.file_type().is_symlink() {
+            return true;
+        }
         metadata.is_file() && metadata.mode() & 0o077 != 0
     }
     #[cfg(not(unix))]
@@ -791,6 +797,28 @@ mod private_state_tests {
         }
         assert!(!others_can_read(&path.with_extension("missing")));
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_counts_as_exposed() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let root = std::env::temp_dir().join(format!("rdsh-creds-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let target = root.join("target");
+        std::fs::write(&target, b"x").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let link = root.join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        // Even onto a 0600 target the link itself is untrusted.
+        assert!(others_can_read(&link), "a symlink can be repointed: unsafe");
+        assert!(!others_can_read(&target));
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(others_can_read(&link));
+        assert!(others_can_read(&target));
+        assert!(!others_can_read(&root.join("missing")));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
 #[cfg(test)]

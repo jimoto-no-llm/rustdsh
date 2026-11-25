@@ -48,6 +48,14 @@ use crate::locale::Locale;
 const MAX_BINARY_BYTES: usize = 200 * 1024 * 1024;
 /// Ceiling for the release JSON and a `.sha256` sidecar.
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
+/// GitLab mirror of the rustxng releases (issue #1150). Public project
+/// sahenjp/rustxng-mirror, numeric id pinned so a renamed project never
+/// silently redirects the download.
+const GITLAB_RELEASES_API: &str =
+    "https://gitlab.com/api/v4/projects/89398191/releases?per_page=10";
+const GITLAB_PACKAGE_PREFIX: &str =
+    "https://gitlab.com/api/v4/projects/89398191/packages/generic/rustxng/";
+const GITLAB_RELEASES_PREFIX: &str = "https://gitlab.com/sahenjp/rustxng-mirror/-/releases/";
 const API_TIMEOUT: Duration = Duration::from_secs(20);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 /// How long `<binary> --version` may take before the binary counts as broken.
@@ -276,20 +284,45 @@ fn write_banner_report(path: &Path, from: Option<&str>, to: &str) {
     );
     let body = serde_json::Value::Object(document).to_string();
     if let Some(parent) = path.parent() {
-        if std::fs::create_dir_all(parent).is_err() {
-            return;
+        if !parent.is_dir() {
+            let mut builder = std::fs::DirBuilder::new();
+            builder.recursive(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            if builder.create(parent).is_err() {
+                return;
+            }
         }
     }
-    let tmp = path.with_extension("json.tmp");
-    if std::fs::write(&tmp, body).is_err() {
+    // A unique, freshly-created 0600 temp file: `create_new` never follows a
+    // planted symlink, and the mode is set before the file can be read.
+    let nonce =
+        crate::local_http::random_token().unwrap_or_else(|_| format!("{}", std::process::id()));
+    let tmp = path.with_extension(format!("json.tmp.{nonce}"));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let written = options.open(&tmp).and_then(|mut file| {
+        use std::io::Write;
+        file.write_all(body.as_bytes())?;
+        file.sync_all()
+    });
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
         return;
     }
-    let replaced = std::fs::rename(&tmp, path);
-    if replaced.is_err() && path.exists() {
-        let _ = std::fs::remove_file(path);
-        let _ = std::fs::rename(&tmp, path);
+    // Atomic rename; the previous file is replaced by rename(2) itself, never
+    // deleted first, so a failure leaves the old report readable.
+    if std::fs::rename(&tmp, path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
-    let _ = std::fs::remove_file(&tmp);
 }
 
 pub(crate) fn load_state(path: &Path) -> UpdateState {
@@ -470,7 +503,9 @@ fn https_host(url: &str) -> Option<&str> {
     Some(host)
 }
 
-/// Hosts a request or redirect may land on: GitHub itself and its asset CDN.
+/// Hosts a request or redirect may land on: GitHub itself and its asset CDN,
+/// plus the GitLab mirror hosts (the mirror is the fallback release source,
+/// issue #1150).
 pub(crate) fn allowed_url(url: &str) -> bool {
     let Some(host) = https_host(url) else {
         return false;
@@ -480,11 +515,24 @@ pub(crate) fn allowed_url(url: &str) -> bool {
         || host == "api.github.com"
         || host == "githubusercontent.com"
         || host.ends_with(".githubusercontent.com")
+        || host == "gitlab.com"
+        || host.ends_with(".gitlab.com")
+        || host.ends_with(".gitlab-static.net")
 }
 
-/// A release asset URL must be a download of INSTALL_REPO's own releases.
+/// A release asset URL must be a download of INSTALL_REPO's own releases, or
+/// a verified GitLab mirror asset.
 pub(crate) fn allowed_asset_url(url: &str) -> bool {
-    allowed_asset_url_for(INSTALL_REPO, url)
+    allowed_asset_url_for(INSTALL_REPO, url) || gitlab_mirror_asset_url(url)
+}
+
+/// The GitLab mirror publishes each asset twice: through the generic package
+/// registry API and as a release direct-asset link. Both prefixes are pinned
+/// to the one mirror project; anything else on gitlab.com is refused.
+fn gitlab_mirror_asset_url(url: &str) -> bool {
+    allowed_url(url)
+        && (url.starts_with(GITLAB_PACKAGE_PREFIX) || url.starts_with(GITLAB_RELEASES_PREFIX))
+        && !url.contains("..")
 }
 
 /// The same rule for another repository (the bundled plugins archive).
@@ -590,8 +638,100 @@ pub(crate) fn parse_release(json: &str) -> Result<Release> {
     })
 }
 
-fn fetch_release(fetch: &dyn Fetch) -> Result<Release> {
-    fetch_release_from(fetch, &latest_api_url())
+/// Resolve the release to install: GitHub first, then the GitLab mirror
+/// when GitHub is unreachable (HTTP 404, rate limited, offline) or carries
+/// no asset for this host. The newest mirror release that ships both the
+/// matching binary asset and its `.sha256` sidecar wins; the sidecar is
+/// mandatory there because the mirror API publishes no digest field.
+pub(crate) fn fetch_release(fetch: &dyn Fetch) -> Result<Release> {
+    let triple = target_triple();
+    let github = fetch_release_from(fetch, &latest_api_url());
+    let usable = matches!(&github, Ok(release) if choose_asset(&release.assets, triple).is_some());
+    if usable {
+        return github;
+    }
+    if let Some(release) = fetch_gitlab_release(fetch, triple) {
+        return Ok(release);
+    }
+    match github {
+        Err(e) => Err(e),
+        Ok(_) => Err(anyhow::anyhow!(
+            "no release asset matches {triple} on GitHub or the GitLab mirror"
+        )),
+    }
+}
+
+/// Newest-first mirror release carrying this host's binary and its sidecar.
+fn fetch_gitlab_release(fetch: &dyn Fetch, triple: &str) -> Option<Release> {
+    let body = fetch
+        .get(GITLAB_RELEASES_API, MAX_TEXT_BYTES, API_TIMEOUT)
+        .ok()?;
+    let mut releases = parse_gitlab_releases(&String::from_utf8_lossy(&body));
+    releases.sort_by(|a, b| b.version.cmp(&a.version));
+    releases.into_iter().find(|release| {
+        let Some(asset) = choose_asset(&release.assets, triple) else {
+            return false;
+        };
+        let sidecar = format!("{}.sha256", asset.name);
+        allowed_asset_url(&asset.url)
+            && release
+                .assets
+                .iter()
+                .any(|a| a.name == sidecar && allowed_asset_url(&a.url))
+    })
+}
+
+/// Parse the GitLab mirror's `/releases` array. Entries without a plain semver
+/// tag or without usable asset links are dropped, never fatal.
+fn parse_gitlab_releases(json: &str) -> Vec<Release> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in value.as_array().into_iter().flatten() {
+        let Some(tag) = entry.get("tag_name").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(version) = parse_version(tag).filter(|v| v.pre.is_none()) else {
+            continue;
+        };
+        let mut assets = Vec::new();
+        if let Some(links) = entry
+            .get("assets")
+            .and_then(|a| a.get("links"))
+            .and_then(|l| l.as_array())
+        {
+            for link in links {
+                let Some(name) = link.get("name").and_then(|v| v.as_str()) else {
+                    continue;
+                };
+                // Prefer the canonical generic-package URL; the direct asset
+                // link is the fallback spelling.
+                let url = link
+                    .get("url")
+                    .and_then(|v| v.as_str())
+                    .filter(|u| gitlab_mirror_asset_url(u))
+                    .or_else(|| {
+                        link.get("direct_asset_url")
+                            .and_then(|v| v.as_str())
+                            .filter(|u| gitlab_mirror_asset_url(u))
+                    });
+                if let Some(url) = url {
+                    assets.push(ReleaseAsset {
+                        name: name.to_string(),
+                        url: url.to_string(),
+                    });
+                }
+            }
+        }
+        out.push(Release {
+            tag: tag.to_string(),
+            version,
+            assets,
+            digests: HashMap::new(),
+        });
+    }
+    out
 }
 
 /// Fetch and parse a release JSON (`/releases/latest` or `/releases/tags/<tag>`).
@@ -645,7 +785,7 @@ pub(crate) fn verify_sources(bytes: &[u8], sources: &[Option<&str>]) -> Result<(
 }
 
 /// Download this host's release binary and prove it is the published one.
-fn download_verified(fetch: &dyn Fetch, release: &Release) -> Result<Vec<u8>> {
+pub(crate) fn download_verified(fetch: &dyn Fetch, release: &Release) -> Result<Vec<u8>> {
     let triple = target_triple();
     let asset = choose_asset(&release.assets, triple)
         .ok_or_else(|| anyhow::anyhow!("no release asset matches {triple}"))?;
@@ -2011,5 +2151,215 @@ mod tests {
         assert!(!path.exists());
         assert!(UpdateLock::acquire(&path).is_some());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A GitLab mirror payload covering v0.40.0 (linux-gnu only) and v0.32.0
+    /// (this host), optionally with a sidecar for the host asset.
+    fn mirror_payload(host_sidecar: bool) -> serde_json::Value {
+        let triple = target_triple();
+        let pkg = GITLAB_PACKAGE_PREFIX;
+        let host_bin = format!("rustxng-v0.32.0-{triple}");
+        let mut host_links = vec![serde_json::json!({
+            "name": host_bin,
+            "url": format!("{pkg}0.32.0/{host_bin}"),
+            "direct_asset_url": format!("{GITLAB_RELEASES_PREFIX}v0.32.0/downloads/{host_bin}"),
+        })];
+        if host_sidecar {
+            host_links.push(serde_json::json!({
+                "name": format!("{host_bin}.sha256"),
+                "url": format!("{pkg}0.32.0/{host_bin}.sha256"),
+            }));
+        }
+        serde_json::json!([
+            // Newest, but without a sidecar: never selectable.
+            {"tag_name": "v0.41.0", "assets": {"links": [serde_json::json!({
+                "name": format!("rustxng-v0.41.0-{triple}"),
+                "url": format!("{pkg}0.41.0/bin"),
+            })]}},
+            {"tag_name": "not-a-version", "assets": {"links": []}},
+            {"tag_name": "v0.40.0", "assets": {"links": [
+                serde_json::json!({"name": "rustxng-v0.40.0-x86_64-unknown-linux-gnu",
+                    "url": format!("{pkg}0.40.0/rustxng-v0.40.0-x86_64-unknown-linux-gnu")}),
+                serde_json::json!({"name": "rustxng-v0.40.0-x86_64-unknown-linux-gnu.sha256",
+                    "url": format!("{pkg}0.40.0/rustxng-v0.40.0-x86_64-unknown-linux-gnu.sha256")}),
+            ]}},
+            {"tag_name": "v0.32.0", "assets": {"links": host_links}},
+        ])
+    }
+
+    #[test]
+    fn mirror_listing_selects_the_newest_release_with_a_sidecar() {
+        let releases = parse_gitlab_releases(&mirror_payload(true).to_string());
+        assert_eq!(releases.len(), 3, "invalid tags drop out");
+        let mut table = HashMap::new();
+        table.insert(
+            GITLAB_RELEASES_API.to_string(),
+            mirror_payload(true).to_string().into_bytes(),
+        );
+        let fetch = FakeFetch {
+            table,
+            calls: Default::default(),
+        };
+        let triple = target_triple();
+        let selected = fetch_gitlab_release(&fetch, triple).expect("a mirror release");
+        let expected = if triple == "x86_64-unknown-linux-gnu" {
+            "v0.40.0"
+        } else {
+            "v0.32.0"
+        };
+        assert_eq!(selected.tag, expected);
+        // Without the host sidecar nothing on the mirror is selectable.
+        let mut table = HashMap::new();
+        table.insert(
+            GITLAB_RELEASES_API.to_string(),
+            mirror_payload(false).to_string().into_bytes(),
+        );
+        let fetch = FakeFetch {
+            table,
+            calls: Default::default(),
+        };
+        if triple == "x86_64-unknown-linux-gnu" {
+            assert_eq!(fetch_gitlab_release(&fetch, triple).unwrap().tag, "v0.40.0");
+        } else {
+            assert!(fetch_gitlab_release(&fetch, triple).is_none());
+        }
+    }
+
+    #[test]
+    fn mirror_asset_urls_are_pinned_to_the_mirror_project() {
+        assert!(allowed_asset_url("https://gitlab.com/api/v4/projects/89398191/packages/generic/rustxng/0.40.0/rustxng-v0.40.0-x86_64-unknown-linux-gnu"));
+        assert!(allowed_asset_url("https://gitlab.com/sahenjp/rustxng-mirror/-/releases/v0.40.0/downloads/rustxng-v0.40.0-x86_64-unknown-linux-gnu"));
+        assert!(allowed_url(
+            "https://gitlab.com/api/v4/projects/89398191/releases?per_page=10"
+        ));
+        for bad in [
+            "https://gitlab.com/api/v4/projects/1/packages/generic/rustxng/0.40.0/x",
+            "https://gitlab.com/other/repo/-/releases/v0.40.0/downloads/x",
+            "https://evil.example/api/v4/projects/89398191/packages/generic/rustxng/x",
+            "https://gitlab.com/api/v4/projects/89398191/packages/generic/rustxng/../x",
+            "http://gitlab.com/api/v4/projects/89398191/packages/generic/rustxng/x",
+        ] {
+            assert!(!allowed_asset_url(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn update_falls_back_to_the_mirror_and_verifies_the_sidecar() {
+        let dir = temp_dir("run-gitlab");
+        let dest = dir.join(exe_name("rustxng"));
+        std::fs::write(&dest, b"OLD").unwrap();
+        let triple = target_triple();
+        let host_bin = format!("rustxng-v0.32.0-{triple}");
+        let bin_url = format!("{GITLAB_PACKAGE_PREFIX}0.32.0/{host_bin}");
+        let digest = sha(ELF);
+        let mut table = HashMap::new();
+        table.insert(
+            GITLAB_RELEASES_API.to_string(),
+            mirror_payload(true).to_string().into_bytes(),
+        );
+        table.insert(bin_url.clone(), ELF.to_vec());
+        table.insert(
+            format!("{bin_url}.sha256"),
+            format!("{digest}  {host_bin}\n").into_bytes(),
+        );
+        let linux_bin = "rustxng-v0.40.0-x86_64-unknown-linux-gnu";
+        let linux_url = format!("{GITLAB_PACKAGE_PREFIX}0.40.0/{linux_bin}");
+        table.insert(linux_url.clone(), ELF.to_vec());
+        table.insert(
+            format!("{linux_url}.sha256"),
+            format!("{digest}  {linux_bin}\n").into_bytes(),
+        );
+        let fetch = FakeFetch {
+            table,
+            calls: Default::default(),
+        };
+        let mut state = UpdateState::default();
+        let report =
+            run_update(&fetch, &dest, false, &probe_reading("0.4.1"), &mut state, 7).unwrap();
+        assert_eq!(report.action, Action::Updated);
+        let expected = if triple == "x86_64-unknown-linux-gnu" {
+            "v0.40.0"
+        } else {
+            "v0.32.0"
+        };
+        assert_eq!(report.latest_tag, expected);
+        assert_eq!(std::fs::read(&dest).unwrap(), ELF);
+        // GitHub was probed first and failed (offline in this fixture); every
+        // later request went to the mirror.
+        let calls = fetch.calls.borrow();
+        assert_eq!(
+            calls.first().map(String::as_str),
+            Some(latest_api_url().as_str())
+        );
+        assert!(calls.len() >= 3);
+        assert!(calls[1..].iter().all(|u| u.contains("gitlab.com")));
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        // A mirror asset whose sidecar digest disagrees is refused.
+        let dir = temp_dir("run-gitlab-bad");
+        let dest = dir.join(exe_name("rustxng"));
+        std::fs::write(&dest, b"OLD").unwrap();
+        let mut table = HashMap::new();
+        table.insert(
+            GITLAB_RELEASES_API.to_string(),
+            mirror_payload(true).to_string().into_bytes(),
+        );
+        table.insert(bin_url.clone(), ELF.to_vec());
+        table.insert(
+            format!("{bin_url}.sha256"),
+            format!("{}  {host_bin}\n", "f".repeat(64)).into_bytes(),
+        );
+        let linux_bin = "rustxng-v0.40.0-x86_64-unknown-linux-gnu";
+        let linux_url = format!("{GITLAB_PACKAGE_PREFIX}0.40.0/{linux_bin}");
+        table.insert(linux_url.clone(), ELF.to_vec());
+        table.insert(
+            format!("{linux_url}.sha256"),
+            format!("{}  {linux_bin}\n", "f".repeat(64)).into_bytes(),
+        );
+        let fetch = FakeFetch {
+            table,
+            calls: Default::default(),
+        };
+        let mut state = UpdateState::default();
+        assert!(run_update(&fetch, &dest, false, &probe_reading("0.4.1"), &mut state, 7).is_err());
+        assert_eq!(std::fs::read(&dest).unwrap(), b"OLD");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn banner_report_is_private_and_atomically_replaced() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = temp_dir("banner-private");
+        let path = home.join("nested").join("update-state.json");
+        write_banner_report(&path, None, "v0.15.1");
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(path.parent().unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        // Replacing an existing report never leaves a gap or a tmp leftover.
+        std::fs::write(&path, "{}").unwrap();
+        write_banner_report(&path, Some("v0.14.0"), "v0.15.1");
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(value["to"], serde_json::json!("v0.15.1"));
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let names: Vec<_> = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names.len(), 1, "only the atomic result remains: {names:?}");
+        std::fs::remove_dir_all(&home).unwrap();
     }
 }

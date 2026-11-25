@@ -339,7 +339,14 @@ mod tests {
         // reproduced on Linux/Node 24.19.0.
         let mut nonce = [0u8; 8];
         getrandom::fill(&mut nonce).unwrap();
-        let directory = Path::new("//tmp").join(format!("rdsh-preload-{}", hex(&nonce)));
+        // Derive the `//`-rooted form from the real temp dir so the test
+        // stays hermetic when TMPDIR points elsewhere.
+        let trimmed = std::env::temp_dir()
+            .to_string_lossy()
+            .trim_start_matches('/')
+            .to_string();
+        let double_slash = format!("//{trimmed}");
+        let directory = Path::new(&double_slash).join(format!("rdsh-preload-{}", hex(&nonce)));
         create_private_directory(&directory).unwrap();
         let path = directory.join(FILE_NAME);
         write_new_private_file(&path, "globalThis.__rdshPreloadRan = 'yes';\n").unwrap();

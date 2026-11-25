@@ -426,9 +426,10 @@ pub fn resolve_plugins_dir(
     if let Some(dir) = &env.plugins_dir {
         push(dir.clone());
     }
-    if let Ok(cwd) = std::env::current_dir() {
-        push(cwd);
-    }
+    // GHSA-5gv9-rpv6-h59r: the working directory is NOT an implicit source.
+    // Whoever happens to launch rdsh controls it, so a forged
+    // rdsh-settings/package.json there must never be trusted unless the user
+    // named it explicitly (--plugins-dir / RDSH_PLUGINS_DIR).
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             push(dir.join("..").join("share").join("rdsh"));
@@ -507,13 +508,18 @@ fn invocation_for(cli: &Path, windows: bool, executable: bool) -> Invocation {
     Invocation::Direct
 }
 
-/// Quote one token for a `cmd.exe` command line.
+/// Quote one token for a `cmd.exe` command line. `%` is doubled so cmd.exe
+/// never expands an attacker-chosen `%VAR%` inside the token, and the control
+/// characters cmd uses as line separators (`\0`, `\r`, `\n`) are dropped:
+/// none of them can belong to a path rdsh legitimately passes.
 fn quote_for_cmd(token: &str) -> String {
     let mut out = String::with_capacity(token.len() + 2);
     out.push('"');
     for ch in token.chars() {
-        if ch == '"' {
-            out.push('"');
+        match ch {
+            '"' | '%' => out.push(ch),
+            '\0' | '\r' | '\n' => continue,
+            _ => {}
         }
         out.push(ch);
     }
@@ -1619,6 +1625,49 @@ mod tests {
             plugins
         );
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// GHSA-5gv9-rpv6-h59r: a forged rdsh-settings manifest in the working
+    /// directory must never be trusted implicitly.
+    #[test]
+    fn cwd_is_not_an_implicit_plugins_dir() {
+        let cwd = std::env::current_dir().unwrap();
+        let root = temp_root("cwdbase");
+        let env = base_env(&root);
+        if let Ok(found) = resolve_plugins_dir(None, &env, crate::locale::Locale::English) {
+            assert_ne!(found, cwd);
+            assert_ne!(found, cwd.join("plugins"));
+        }
+        // Explicitly naming the same directory is of course still honored.
+        if cwd.join("plugins/rdsh-settings/package.json").exists() {
+            let found = resolve_plugins_dir(
+                Some(cwd.to_str().unwrap()),
+                &env,
+                crate::locale::Locale::English,
+            )
+            .unwrap();
+            assert_eq!(found, cwd.join("plugins"));
+            let mut with_env = base_env(&root);
+            with_env.plugins_dir = Some(cwd.clone());
+            assert_eq!(
+                resolve_plugins_dir(None, &with_env, crate::locale::Locale::English).unwrap(),
+                cwd.join("plugins")
+            );
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn cmd_quoting_blocks_variable_expansion_and_control_injection() {
+        // `%VAR%` must stay literal: doubling `%` stops cmd.exe expansion.
+        assert_eq!(quote_for_cmd("100%"), "\"100%%\"");
+        assert_eq!(quote_for_cmd("%USERPROFILE%\\x"), "\"%%USERPROFILE%%\\x\"");
+        // Command separators can never survive into the line.
+        assert_eq!(quote_for_cmd("a\rb\n\0c"), "\"abc\"");
+        // Quotes still double; spaces still survive.
+        assert_eq!(quote_for_cmd("a \"b\" c"), "\"a \"\"b\"\" c\"");
+        let line = windows_cmd_line(Path::new("dsh.cmd"), &["%PATH%".to_string()]);
+        assert!(line.contains("\"%%PATH%%\""), "{line}");
     }
 
     /// 相対の --plugins-dir でも spec は絶対パスになること（相対 spec だと DSH が

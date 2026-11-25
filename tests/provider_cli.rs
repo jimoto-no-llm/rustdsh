@@ -91,7 +91,10 @@ impl Fixture {
             fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
         }
         #[cfg(windows)]
-        let _ = dir;
+        {
+            let source = include_str!("fixtures/curl-models-stub.cmd");
+            fs::write(dir.join("curl.cmd"), source).unwrap();
+        }
     }
 
     fn patch_path(&self) -> PathBuf {

@@ -80,13 +80,13 @@ impl std::error::Error for Error {}
 pub fn missing_binary_hint(locale: crate::locale::Locale) -> String {
     match locale {
         crate::locale::Locale::English => {
-            "rustxng binary not found; set RUSTXNG_BIN=/path/to/rustxng, put rustxng on PATH, or install it to ~/.local/bin/rustxng (rustdsh stays MIT: the AGPL engine runs as a separate process)".to_string()
+            "rustxng binary not found; set RUSTXNG_BIN=/path/to/rustxng, put rustxng on PATH, or install a verified release to ~/.local/bin/rustxng (rdsh rustxng install downloads from GitHub or the https://gitlab.com/sahenjp/rustxng-mirror releases; rustdsh stays MIT: the AGPL engine runs as a separate process)".to_string()
         }
         crate::locale::Locale::Chinese => {
-            "未找到 rustxng 可执行文件；请设置 RUSTXNG_BIN=/path/to/rustxng，或将 rustxng 放入 PATH，或安装到 ~/.local/bin/rustxng（rustdsh 保持 MIT：AGPL 引擎作为独立进程运行）".to_string()
+            "未找到 rustxng 可执行文件；请设置 RUSTXNG_BIN=/path/to/rustxng，或将 rustxng 放入 PATH，或将经过校验的发布版安装到 ~/.local/bin/rustxng（rdsh rustxng install 会从 GitHub 或 https://gitlab.com/sahenjp/rustxng-mirror 的发布页下载；rustdsh 保持 MIT：AGPL 引擎作为独立进程运行）".to_string()
         }
         crate::locale::Locale::Japanese => {
-            "rustxng の実行ファイルが見つかりません。RUSTXNG_BIN=/path/to/rustxng を設定するか、rustxng を PATH に置くか、~/.local/bin/rustxng へインストールしてください（rustdsh は MIT のまま: AGPL エンジンは別プロセスとして動きます）".to_string()
+            "rustxng の実行ファイルが見つかりません。RUSTXNG_BIN=/path/to/rustxng を設定するか、rustxng を PATH に置くか、検証済みリリースを ~/.local/bin/rustxng へインストールしてください（rdsh rustxng install は GitHub または https://gitlab.com/sahenjp/rustxng-mirror のリリースから取得します。rustdsh は MIT のまま: AGPL エンジンは別プロセスとして動きます）".to_string()
         }
     }
 }
@@ -784,8 +784,6 @@ pub fn cmd_stop(locale: crate::locale::Locale) -> Result<()> {
 /// stays a separate AGPL-3.0 program: this downloads a release asset only.
 /// Its source is never vendored or linked (see the module docs above).
 const INSTALL_REPO: &str = "sahenjp/RustXNG";
-/// How long one installer step (API call or asset download) may take.
-const INSTALL_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// The release asset suffix that matches the running host. An unknown host
 /// yields a placeholder no asset matches, so the error can list what exists.
@@ -890,48 +888,20 @@ fn install_failed(locale: crate::locale::Locale, detail: &str) -> anyhow::Error 
 }
 
 /// Download the latest release and place it at `dest` (atomic replace).
-async fn download_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<()> {
-    let client = reqwest::Client::builder()
-        .user_agent(format!("rdsh/{}", env!("CARGO_PKG_VERSION")))
-        .connect_timeout(Duration::from_secs(30))
-        .timeout(INSTALL_TIMEOUT)
-        .build()?;
-    let api = format!("https://api.github.com/repos/{INSTALL_REPO}/releases/latest");
-    let body = client
-        .get(&api)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    let assets = parse_latest_assets(&body);
-    let triple = target_triple();
-    let asset = choose_asset(&assets, triple).ok_or_else(|| {
-        let names = assets
-            .iter()
-            .map(|a| a.name.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        install_failed(
-            locale,
-            &format!("no release asset matches {triple}; the release has: {names}"),
-        )
-    })?;
-    let bytes = client
-        .get(&asset.url)
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
-    anyhow::ensure!(
-        !bytes.is_empty() && looks_like_executable(&bytes),
-        "{}",
-        install_failed(
-            locale,
-            &format!("{} did not download as an executable", asset.name)
-        )
-    );
+///
+/// GHSA-wc7v-cgrc-9r2h: the initial install must meet the same bar as an
+/// update, so this rides the exact same code path: the release is resolved
+/// through [update::fetch_release] (GitHub first, the GitLab mirror as a
+/// fallback), the asset URL is validated against the allowlist, the download
+/// is capped at MAX_BINARY_BYTES, and the bytes are refused unless a sha256
+/// sidecar (and/or the API digest) matches. Nothing unverified is ever
+/// written, let alone executed.
+fn download_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<()> {
+    let fetch = update::HttpsFetch;
+    let release =
+        update::fetch_release(&fetch).map_err(|e| install_failed(locale, &format!("{e:#}")))?;
+    let bytes = update::download_verified(&fetch, &release)
+        .map_err(|e| install_failed(locale, &format!("{e:#}")))?;
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -949,10 +919,7 @@ async fn download_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<
 /// The sync entry point both the install command and the ensure() self-heal
 /// use. Returns the placed binary path.
 fn install_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<PathBuf> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?
-        .block_on(download_sidecar(dest, locale))?;
+    download_sidecar(dest, locale)?;
     Ok(dest.to_path_buf())
 }
 
@@ -1075,7 +1042,7 @@ fn http_get(base: &str, target: &str, timeout: Duration) -> Result<HttpResponse>
             Err(e) => return Err(e.into()),
         }
     }
-    parse_response(&String::from_utf8_lossy(&raw))
+    parse_response(&raw)
 }
 
 fn connect(host: &str, port: u16, deadline: Instant) -> Result<TcpStream> {
@@ -1147,11 +1114,17 @@ impl HttpResponse {
     }
 }
 
-fn parse_response(text: &str) -> Result<HttpResponse> {
-    let (head, body) = text
-        .split_once("\r\n\r\n")
-        .or_else(|| text.split_once("\n\n"))
+/// Parse one response on raw bytes. The head is ASCII in practice, but the
+/// body must stay bytes until chunk decoding finishes: a multi-byte UTF-8
+/// codepoint may be split across two chunks, and slicing a `&str` mid-
+/// codepoint (or computing `start + size` without checking) used to panic.
+fn parse_response(raw: &[u8]) -> Result<HttpResponse> {
+    let split = find_subsequence(raw, b"\r\n\r\n")
+        .map(|at| (at, 4))
+        .or_else(|| find_subsequence(raw, b"\n\n").map(|at| (at, 2)))
         .ok_or_else(|| anyhow::anyhow!("malformed HTTP response"))?;
+    let (head_bytes, body_bytes) = (&raw[..split.0], &raw[split.0 + split.1..]);
+    let head = String::from_utf8_lossy(head_bytes);
     let status = head
         .lines()
         .next()
@@ -1163,31 +1136,49 @@ fn parse_response(text: &str) -> Result<HttpResponse> {
         lower.starts_with("transfer-encoding:") && lower.contains("chunked")
     });
     let body = if chunked {
-        decode_chunked(body)
+        decode_chunked_bytes(body_bytes)
     } else {
-        body.to_string()
+        body_bytes.to_vec()
     };
-    Ok(HttpResponse { status, body })
+    Ok(HttpResponse {
+        status,
+        body: String::from_utf8_lossy(&body).into_owned(),
+    })
 }
 
-/// Decode a chunked body; a truncated stream yields what was decoded so far,
-/// which is enough for a health check.
-fn decode_chunked(body: &str) -> String {
-    let mut out = String::new();
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Decode a chunked body on raw bytes; a truncated stream yields what was
+/// decoded so far, which is enough for a health check.
+fn decode_chunked_bytes(body: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
     let mut rest = body;
-    while let Some(eol) = rest.find("\r\n") {
-        let size = usize::from_str_radix(rest[..eol].trim(), 16).unwrap_or(0);
+    while let Some(eol) = find_subsequence(rest, b"\r\n") {
+        let size = std::str::from_utf8(&rest[..eol])
+            .ok()
+            .and_then(|line| usize::from_str_radix(line.trim(), 16).ok())
+            .unwrap_or(0);
         if size == 0 {
             break;
         }
         let start = eol + 2;
-        if start + size > rest.len() {
-            out.push_str(&rest[start..]);
-            break;
+        // usize::MAX-sized chunks must saturate instead of wrapping or
+        // panicking: a hostile server controls this number.
+        match start.checked_add(size) {
+            Some(end) if end <= rest.len() => {
+                out.extend_from_slice(&rest[start..end]);
+                rest = &rest[end..];
+                rest = rest.strip_prefix(b"\r\n").unwrap_or(rest);
+            }
+            _ => {
+                if start < rest.len() {
+                    out.extend_from_slice(&rest[start..]);
+                }
+                break;
+            }
         }
-        out.push_str(&rest[start..start + size]);
-        rest = &rest[(start + size).min(rest.len())..];
-        rest = rest.strip_prefix("\r\n").unwrap_or(rest);
     }
     out
 }
@@ -1417,19 +1408,19 @@ pub(crate) mod tests {
 
     #[test]
     fn plain_chunked_and_bad_health_responses_are_understood() {
-        let plain = parse_response("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok").unwrap();
+        let plain = parse_response(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok").unwrap();
         assert_eq!(plain.status, 200);
         assert_eq!(plain.body, "ok");
         assert!(plain.healthy());
         let chunked = parse_response(
-            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nok\r\n0\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nok\r\n0\r\n\r\n",
         )
         .unwrap();
         assert_eq!(chunked.body, "ok");
-        assert!(!parse_response("HTTP/1.1 404 Not Found\r\n\r\nnope")
+        assert!(!parse_response(b"HTTP/1.1 404 Not Found\r\n\r\nnope")
             .unwrap()
             .healthy());
-        assert!(parse_response("<html>not http</html>").is_err());
+        assert!(parse_response(b"<html>not http</html>").is_err());
         // The request-line splitter refuses anything injectable, and keeps a
         // path prefix for instances mounted under one.
         assert!(split_base("http://127.0.0.1:8888/x\r\nInjected: yes").is_err());
@@ -1438,6 +1429,35 @@ pub(crate) mod tests {
             split_base("http://127.0.0.1:8888/searx").unwrap(),
             ("127.0.0.1".to_string(), 8888, "/searx".to_string())
         );
+    }
+
+    // A multi-byte UTF-8 codepoint split across two chunks must decode
+    // losslessly: byte-based decoding never slices mid-codepoint.
+    #[test]
+    fn chunked_bodies_split_mid_codepoint_decode_without_panicking() {
+        // "\u{65e5}" (E6 97 A5) split after the second byte; the rest arrives
+        // with "\u{672c}" in the next chunk.
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n\xe6\x97\r\n4\r\n\xa5\xe6\x9c\xac\r\n0\r\n\r\n";
+        let response = parse_response(raw).unwrap();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, "\u{65e5}\u{672c}");
+        // LF-only heads are accepted too.
+        let lf = parse_response(b"HTTP/1.1 200 OK\n\nabc").unwrap();
+        assert_eq!(lf.body, "abc");
+    }
+
+    // A hostile usize::MAX chunk size must saturate instead of wrapping or
+    // panicking; the partial payload is all that is kept.
+    #[test]
+    fn overflowing_chunk_sizes_never_panic() {
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nffffffffffffffff\r\nxx";
+        let response = parse_response(raw).unwrap();
+        assert_eq!(response.body, "xx");
+        assert_eq!(decode_chunked_bytes(b"ffffffffffffffff\r\nxx"), b"xx");
+        assert_eq!(decode_chunked_bytes(b"2\r\nok\r\n0\r\n\r\n"), b"ok");
+        assert_eq!(decode_chunked_bytes(b""), b"");
+        // A size wider than the hex parser accepts decodes as nothing.
+        assert_eq!(decode_chunked_bytes(b"1fffffffffffffffff\r\nxx"), b"");
     }
 
     /// A rustxng stand-in compiled from STUB_SOURCE at test time, so this
