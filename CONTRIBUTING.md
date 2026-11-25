@@ -30,6 +30,9 @@ tests/install-isolated.sh --source local
 (cd dashboard && npm ci && npm test)   # if you touched dashboard/
 # If UI or HTTP behavior changed, follow tests/e2e/README.md and run:
 RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
+# Also run the tests/*.test.mjs that CI does not list (sh scripts/check.sh
+# full picks these up automatically), e.g.:
+node --test tests/tui-web-surface.test.mjs
 ```
 
 ## Pull Request

@@ -80,7 +80,7 @@ browser-e2e）や、どの検証にも対応しない変更ファイルは、`to
 
 ## 手動 PTY / Web surface テスト
 
-次のテストは実端末・Node の `ws`・pyte を必要とするため、どの workflow からも
+次の3つの PTY テストは実端末・Node の `ws`・pyte を必要とするため、どの workflow からも
 実行していません（`sh scripts/check.sh` の対象外です）。UI の描画・入力・承認や
 DSH Remote wire を変えたときに、手元で明示的に実行してください。
 
@@ -89,7 +89,12 @@ DSH Remote wire を変えたときに、手元で明示的に実行してくだ�
 | `tests/native-tui-pty.py` | native バックエンドの全画面PTY（承認、貼り付け、SIGTERM復元） | `python3 tests/native-tui-pty.py ./target/debug/rdsh` |
 | `tests/dsh-tui-pty.py` | DSH Remote wire とTUI（loopback fixture、承認・質問・使用量・再開） | `python3 tests/dsh-tui-pty.py ./target/debug/rdsh --ws-package <dsh>/package.json` |
 | `tests/tui-admin-pty.py` | `/manage` の確認・revision競合・機密マスク・binary転送・stream | `python3 tests/tui-admin-pty.py ./target/debug/rdsh --ws-package <dsh>/package.json` |
-| `tests/tui-web-surface.test.mjs` | `/webui` のChrome surface 中継と script-json | `node --test tests/tui-web-surface.test.mjs` |
+
+`tests/tui-web-surface.test.mjs`（`/webui` のChrome surface 中継と script-json）は
+CI の workflow では実行しませんが、`tests/*.test.mjs` の一括分類によって
+`sh scripts/check.sh full` が直接実行します。このテスト自体を変更した場合は
+changed モードでも対象になります。Node の標準モジュールだけで動くため、
+追加の依存は不要です。
 
 いずれも外部API・実資格情報・ユーザーのプロジェクトを使いません。CI へ接続する場合は
 workflow を変更する PR を分けてください。

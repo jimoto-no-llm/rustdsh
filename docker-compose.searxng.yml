@@ -6,6 +6,11 @@
 # Loopback only: the instance is reachable from this host, never from the
 # network. The first `up` pulls the image from Docker Hub, which is a network
 # request; after that the container runs locally.
+#
+# The bundled docker/searxng/settings.yml ships a placeholder `secret_key` for
+# the loopback-only default. Before exposing the instance beyond loopback,
+# replace that key with your own, or point $RDSH_SEARXNG_COMPOSE_FILE at a
+# compose project (and settings file) that carries your secret.
 services:
   searxng:
     image: docker.io/searxng/searxng:2026.10.17-1c10abe2d

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 PackageIdentifier: jimoto-no-llm.rdsh
-PackageVersion: 0.10.0
+PackageVersion: 0.16.0
 InstallerLocale: en-US
 Platform:
   - Windows.Desktop
@@ -11,10 +11,10 @@ NestedInstallerFiles:
   - RelativeFilePath: rdsh.exe
     PortableCommandAlias: rdsh
 UpgradeBehavior: install
-ReleaseDate: "2026-10-21"
+ReleaseDate: "2026-11-12"
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.10.0/rdsh-windows-x64.zip
-    InstallerSha256: 827075167A517C324F98CE4608C1DF94C41D2633F546F999CFF1469FD9FC562B
+    InstallerUrl: https://github.com/jimoto-no-llm/rustdsh/releases/download/v0.16.0/rdsh-windows-x64.zip
+    InstallerSha256: 37AA4F1EF73B393867B3D7957E097DF192ADE774E1C5266D14D4F97DB729FF69
 ManifestType: installer
 ManifestVersion: 1.6.0
