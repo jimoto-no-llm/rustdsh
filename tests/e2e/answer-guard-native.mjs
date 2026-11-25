@@ -47,7 +47,7 @@ const load = (name) =>
   import(pathToFileURL(join(modules, '@deepseek-ai', name, 'lib/index.js')).href);
 
 const [
-  { Context },
+  { Context, Service },
   { AgentRegistry },
   { SessionStore },
   { SessionProjectionRegistry },
@@ -67,6 +67,11 @@ const [
     'dsh-agent-loop',
   ].map(load),
 );
+const NativeToolExecutor = existsSync(
+  join(modules, '@deepseek-ai/dsh-tool-executor-native/lib/index.js'),
+)
+  ? (await load('dsh-tool-executor-native')).NativeToolExecutor
+  : undefined;
 
 const { apply: applyAnswerGuard } = await import(pathToFileURL(PLUGIN).href);
 
@@ -152,11 +157,13 @@ async function runScenario(label, { withPlugin, answerGuardFeature }) {
   process.env.DSH_HOME = home;
 
   const ctx = new Context();
-  new AgentRegistry(ctx);
-  new SessionStore(ctx);
-  new SessionProjectionRegistry(ctx);
-  new SystemPrompt(ctx, {});
-  new ToolRuntime(ctx);
+  const sessions = new SessionStore(ctx);
+  const projections = new SessionProjectionRegistry(ctx);
+  const agents = new AgentRegistry(ctx);
+  const prompt = new SystemPrompt(ctx, {});
+  const tools = new ToolRuntime(ctx);
+  if (NativeToolExecutor && typeof tools.setExecutor === 'function')
+    tools.setExecutor(new NativeToolExecutor(ctx));
   const llm = new LlmRuntime(ctx);
 
   const record = { calls: [], waterfall: [], events: [], errors: [] };
@@ -172,6 +179,10 @@ async function runScenario(label, { withPlugin, answerGuardFeature }) {
   llm.registerAdapter(['stub-provider'], makeStubAdapter(record));
 
   const loop = new AgentLoop(ctx, { agents: [], maxParallelToolCalls: 10 });
+  for (const svc of [sessions, projections, agents, prompt, tools, llm, loop]) {
+    if (Service?.init && typeof svc[Service.init] === 'function') await svc[Service.init]();
+  }
+  if (typeof ctx.start === 'function') await ctx.start();
 
   ctx.on('agent/error', ({ error }) => record.errors.push(String(error?.message ?? error)));
   ctx.on('session/event', (session, event) => {
