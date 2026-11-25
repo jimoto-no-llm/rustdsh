@@ -763,7 +763,7 @@ install_agent_runtime() {
     export PATH="$node_dir/bin:$PATH"
     npm_program="$node_dir/bin/npm"
   fi
-  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1 && [ "$need_dsh" = 0 ] && [ "$WITH_CODEX" = 0 ]; then
+  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1 && [ "$need_dsh" = 0 ] && [ "$WITH_CODEX" = 0 ] && [ ! -f "$runtime/package.json" ]; then
     echo "[1/3] Node.js, pnpm and dsh are already available; keeping them."
     return 0
   fi
@@ -772,6 +772,21 @@ install_agent_runtime() {
   if [ "$need_dsh" = 1 ]; then spec="$spec @deepseek-ai/dsh@$dsh_version"; fi
   if [ "$WITH_CODEX" = 1 ]; then spec="$spec @openai/codex@0.166.0"; fi
   mkdir -p "$runtime/bin" "$PREFIX" "$HOME/.config/rdsh"
+  # Own only the private runtime manifest; keep DSH source bytes unchanged while
+  # replacing the audited vulnerable transitive packages (preserve Zod 3 users).
+  "$node_program" - "$runtime/package.json" <<'RDSH_RUNTIME_POLICY' || return 1
+const fs = require('node:fs');
+const file = process.argv[2];
+let metadata;
+try { metadata = fs.lstatSync(file); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+if (metadata && !metadata.isFile()) throw new Error('Invalid private runtime manifest');
+const manifest = metadata ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('Invalid private runtime manifest');
+if (manifest.overrides !== undefined && (!manifest.overrides || typeof manifest.overrides !== 'object' || Array.isArray(manifest.overrides))) throw new Error('Invalid private runtime overrides');
+manifest.private = true;
+manifest.overrides = { ...manifest.overrides, undici: '8.12.3', 'zod@>=4 <4.6.7': '4.6.7', '@modelcontextprotocol/client': '2.3.1', fflate: '0.8.3' };
+fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+RDSH_RUNTIME_POLICY
   # Fixed package specs only; never install into a global npm prefix or run hooks.
   # shellcheck disable=SC2086
   "$npm_program" install --prefix "$runtime" --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true $spec || return 1

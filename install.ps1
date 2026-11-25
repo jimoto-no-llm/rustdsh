@@ -95,6 +95,22 @@ function Ensure-AgentRuntime {
   $packages = @('pnpm@10.34.9')
   if ($WithCodex) { $packages += '@openai/codex@0.166.0' }
   if ($needDsh) { $packages += '@deepseek-ai/dsh@0.2.2-rc.5' }
+  # Keep the upstream DSH entry/tool bytes; repair only private runtime dependencies.
+  $runtimePolicy = @'
+const fs = require('node:fs');
+const file = process.argv[2];
+let metadata;
+try { metadata = fs.lstatSync(file); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+if (metadata && !metadata.isFile()) throw new Error('Invalid private runtime manifest');
+const manifest = metadata ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('Invalid private runtime manifest');
+if (manifest.overrides !== undefined && (!manifest.overrides || typeof manifest.overrides !== 'object' || Array.isArray(manifest.overrides))) throw new Error('Invalid private runtime overrides');
+manifest.private = true;
+manifest.overrides = { ...manifest.overrides, undici: '8.12.3', 'zod@>=4 <4.6.7': '4.6.7', '@modelcontextprotocol/client': '2.3.1', fflate: '0.8.3' };
+fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+'@
+  $runtimePolicy | & $nodeProgram - (Join-Path $runtime 'package.json')
+  if ($LASTEXITCODE -ne 0) { throw 'Private runtime policy preparation failed' }
   & $npmProgram install --prefix $runtime --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --strict-ssl=true @packages
   if ($LASTEXITCODE -ne 0) { throw 'Private runtime installation failed' }
   $pnpmScript = Join-Path $runtime 'node_modules/pnpm/bin/pnpm.cjs'

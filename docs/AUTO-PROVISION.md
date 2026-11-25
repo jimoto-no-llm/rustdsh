@@ -10,6 +10,10 @@ Unix のインストーラと Windows のインストーラは、不足する No
 Node.js は 24.22.1 の公式アーカイブを固定 SHA-256 で検証し、pnpm は 10.34.9、DSH は
 0.2.2-rc.5 を npm の公開レジストリから導入します。npm の install scripts は無効です。
 管理者権限や、事前の pnpm・Corepack の導入は不要です。
+利用者専用 runtime の manifest に、既知の脆弱性を修正した `undici 8.12.3`、
+Zod 4 のみ `4.6.7`、`@modelcontextprotocol/client 2.3.1`、`fflate 0.8.3` を固定します。
+既存の依存と無関係な override は保持し、DSH 本体・ツールの監査済みバイト列は変更しません。
+[2026-11-10 の検証と制約](evidence/one-command-install/dependency-repair-20261110.md)を参照してください。
 
 本体だけを導入する場合は `install.sh --no-runtime` / `install.ps1 -NoRuntime`、
 実行環境だけを準備する場合は `install.sh --runtime-only` / `install.ps1 -RuntimeOnly` を使います。

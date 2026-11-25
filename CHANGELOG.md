@@ -16,6 +16,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- 自動導入が作る利用者専用 runtime の manifest に、修正版の `undici 8.12.3`、
+  Zod 4 のみ `4.6.7`、`@modelcontextprotocol/client 2.3.1`、`fflate 0.8.3` を
+  `overrides` として固定しました（`install.sh` / `install.ps1`）。素の DSH `0.2.2-rc.5` の
+  依存は npm audit で75件でしたが、固定後は0件です。既存の依存・無関係な override は保持し、
+  DSH 本体のバイト列は変更しません。
 - `rdsh tui` がローカルの `tui` プロファイルを持たない環境で
   `dsh: profile "tui" does not exist` で終了していた問題を修正しました。
   DSH は `tui` テンプレートを同梱しないため、新しいインストールでは
