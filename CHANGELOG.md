@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-26
+
 ### Added
 
 - DSH `0.2.2-rc.5`（および `0.2.2-rc.4`）の保護付きツール委譲に対応しました。
@@ -13,8 +15,32 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   上流の変更は `docs/upgrade-guide` と manifest だけで、`lib/` の入口ファイルは
   rc.2 から byte-identical です。監査内容と未検証範囲は
   [rc.5の記録](docs/evidence/dsh-rc5/README.md) にまとめています。
+- DSH `0.2.2-rc.5` と `@earendil-works/pi-ai` `1.6.0` の移行対象を拡張し、
+  Dashboard の `plan-native` 監査面と予算制御面、`rdsh-budget-guard`、
+  `rdsh-mcp-oauth`、`rdsh-ptc-catalog`、`rdsh-session-cleanup`、および
+  オフライン headless 候補ランタイムビルダーが新契約で動作するようになりました。
+- `rustxng` サイドカーの初回導入と自動更新に GitLab ミラー Releases への
+  検証付きフォールバックを追加しました。GitHub 上の配布元へ到達できない場合や
+  対象アーキテクチャの配布物が無い場合でも、`.sha256` サイドカー照合を必須としたまま
+  ミラーから安全に取得します。
 
 ### Fixed
+
+- `--share-file` 指定時に `rdsh.json` で `features.agent_tool_sandbox = false` が
+  明示されている場合、無防備なまま起動せずエラーで停止するよう修正しました。
+- `rustxng` 初回自動導入の SHA-256 検証を自動更新と同じ検証経路へ統一し、
+  通知状態ファイルの `0600` アトミック書き込みと、chunked HTTP 応答の
+  マルチバイト UTF-8 分割・整数境界安全化を追加しました。
+- Desktop プラグイン探索からカレントディレクトリの暗黙参照を廃止し、
+  Windows `.cmd` 起動時の環境変数展開防止、資格情報ファイルの `rename` 前 ACL 適用、
+  および `native_oauth` の `O_NOFOLLOW` 単一ファイルディスクリプタ検査を追加しました。
+- `native_compaction` のサイズ集計を飽和演算に統一し、切り詰め範囲の拡張時に
+  孤児 `ToolResult` が混入しないよう不動点再検査を追加しました。
+- 更新通知バナーで `locale` サービス注入を明示し、適用済み更新（`rdsh` / `rustxng`）の
+  閉鎖記録を更新イベント時刻 `at` 単位で保持するよう修正しました。
+- `desktop/sdk`・`tests/e2e`・headless ランタイムの依存パッケージ脆弱性を解消し、
+  Codecov ワークフローを `cargo-llvm-cov` へ移行しました。あわせて `v0.16.0` 向けの
+  各種パッケージマニフェスト・Cloud SBOM・systemd ユニット保護設定を同期しました。
 
 - `rdsh tui` がローカルの `tui` プロファイルを持たない環境で
   `dsh: profile "tui" does not exist` で終了していた問題を修正しました。
